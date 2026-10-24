@@ -1,0 +1,137 @@
+# Frontend checks for nextjs-frontend/.
+# Called by ci.yml only when nextjs-frontend/** or shared root config changed.
+name: Frontend
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint, typecheck, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: nextjs-frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: nextjs-frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      # Runtime dependencies only; dev-only findings do not block.
+      - name: Audit runtime dependencies
+        run: |
+          # One retry when the registry call itself failed (no vulnerability
+          # summary came back). Real findings still fail the step.
+          if ! npm audit --omit=dev --json 2>/dev/null | jq -e '.metadata.vulnerabilities' > /dev/null; then
+            echo 'npm audit returned no result; retrying once in 15s'
+            sleep 15
+          fi
+          npm audit --omit=dev --audit-level=high
+
+      # Regenerates the typed API client from openapi.json and fails if it differs from
+      # src/lib/api/generated. Takes about a second; the schema itself is checked
+      # against the backend by the pre-commit job.
+      - name: OpenAPI client is up to date
+        run: npm run check:client
+
+      # The browser app never holds server code: no firebase-admin, stripe or Prisma imports and no
+      # DATABASE_URL in src/. ESLint enforces the same rule (no-restricted-imports); this is the
+      # dependency-free backstop. Tests are excluded because the ESLint test quotes the banned imports.
+      - name: No server-only packages in the frontend
+        run: |
+          if grep -rEn "from ['\"](firebase-admin|stripe|@prisma/client)|process\.env\.DATABASE_URL" src \
+              --include='*.ts' --include='*.tsx' --exclude-dir=__tests__; then
+            echo '::error::Server-only package or DATABASE_URL referenced in nextjs-frontend/src. Call the backend instead.'
+            exit 1
+          fi
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Runs unit and integration tests. The thresholds in vitest.config.ts are the
+      # coverage ratchet: this step fails if coverage drops below them.
+      - name: Unit and integration tests with coverage
+        run: >-
+          npx vitest run --coverage --coverage.reporter=text --coverage.reporter=json-summary
+          --reporter=default --reporter=junit --outputFile.junit=vitest-junit.xml
+
+      - name: Coverage and slowest-test summary
+        if: always()
+        run: |
+          if [ -f vitest-junit.xml ]; then
+            python3 ../.github/scripts/ci_stats.py slowest-junit vitest-junit.xml 15 >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f coverage/coverage-summary.json ]; then
+            {
+              echo '### Frontend coverage'
+              echo
+              echo '| Metric | Covered |'
+              echo '|---|---|'
+              jq -r '.total | to_entries[] | select(.key != "branchesTrue") | "| \(.key) | \(.value.pct)% |"' coverage/coverage-summary.json
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  build:
+    # the production build runs beside lint, typecheck and unit tests instead of after them.
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: nextjs-frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: nextjs-frontend/package-lock.json
+
+      - name: Cache Next.js build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: nextjs-frontend/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('nextjs-frontend/package-lock.json') }}-${{ hashFiles('nextjs-frontend/src/**', 'nextjs-frontend/next.config.ts') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('nextjs-frontend/package-lock.json') }}-
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      # Production build with public placeholders only, no server secrets.
+      # These values are not secrets; the Firebase ones let the auth pages prerender.
+      - name: Build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ci-placeholder
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci-placeholder.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ci-placeholder
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ci-placeholder.appspot.com
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
+          NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:ci-placeholder'
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_APP_NAME: Your App
+        run: npm run build

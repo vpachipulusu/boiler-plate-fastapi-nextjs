@@ -1,0 +1,105 @@
+# Pre-commit hooks for the Your App monorepo.
+# Adapted from vintasoftware/nextjs-fastapi-template's .pre-commit-config.yaml:
+#   - paths point at nextjs-frontend/ (npm) and fastapi_backend/ (uv);
+#   - ruff is pinned to the version in fastapi_backend/uv.lock so the hook and
+#     `uv run ruff` agree; mypy and the requirements.txt sync were added;
+#   - the OpenAPI client generation is replaced by freshness checks of
+#     nextjs-frontend/openapi.json and the generated client.
+#
+# Install once per clone:  uvx pre-commit install   (see README "Pre-commit hooks")
+# Hooks only run on the files staged in a commit. `pre-commit run --all-files`
+# also reports pre-existing lint/type debt (see the PR for counts).
+fail_fast: true
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+        exclude: >
+          (?x)^(
+              nextjs-frontend/package-lock\.json|
+              fastapi_backend/uv\.lock
+          )$
+      - id: fix-byte-order-marker
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: debug-statements
+      - id: detect-private-key
+
+  # ---------------------------------------------------------------- backend
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Keep in step with the ruff version locked in fastapi_backend/uv.lock.
+    rev: v0.17.0
+    hooks:
+      - id: ruff
+        name: ruff lint (fastapi_backend)
+        args: [--fix]
+        files: ^fastapi_backend/
+      - id: ruff-format
+        name: ruff format (fastapi_backend)
+        files: ^fastapi_backend/
+
+  - repo: local
+    hooks:
+      - id: backend-mypy
+        name: mypy (fastapi_backend)
+        # Paths arrive repo-relative; strip the prefix because mypy runs from
+        # fastapi_backend/ (where mypy.ini lives).
+        entry: sh -c 'cd fastapi_backend && for f in "$@"; do set -- "$@" "${f#fastapi_backend/}"; shift; done; uv run mypy "$@"' --
+        language: system
+        types: [python]
+        files: ^fastapi_backend/(app|commands)/
+        require_serial: true
+
+      - id: backend-requirements-sync
+        name: sync fastapi_backend/requirements.txt with uv.lock
+        # Rewrites requirements.txt; pre-commit fails the commit if it changed,
+        # so stage the regenerated file and commit again.
+        entry: sh -c 'cd fastapi_backend && uv export --frozen --no-dev --no-hashes --quiet -o requirements.txt'
+        language: system
+        files: ^fastapi_backend/(uv\.lock|pyproject\.toml|requirements\.txt)$
+        pass_filenames: false
+
+      - id: openapi-schema-check
+        name: check nextjs-frontend/openapi.json is up to date
+        # Fails when the committed schema differs from what the backend generates.
+        # Fix: cd fastapi_backend && uv run python -m commands.generate_openapi_schema
+        entry: sh -c 'cd fastapi_backend && uv run python -m commands.check_openapi_schema'
+        language: system
+        files: ^(fastapi_backend/(app|commands)/.*\.py|fastapi_backend/pyproject\.toml|nextjs-frontend/openapi\.json)$
+        pass_filenames: false
+
+      # ------------------------------------------------------------ frontend
+      - id: openapi-client-check
+        name: check generated TypeScript client is up to date (nextjs-frontend)
+        # Regenerates the client from openapi.json into a temp dir and compares it with
+        # src/lib/api/generated. Fix: cd nextjs-frontend && npm run generate:client
+        entry: sh -c 'cd nextjs-frontend && npm run --silent check:client'
+        language: system
+        files: ^nextjs-frontend/(openapi\.json|openapi-ts\.config\.ts|package(-lock)?\.json|src/lib/api/generated/.*)$
+        pass_filenames: false
+
+      - id: frontend-eslint
+        name: eslint (nextjs-frontend)
+        entry: sh -c 'cd nextjs-frontend && for f in "$@"; do set -- "$@" "${f#nextjs-frontend/}"; shift; done; npx --no-install eslint --no-warn-ignored "$@"' --
+        language: system
+        files: ^nextjs-frontend/.*\.(js|jsx|mjs|cjs|ts|tsx)$
+        require_serial: true
+
+      - id: frontend-prettier
+        name: prettier (nextjs-frontend)
+        # Uses nextjs-frontend/.prettierrc; rewrites files in place.
+        entry: sh -c 'cd nextjs-frontend && for f in "$@"; do set -- "$@" "${f#nextjs-frontend/}"; shift; done; npx --no-install prettier --write "$@"' --
+        language: system
+        files: ^nextjs-frontend/.*\.(js|jsx|mjs|cjs|ts|tsx)$
+        require_serial: true
+
+      - id: frontend-tsc
+        name: tsc --noEmit (nextjs-frontend)
+        entry: sh -c 'cd nextjs-frontend && npm run --silent typecheck'
+        language: system
+        files: ^nextjs-frontend/.*\.(ts|tsx)$
+        pass_filenames: false

@@ -1,0 +1,66 @@
+[project]
+name = "yourapp-backend"
+version = "0.1.0"
+description = "Your App FastAPI backend (adapted from vintasoftware/nextjs-fastapi-template, see TEMPLATE_LICENSE.txt)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi[standard]>=0.143.0,<0.144",
+    "asyncpg>=0.32.0,<0.33",
+    "sqlalchemy[asyncio]>=2.1.4,<3",
+    "pydantic-settings>=2.15.0,<3",
+    "upstash-ratelimit==1.2.0",
+    "upstash-redis==1.8.0",
+    "sentry-sdk[fastapi]==2.72.0",
+    "cuid2==2.0.1",
+    "firebase-admin==7.7.0",
+    "cryptography==50.0.2",
+    "httpx>=0.28.1,<0.29",
+    "alembic>=1.20.0,<2",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.7.0,<5",
+    "ruff>=0.17.0,<0.18",
+    "watchdog>=6.0.0,<7",
+    "python-dotenv>=1.2.4,<2",
+    "pytest>=9.1.1,<10",
+    "pytest-mock>=3.16.0,<4",
+    "mypy>=2.4.0,<3",
+    "coveralls>=4.1.0,<5",
+    "pytest-asyncio>=1.4.0,<2",
+    "mkdocs-material>=9.7.7",
+    "mkdocs-material[imaging]>=9.7.7",
+    "pytest-cov>=7.1.0,<8",
+    "pytest-xdist>=3.8.0,<4",
+]
+
+[tool.uv]
+package = false
+
+# Makes ruff treat this folder as its project root even when it is run from the
+# repository root (the pre-commit hook does), so app, tests and commands are
+# classified as first-party imports in both places.
+[tool.ruff]
+src = ["."]
+
+# Coverage ratchet. `uv run pytest --cov` fails when line coverage of app/ and
+# commands/ is below fail_under. fail_under is the measured baseline of this
+# template without the Postgres-backed *_e2e tests: raise it as tests are
+# added, never lower it.
+[tool.coverage.run]
+source = ["app", "commands"]
+
+[tool.coverage.report]
+fail_under = 87.0
+precision = 2
+
+[tool.hatch.build.targets.sdist]
+include = ["commands"]
+
+[tool.hatch.build.targets.wheel]
+include = ["commands"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

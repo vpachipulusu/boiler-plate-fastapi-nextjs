@@ -1,0 +1,224 @@
+# Chromium end-to-end tests for nextjs-frontend/.
+#
+# Opt-in (e2e baseline: `npm run test:e2e:baseline`). A standalone workflow, not
+# called from ci.yml: it runs when the frontend or shared config changed AND the repository variable
+# E2E_ENABLED is "true". It is NOT part of the "CI gate" job yet.
+# Why standalone: as a reusable workflow (`workflow_call`) the called job received none of the
+# environment `e2e-test` secrets (all E2E_* were empty), so the guard step always failed.
+#
+# Secrets come from the GitHub environment `e2e-test`, which must hold TEST
+# credentials only: the dedicated Firebase test project `yourapp-test` and
+# Stripe test-mode keys. It must never use the development or
+# production Firebase projects. Secrets are referenced by name only. The two sensitive
+# ones (Firebase Admin private key, Stripe secret key) are exposed only to the
+# steps that need them, not to `npm ci` or the Playwright install.
+#
+# Stripe-dependent specs run only when the repository variable E2E_STRIPE is "true" (and E2E_ENABLED is
+# "true"; this job never runs otherwise). Stripe cannot reach a CI runner, so the job runs the Stripe CLI, which
+# forwards test-mode events to the backend's POST /webhooks/stripe (BACKEND_API_URL, or the variable
+# E2E_BACKEND_API_URL). The backend must be started AFTER the "Forward Stripe webhooks" step with the
+# STRIPE_WEBHOOK_SECRET that step exports (the signing secret `stripe listen` prints), or every event is rejected.
+# This job does not start a backend yet: add a Postgres service and a uvicorn step before enabling it.
+name: E2E
+
+on:
+  pull_request:
+    paths: &paths
+      - 'nextjs-frontend/**'
+      - '.github/**'
+      - '.pre-commit-config.yaml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vercel.json'
+  push:
+    branches: [main]
+    paths: *paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  chromium:
+    name: Playwright (Chromium)
+    # Skips fork PRs (no environment secrets there) and Dependabot.
+    if: >-
+      vars.E2E_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: e2e-test
+    defaults:
+      run:
+        working-directory: nextjs-frontend
+    env:
+      CI: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_NAME: Your App
+      # Firebase test project `yourapp-test` (environment e2e-test).
+      NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.E2E_NEXT_PUBLIC_FIREBASE_API_KEY }}
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.E2E_NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.E2E_NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.E2E_NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.E2E_NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+      NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.E2E_NEXT_PUBLIC_FIREBASE_APP_ID }}
+      FIREBASE_ADMIN_PROJECT_ID: ${{ secrets.E2E_FIREBASE_ADMIN_PROJECT_ID }}
+      FIREBASE_ADMIN_CLIENT_EMAIL: ${{ secrets.E2E_FIREBASE_ADMIN_CLIENT_EMAIL }}
+      # Stripe TEST mode publishable key (environment e2e-test).
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.E2E_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+      # Stripe TEST-mode price ids the pricing and billing specs read (environment e2e-test).
+      STRIPE_PRICE_ID_PRO_MONTHLY: ${{ secrets.E2E_STRIPE_PRICE_ID_PRO_MONTHLY }}
+      STRIPE_PRICE_ID_PRO_YEARLY: ${{ secrets.E2E_STRIPE_PRICE_ID_PRO_YEARLY }}
+      STRIPE_PRICE_ID_ENTERPRISE_MONTHLY: ${{ secrets.E2E_STRIPE_PRICE_ID_ENTERPRISE_MONTHLY }}
+      STRIPE_PRICE_ID_ENTERPRISE_YEARLY: ${{ secrets.E2E_STRIPE_PRICE_ID_ENTERPRISE_YEARLY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: nextjs-frontend/package-lock.json
+
+      - name: Check test-only configuration
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.E2E_STRIPE_SECRET_KEY }}
+          FIREBASE_ADMIN_PRIVATE_KEY: ${{ secrets.E2E_FIREBASE_ADMIN_PRIVATE_KEY }}
+          PROD_FIREBASE_PROJECT_ID: ${{ vars.PROD_FIREBASE_PROJECT_ID }}
+        run: |
+          required_names="
+            NEXT_PUBLIC_FIREBASE_API_KEY
+            NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+            NEXT_PUBLIC_FIREBASE_PROJECT_ID
+            NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+            NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+            NEXT_PUBLIC_FIREBASE_APP_ID
+            FIREBASE_ADMIN_PROJECT_ID
+            FIREBASE_ADMIN_CLIENT_EMAIL
+            FIREBASE_ADMIN_PRIVATE_KEY
+            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+            STRIPE_SECRET_KEY
+          "
+          missing=""
+          for name in $required_names; do
+            if [ -z "$(printenv "$name")" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::These values are empty in the e2e-test environment (E2E_* secrets):${missing}"
+            exit 1
+          fi
+          # Accept only Stripe test-mode keys; anything else is rejected.
+          case "${STRIPE_SECRET_KEY}" in
+            sk_test_*|rk_test_*) ;;
+            *) echo "::error::E2E_STRIPE_SECRET_KEY must be a test-mode key (sk_test_ or rk_test_)."; exit 1 ;;
+          esac
+          case "${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}" in
+            pk_test_*) ;;
+            *) echo "::error::E2E_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY must be a test-mode key (pk_test_)."; exit 1 ;;
+          esac
+          if [ -z "${PROD_FIREBASE_PROJECT_ID}" ]; then
+            echo "::warning::Repository variable PROD_FIREBASE_PROJECT_ID is not set, so the check that e2e is not using the production Firebase project is skipped."
+          elif [ "${NEXT_PUBLIC_FIREBASE_PROJECT_ID}" = "${PROD_FIREBASE_PROJECT_ID}" ]; then
+            echo "::error::E2E_NEXT_PUBLIC_FIREBASE_PROJECT_ID equals PROD_FIREBASE_PROJECT_ID. e2e must use the dedicated test project, never production."
+            exit 1
+          fi
+          if [ "${FIREBASE_ADMIN_PROJECT_ID}" != "${NEXT_PUBLIC_FIREBASE_PROJECT_ID}" ]; then
+            echo "::error::Firebase Admin and client project IDs differ."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Builds into .next-e2e with the test Firebase project and Sentry off (scripts/e2e-build.mjs). NEXT_PUBLIC_*
+      # values are baked in at build time, so this needs the public values from the job env and no private key.
+      - name: Build e2e app
+        run: npm run test:e2e:build
+
+      # Pinned Stripe CLI, verified against the checksums file published with the release.
+      - name: Install Stripe CLI
+        if: vars.E2E_STRIPE == 'true'
+        working-directory: ${{ runner.temp }}
+        env:
+          STRIPE_CLI_VERSION: '1.35.0'
+        run: |
+          base="https://github.com/stripe/stripe-cli/releases/download/v${STRIPE_CLI_VERSION}"
+          archive="stripe_${STRIPE_CLI_VERSION}_linux_x86_64.tar.gz"
+          curl -fsSLO "${base}/${archive}"
+          curl -fsSLO "${base}/stripe-linux-checksums.txt"
+          grep " ${archive}\$" stripe-linux-checksums.txt | sha256sum -c -
+          mkdir -p "${RUNNER_TEMP}/stripe-cli"
+          tar -xzf "${archive}" -C "${RUNNER_TEMP}/stripe-cli" stripe
+          echo "${RUNNER_TEMP}/stripe-cli" >> "$GITHUB_PATH"
+
+      # Forwards TEST-mode webhooks to the backend. The key reaches the CLI through STRIPE_API_KEY (never an
+      # argument), and the check step above already rejected anything but a test-mode key.
+      - name: Forward Stripe webhooks
+        if: vars.E2E_STRIPE == 'true'
+        env:
+          STRIPE_API_KEY: ${{ secrets.E2E_STRIPE_SECRET_KEY }}
+          E2E_BACKEND_API_URL: ${{ vars.E2E_BACKEND_API_URL }}
+        run: |
+          backend="${E2E_BACKEND_API_URL:-http://127.0.0.1:8000}"
+          if ! printf '%s' "${backend}" | grep -Eq '^https?://[A-Za-z0-9._~:/-]+$'; then
+            echo "::error::E2E_BACKEND_API_URL must be a plain http(s) URL."
+            exit 1
+          fi
+          secret="$(stripe listen --print-secret)"
+          case "${secret}" in
+            whsec_*[!A-Za-z0-9_]*|whsec_) echo "::error::Unexpected output from stripe listen --print-secret."; exit 1 ;;
+            whsec_*) ;;
+            *) echo "::error::stripe listen --print-secret did not return a signing secret."; exit 1 ;;
+          esac
+          echo "::add-mask::${secret}"
+          echo "STRIPE_WEBHOOK_SECRET=${secret}" >> "$GITHUB_ENV"
+          echo "BACKEND_API_URL=${backend}" >> "$GITHUB_ENV"
+          nohup stripe listen --forward-to "${backend%/}/webhooks/stripe" > "${RUNNER_TEMP}/stripe-listen.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            if grep -q "Ready!" "${RUNNER_TEMP}/stripe-listen.log"; then exit 0; fi
+            sleep 1
+          done
+          echo "::error::stripe listen did not become ready."
+          exit 1
+
+      - name: Check Stripe forwarder is running
+        if: vars.E2E_STRIPE == 'true'
+        run: pgrep -x stripe > /dev/null || { echo "::error::stripe listen is not running."; cat "${RUNNER_TEMP}/stripe-listen.log"; exit 1; }
+
+      # Creates random e2e accounts in the Firebase test project and writes them to .env.e2e.local.
+      - name: Create test accounts
+        env:
+          FIREBASE_ADMIN_PRIVATE_KEY: ${{ secrets.E2E_FIREBASE_ADMIN_PRIVATE_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.E2E_STRIPE_SECRET_KEY }}
+        run: npm run test:setup
+
+      # The baseline: gated specs, Chromium, serves the build above (scripts/e2e-start.mjs, never rebuilds),
+      # logs in once per role in auth.setup.ts. 1 worker in CI.
+      - name: Run Chromium e2e baseline
+        env:
+          FIREBASE_ADMIN_PRIVATE_KEY: ${{ secrets.E2E_FIREBASE_ADMIN_PRIVATE_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.E2E_STRIPE_SECRET_KEY }}
+          # Runs the Stripe Checkout specs; needs the "Forward Stripe webhooks" step and a backend (see the header).
+          E2E_STRIPE: ${{ vars.E2E_STRIPE == 'true' && '1' || '' }}
+        run: npm run test:e2e:baseline
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: |
+            nextjs-frontend/playwright-report/
+            nextjs-frontend/test-results/
+          retention-days: 7

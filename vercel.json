@@ -1,0 +1,43 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "**": false
+    }
+  },
+  "services": {
+    "nextjs-frontend": {
+      "root": "nextjs-frontend",
+      "framework": "nextjs",
+      "buildCommand": "npm run build",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "fastapi_backend",
+          "format": "url",
+          "env": "BACKEND_API_URL"
+        }
+      ]
+    },
+    "fastapi_backend": {
+      "root": "fastapi_backend",
+      "framework": "fastapi",
+      "entrypoint": "app.main:app"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/webhooks/stripe",
+      "destination": {
+        "service": "fastapi_backend"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "nextjs-frontend"
+      }
+    }
+  ]
+}

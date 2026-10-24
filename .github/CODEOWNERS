@@ -1,0 +1,8 @@
+# Code owners are requested for review automatically on every pull request.
+# Replace the placeholder with your GitHub handle or team (@org/team) and
+# uncomment. Docs: https://docs.github.com/articles/about-code-owners
+#
+# *                      @your-github-handle
+# /fastapi_backend/      @your-github-handle
+# /nextjs-frontend/      @your-github-handle
+# /.github/              @your-github-handle

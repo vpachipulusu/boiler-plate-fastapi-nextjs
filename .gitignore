@@ -1,0 +1,85 @@
+# Your App monorepo: nextjs-frontend/ (npm) + fastapi_backend/ (uv).
+# Patterns without a leading slash match at any depth.
+
+# Dependencies (npm only: package-lock.json and uv.lock are committed)
+node_modules
+.pnp
+.pnp.js
+yarn.lock
+pnpm-lock.yaml
+
+# Testing
+coverage/
+*.lcov
+playwright-report/
+test-results/
+playwright/.cache/
+# Saved e2e login state per role: holds live session cookies
+**/playwright/.auth/
+
+# Next.js
+.next/
+# Separate e2e builds: test Firebase project, Sentry off
+.next-e2e/
+.next-e2e-dev/
+nextjs-frontend/out/
+nextjs-frontend/build/
+next-env.d.ts
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Application logs
+logs/
+
+# Sentry
+.sentryclirc
+
+# Local env files (keep *.example committed)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+
+# Capacitor
+nextjs-frontend/ios/
+nextjs-frontend/android/
+nextjs-frontend/capacitor.config.json
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+mypy-report.txt
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Windows reserved filename
+nul

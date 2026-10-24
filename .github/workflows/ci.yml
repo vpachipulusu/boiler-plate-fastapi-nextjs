@@ -1,0 +1,204 @@
+# Your App CI entry point.
+#
+# One workflow decides what changed, calls the per-app workflows only when their
+# paths changed, and ends in a single always-run "CI gate" job. Branch protection
+# requires only "CI gate", so a skipped app workflow never blocks a merge.
+#
+#   changes ──┬─> pre-commit (PRs only)  ─┐
+#             ├─> frontend.yml            ├─> CI gate  (the required check)
+#             ├─> backend.yml            ─┤
+#             └─> compose-smoke─┘
+#
+# Path rules:
+#   nextjs-frontend/**  -> frontend
+#   fastapi_backend/**  -> backend
+#   shared config       -> both (.github/**, .pre-commit-config.yaml, root
+#                          package files, vercel.json, and the OpenAPI schema
+#                          nextjs-frontend/openapi.json, which links the apps)
+#   manual dispatch     -> both
+#
+# e2e.yml is a separate workflow, triggered on its own: a reusable workflow called
+# from here did not receive the environment `e2e-test` secrets. It is not part of the gate.
+name: CI
+
+on:
+  # Every PR, including stacked PRs whose base is another feature branch.
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read # dorny/paths-filter lists PR files through the API
+    outputs:
+      frontend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.frontend }}
+      backend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.backend }}
+      openapi: ${{ steps.filter.outputs.openapi }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          # On pushes to main, paths-filter compares with the previous commit.
+          filters: |
+            shared: &shared
+              - '.github/**'
+              - '.pre-commit-config.yaml'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'vercel.json'
+              - 'nextjs-frontend/openapi.json'
+            openapi:
+              - 'nextjs-frontend/openapi.json'
+            frontend:
+              - *shared
+              - 'nextjs-frontend/**'
+            backend:
+              - *shared
+              - 'fastapi_backend/**'
+
+  pre-commit:
+    name: Pre-commit (changed files)
+    needs: changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # --from-ref needs the base branch history
+          persist-credentials: false
+
+      - name: Cache pre-commit environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: '0.8.12'
+          cache-suffix: pre-commit
+          enable-cache: true
+          cache-dependency-glob: fastapi_backend/uv.lock
+
+      # The frontend hooks (eslint, prettier, tsc) run from nextjs-frontend/node_modules.
+      - if: needs.changes.outputs.frontend == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: nextjs-frontend/package-lock.json
+      - if: needs.changes.outputs.frontend == 'true'
+        name: Install frontend dependencies
+        working-directory: nextjs-frontend
+        run: |
+          npm ci --no-audit --no-fund
+
+      # The backend hooks (mypy, requirements sync, OpenAPI check) use `uv run`;
+      # the OpenAPI check also runs when only openapi.json changed.
+      - if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.openapi == 'true'
+        name: Install backend dependencies
+        working-directory: fastapi_backend
+        run: uv sync --frozen
+
+      - name: Run pre-commit on the files changed by this PR
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: >-
+          uvx --from 'pre-commit==3.8.0' pre-commit run
+          --from-ref "origin/${BASE_REF}" --to-ref HEAD
+          --show-diff-on-failure --color always
+
+  frontend:
+    name: Frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/frontend.yml
+
+  backend:
+    name: Backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    uses: ./.github/workflows/backend.yml
+
+  compose-smoke:
+    # starts the whole docker-compose.yml stack (fake local values, no secrets) and
+    # asserts frontend /api/health (200, then a generic 503 with the backend stopped) and backend
+    # /health. In the gate: it needs no secrets, only public images and package registries.
+    name: Compose smoke
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compose up, then assert /api/health and /health
+        run: scripts/compose-smoke.sh all
+
+  gate:
+    # Branch protection: require exactly this check ("CI gate").
+    name: CI gate
+    if: always()
+    needs: [changes, pre-commit, frontend, backend, compose-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every needed job succeeded or was skipped by the path filter
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          # The path filter itself must have run, otherwise "skipped" means nothing.
+          if [ "$(echo "$NEEDS" | jq -r '.changes.result')" != "success" ]; then
+            echo "::error::Path detection did not succeed."
+            exit 1
+          fi
+          bad=$(echo "$NEEDS" | jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key' | tr '\n' ' ')
+          if [ -n "$bad" ]; then
+            echo "::error::These jobs failed or were cancelled: $bad"
+            exit 1
+          fi
+          echo "CI gate passed."
+
+  timing:
+    # per-job and per-step durations of this run in the run summary. It runs after the
+    # gate and is not in its needs, so it can neither delay nor fail the required check.
+    name: Timing summary
+    needs: gate
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read # lists this run's jobs through the API
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Script tests
+        run: python3 -m unittest discover -s .github/scripts
+      - name: Write job and step timings
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+        run: python3 .github/scripts/ci_stats.py job-timing "$RUN_ID" >> "$GITHUB_STEP_SUMMARY"

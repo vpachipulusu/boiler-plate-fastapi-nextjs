@@ -1,0 +1,34 @@
+# Post-deploy smoke test. Vercel reports each finished deployment as a
+# deployment_status event; this curls /api/health on the deployed URL. It is outside the
+# CI gate (it runs after a deploy, not on PRs). Preview deployments behind Vercel
+# protection answer 401 and are skipped; only public production deploys are asserted.
+name: Post-deploy smoke
+
+on:
+  deployment_status:
+  # Manual run against any public URL, e.g. before the first Production deploy.
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Base URL to check, e.g. https://yourapp.example.com
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    name: Smoke /api/health
+    if: github.event_name == 'workflow_dispatch' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check /api/health
+        env:
+          DEPLOY_URL: ${{ inputs.url || github.event.deployment_status.environment_url }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --retry 5 --retry-delay 5 --retry-all-errors --max-time 15 \
+            "${DEPLOY_URL%/}/api/health"
