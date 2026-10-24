@@ -396,16 +396,13 @@ describe('API failures', () => {
     expectNoLeak(await run(), msg);
   });
 
-  it.each(cases)(
-    '%s answers Unauthorized when the API rejects the session',
-    async (_n, run) => {
-      for (const status of [401, 403]) {
-        failAll(failure(status, 'Email verification required'));
+  it.each(cases)('%s answers Unauthorized when the API rejects the session', async (_n, run) => {
+    for (const status of [401, 403]) {
+      failAll(failure(status, 'Email verification required'));
 
-        expect(await run()).toEqual({ success: false, error: 'Unauthorized' });
-      }
+      expect(await run()).toEqual({ success: false, error: 'Unauthorized' });
     }
-  );
+  });
 
   it('answers "User not found" when the platform user is missing', async () => {
     failAll(failure(404, 'Not found'));

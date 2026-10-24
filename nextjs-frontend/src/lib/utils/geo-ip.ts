@@ -21,10 +21,9 @@ export async function getLocationFromIP(ip: string): Promise<string | null> {
   }
 
   try {
-    const response = await fetch(
-      `http://ip-api.com/json/${ip}?fields=country,regionName,city`,
-      { signal: AbortSignal.timeout(3000) }
-    );
+    const response = await fetch(`http://ip-api.com/json/${ip}?fields=country,regionName,city`, {
+      signal: AbortSignal.timeout(3000),
+    });
 
     if (!response.ok) return null;
 

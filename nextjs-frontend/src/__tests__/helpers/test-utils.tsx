@@ -7,10 +7,7 @@ function AllTheProviders({ children }: { children: React.ReactNode }) {
 }
 
 // Custom render function that includes providers
-export function renderWithProviders(
-  ui: ReactElement,
-  options?: Omit<RenderOptions, 'wrapper'>
-) {
+export function renderWithProviders(ui: ReactElement, options?: Omit<RenderOptions, 'wrapper'>) {
   return render(ui, { wrapper: AllTheProviders, ...options });
 }
 

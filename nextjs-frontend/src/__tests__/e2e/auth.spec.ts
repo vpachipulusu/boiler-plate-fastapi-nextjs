@@ -24,9 +24,7 @@ test('authentication rate limits resist forged headers while E2E identities stay
     await useDistinctClientIp(otherPage);
     await otherPage.goto('/login');
     expect(
-      await otherPage.evaluate(
-        async () => (await fetch('/api/auth/rate-limit-probe')).status
-      )
+      await otherPage.evaluate(async () => (await fetch('/api/auth/rate-limit-probe')).status)
     ).toBe(401);
   } finally {
     await otherPage.close();

@@ -2,12 +2,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import e2eEnv from '../../../scripts/e2e-env.cjs';
 import { test as setup } from './helpers/fixtures';
-import {
-  STORAGE_STATE,
-  TEST_ADMIN,
-  TEST_USER,
-  loginViaUI,
-} from './helpers/e2e-utils';
+import { STORAGE_STATE, TEST_ADMIN, TEST_USER, loginViaUI } from './helpers/e2e-utils';
 
 /**
  * Global setup for Playwright tests. Runs before every browser project.

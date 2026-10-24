@@ -34,8 +34,7 @@ const SERVER_SDK_PATTERNS = [
 
 const GENERATED_CLIENT_PATTERN = {
   group: ['@/lib/api/generated', '@/lib/api/generated/*', '**/api/generated', '**/api/generated/*'],
-  message:
-    'Import the generated API client only from src/lib/api (server-only wrappers) or tests.',
+  message: 'Import the generated API client only from src/lib/api (server-only wrappers) or tests.',
 };
 
 const BACKEND_ONLY_IMPORTS = {
