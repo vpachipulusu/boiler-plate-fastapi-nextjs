@@ -23,14 +23,12 @@ import {
 } from '@/lib/api/account';
 
 /**
- * Profile, settings, login history and password actions. Profile data lives behind the FastAPI backend
- *: the API authenticates the session cookie, enforces the verified-email claim and derives the
- * user, so no user id ever comes from the browser.
+ * Profile, settings, login history and password actions. Profile data lives behind the FastAPI backend:
+ * the API authenticates the session cookie, enforces the verified-email claim and derives the user, so
+ * no user id ever comes from the browser.
  *
- * Switched off until their replacements land (the controls are hidden, no Prisma access is left behind):
- * - notifications: 
- * - 2FA setup stays hidden while (sign-in enforcement) is parked; disable and account deletion take a
- *   fresh ID token from the browser's re-authentication dialog
+ * 2FA setup stays hidden until sign-in enforcement lands; disable and account deletion take a fresh ID
+ * token from the browser's re-authentication dialog.
  */
 
 /**
@@ -175,7 +173,7 @@ export async function updateUserProfileAction(
     if (!validation.success) {
       return {
         success: false,
-        error: validation.error.errors[0].message,
+        error: validation.error.issues[0].message,
       };
     }
 
@@ -262,7 +260,7 @@ export async function updateUserSettingsAction(
     if (!validation.success) {
       return {
         success: false,
-        error: validation.error.errors[0].message,
+        error: validation.error.issues[0].message,
       };
     }
 

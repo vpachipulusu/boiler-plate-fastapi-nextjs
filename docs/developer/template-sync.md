@@ -32,7 +32,9 @@ This page describes how to pull template improvements into such a project, and h
    conflict: anything you rebranded, pages you redesigned, and the Alembic baseline (take schema changes as a
    new revision in your project instead of editing `0001`).
 
-4. Regenerate the OpenAPI client if backend routes changed, run the full check set, tag the new sync point.
+4. Run `npx prettier --write` (frontend) and `uv run ruff format` (backend) on the files you took, since
+   the pre-commit job formats every changed file; regenerate the OpenAPI client if backend routes changed,
+   run the full check set, tag the new sync point.
 
 ## Feeding fixes back to the template
 

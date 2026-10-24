@@ -1,11 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import {
-  ThemeProvider as NextThemesProvider,
-  ThemeProviderProps,
-  useTheme,
-} from 'next-themes';
+import { ThemeProvider as NextThemesProvider, ThemeProviderProps, useTheme } from 'next-themes';
 import { getThemePreset, DEFAULT_THEME } from '@/config/themes';
 
 interface AppThemeProviderProps extends ThemeProviderProps {

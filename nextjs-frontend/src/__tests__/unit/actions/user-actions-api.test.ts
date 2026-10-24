@@ -181,7 +181,7 @@ describe('profile actions', () => {
 
     expect(result).toEqual({
       success: false,
-      error: 'String must contain at most 500 character(s)',
+      error: 'Too big: expected string to have <=500 characters',
     });
     expect(mocks.patchProfile).not.toHaveBeenCalled();
   });
@@ -258,7 +258,7 @@ describe('settings actions', () => {
 
     expect(result).toEqual({
       success: false,
-      error: 'String must contain at least 2 character(s)',
+      error: 'Too small: expected string to have >=2 characters',
     });
     expect(mocks.patchSettings).not.toHaveBeenCalled();
   });
@@ -396,16 +396,13 @@ describe('API failures', () => {
     expectNoLeak(await run(), msg);
   });
 
-  it.each(cases)(
-    '%s answers Unauthorized when the API rejects the session',
-    async (_n, run) => {
-      for (const status of [401, 403]) {
-        failAll(failure(status, 'Email verification required'));
+  it.each(cases)('%s answers Unauthorized when the API rejects the session', async (_n, run) => {
+    for (const status of [401, 403]) {
+      failAll(failure(status, 'Email verification required'));
 
-        expect(await run()).toEqual({ success: false, error: 'Unauthorized' });
-      }
+      expect(await run()).toEqual({ success: false, error: 'Unauthorized' });
     }
-  );
+  });
 
   it('answers "User not found" when the platform user is missing', async () => {
     failAll(failure(404, 'Not found'));
