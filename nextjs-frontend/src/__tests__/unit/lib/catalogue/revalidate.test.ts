@@ -32,6 +32,12 @@ describe('revalidateCatalogue', () => {
     expect(mocks.revalidatePath.mock.calls).toEqual([['/freebies/free-tea'], ['/']]);
   });
 
+  it('accepts a path of letters, digits and the unreserved characters, up to 256 long', () => {
+    revalidateCatalogue(['/a-b_c.d~e/f', `/${'a'.repeat(255)}`]);
+
+    expect(mocks.revalidatePath).toHaveBeenCalledTimes(2);
+  });
+
   it.each([
     'freebies/oops',
     '',
@@ -41,6 +47,11 @@ describe('revalidateCatalogue', () => {
     '/free bies',
     '/freebies	',
     '//..',
+    '/freebies/%2e%2e/admin',
+    '/a\u0000b',
+    '/a\\b',
+    '/café',
+    `/${'a'.repeat(256)}`,
   ])('rejects %j before changing anything', (path) => {
     expect(() => revalidateCatalogue(['/ok', path])).toThrow(TypeError);
 

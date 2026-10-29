@@ -8,10 +8,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   cookiesGet: vi.fn(),
   headerValues: new Map<string, string>(),
+  warn: vi.fn(),
   cacheArgs: [] as unknown[][],
 }));
 
-vi.mock('@/lib/logger', () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
+vi.mock('@/lib/logger', () => ({
+  logger: { warn: mocks.warn, error: vi.fn(), info: vi.fn() },
+}));
 vi.mock('next/headers', () => ({
   cookies: vi.fn(async () => ({ get: mocks.cookiesGet })),
   headers: vi.fn(async () => ({ get: (name: string) => mocks.headerValues.get(name) ?? null })),
@@ -49,6 +52,7 @@ beforeEach(() => {
   mocks.cookiesGet.mockReturnValue({ value: 'visitor-session' });
   mocks.headerValues.clear();
   mocks.cacheArgs.length = 0;
+  mocks.warn.mockClear();
 });
 
 afterEach(() => {
@@ -189,6 +193,8 @@ describe('the visitor address', () => {
   it.each([
     ['a value that is not an address', 'not-an-ip'],
     ['an address list', '203.0.113.20, 198.51.100.1'],
+    ['a scoped IPv6 address', 'fe80::1%eth0'],
+    ['a bracketed IPv6 address', '[2001:db8::1]'],
   ])('ignores the configured header when it holds %s', async (_name, value) => {
     vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'x-real-ip');
     mocks.headerValues.set('x-real-ip', value);
@@ -211,6 +217,35 @@ describe('the visitor address', () => {
     }
   );
 
+  it.each(['x-forwarded-for', 'Forwarded', 'via', 'x-vercel-forwarded-for'])(
+    'never trusts %s as the configured header, and says so once',
+    async (name) => {
+      vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', name);
+      mocks.headerValues.set(name.toLowerCase(), '198.51.100.1');
+
+      await fetchOffers();
+      await fetchOffers({ limit: 5 });
+
+      expect(sentRequest(0).headers.get('X-Client-IP')).toBeNull();
+      expect(sentRequest(1).headers.get('X-Client-IP')).toBeNull();
+      const warnings = mocks.warn.mock.calls.filter(([message]) =>
+        String(message).includes('TRUSTED_CLIENT_IP_HEADER')
+      );
+      expect(warnings).toHaveLength(1);
+    }
+  );
+
+  it('still uses the Vercel header automatically when the denylisted one is configured', async () => {
+    vi.stubEnv('VERCEL', '1');
+    vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'x-forwarded-for');
+    mocks.headerValues.set('x-vercel-forwarded-for', '203.0.113.7');
+    mocks.headerValues.set('x-forwarded-for', '198.51.100.1');
+
+    await fetchOffers();
+
+    expect(sentRequest().headers.get('X-Client-IP')).toBe('203.0.113.7');
+  });
+
   it('does not let a spoofed x-forwarded-for win over the configured header', async () => {
     vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'x-real-ip');
     mocks.headerValues.set('x-forwarded-for', '198.51.100.1');
@@ -231,6 +266,7 @@ describe('the visitor address', () => {
 
   it.each([
     ['absent', undefined],
+    ['a scoped IPv6 address', 'fe80::1%eth0'],
     ['not an address', 'not-an-ip'],
     ['an injected header', '203.0.113.7\r\nX-Internal-Key: stolen'],
   ])('omits it when the platform header is %s', async (_name, value) => {

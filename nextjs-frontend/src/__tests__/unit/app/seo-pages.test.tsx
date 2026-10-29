@@ -337,19 +337,19 @@ describe('when the catalogue cannot be read (API source)', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Beauty freebies' })).toBeInTheDocument();
   });
 
-  it('adds no robots of its own when the offer cannot be read, and shows the alert, never a 404', async () => {
+  it('marks an offer page noindex, follow when the offer cannot be read, and shows the alert, never a 404', async () => {
     mocks.lookup.mockImplementation(outage);
 
     const metadata = await offerMetadata(offerParams);
 
     expect(metadata.title).toBe('Freebie unavailable');
-    expect(metadata.robots).toBeUndefined();
+    expect(metadata.robots).toEqual({ index: false, follow: true });
     render(await OfferPage(offerParams));
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(mocks.notFound).not.toHaveBeenCalled();
   });
 
-  it('adds no robots of its own when the category cannot be read', async () => {
+  it('marks a category page noindex, follow when the category cannot be read', async () => {
     mocks.search.mockImplementation(outage);
     const { CatalogueUnavailableError: Outage } = await import('@/lib/catalogue/errors');
     const lookupFails = vi.spyOn(await import('@/lib/catalogue'), 'getCategoryBySlug');
@@ -358,7 +358,7 @@ describe('when the catalogue cannot be read (API source)', () => {
     const metadata = await categoryMetadata({ params: Promise.resolve({ slug: 'beauty' }) });
 
     expect(metadata.title).toBe('Freebies unavailable');
-    expect(metadata.robots).toBeUndefined();
+    expect(metadata.robots).toEqual({ index: false, follow: true });
     lookupFails.mockRestore();
   });
 
