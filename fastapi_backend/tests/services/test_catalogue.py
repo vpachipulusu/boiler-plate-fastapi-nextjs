@@ -122,3 +122,35 @@ async def test_default_clock_is_timezone_aware() -> None:
     await CatalogueService(repo).list_categories()
 
     assert repo.category_now[0].tzinfo is not None
+
+
+@pytest.mark.parametrize("status", [OfferStatus.EXPIRED, OfferStatus.DRAFT])
+async def test_expired_offer_without_verification_is_treated_as_unknown(
+    status: OfferStatus,
+) -> None:
+    offer = make_offer(
+        status=status, end_at=NOW - timedelta(days=1), last_verified_at=None
+    )
+
+    result = await service_for(FakeCatalogueRepository(by_slug=offer)).get_offer("x")
+
+    assert result is None
+
+
+async def test_expired_offer_with_a_future_end_date_reports_no_end_date() -> None:
+    offer = make_offer(status=OfferStatus.EXPIRED, end_at=NOW + timedelta(days=3))
+
+    result = await service_for(FakeCatalogueRepository(by_slug=offer)).get_offer("x")
+
+    assert isinstance(result, ExpiredOffer)
+    assert result.ended_at is None
+
+
+async def test_published_offer_ended_in_the_past_keeps_its_end_date() -> None:
+    ended = NOW - timedelta(hours=2)
+    offer = make_offer(end_at=ended)
+
+    result = await service_for(FakeCatalogueRepository(by_slug=offer)).get_offer("x")
+
+    assert isinstance(result, ExpiredOffer)
+    assert result.ended_at == ended

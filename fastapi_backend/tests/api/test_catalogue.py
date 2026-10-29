@@ -14,7 +14,10 @@ from app.api.deps import get_rate_limiter
 from app.api.v1.catalogue import get_catalogue_service
 from app.api.v1.catalogue_schemas import (
     CategoryData,
+    CategoryRef,
+    ExpiredOfferData,
     ExpiredOfferResponse,
+    MerchantData,
     OfferData,
 )
 from app.core.rate_limit import PUBLIC_CATALOGUE_POLICY
@@ -35,9 +38,30 @@ from tests.fakes_catalogue import (
     make_offer,
 )
 
+CATEGORY_FIELDS = {
+    "slug",
+    "name",
+    "short_name",
+    "description",
+    "intro",
+    "tint",
+    "sort_order",
+    "offer_count",
+}
 KEY = "test-only-internal-service-key-not-for-deployment"
 CACHE = "private, max-age=60"
-EDITORIAL_ONLY = {"publisher_notes", "status", "destination_url", "tracking_id"}
+EDITORIAL_ONLY = {
+    "publisher_notes",
+    "status",
+    "destination_url",
+    "tracking_id",
+    "source_url",
+    "website",
+    "created_at",
+    "updated_at",
+    "enabled",
+    "active",
+}
 
 
 def build(
@@ -179,6 +203,7 @@ async def test_list_defaults_are_newest_first_twelve_with_no_filters() -> None:
         "type=FREE_SAMPLE",
         "postage=cost",
         "featured=maybe",
+        "type=cashback&" * 5 + "type=cashback",
         "q=" + "x" * 101,
         "category=" + "x" * 101,
     ],
@@ -312,7 +337,7 @@ async def test_categories_return_counts_in_the_envelope() -> None:
     data = response.json()["data"]
     assert response.status_code == 200
     assert [(c["slug"], c["offer_count"]) for c in data] == [("beauty", 3), ("food", 0)]
-    assert set(data[0]) == set(CategoryData.model_fields)
+    assert set(data[0]) == CATEGORY_FIELDS
 
 
 async def test_categories_empty_is_an_empty_list() -> None:
@@ -457,6 +482,8 @@ def test_public_offer_schema_exposes_no_editorial_only_field() -> None:
     names = _field_names(OfferData) | _field_names(ExpiredOfferResponse)
 
     assert names.isdisjoint(EDITORIAL_ONLY)
+    assert _field_names(CategoryData).isdisjoint(EDITORIAL_ONLY)
+    assert _field_names(MerchantData).isdisjoint(EDITORIAL_ONLY)
     assert "category_id" not in names
     assert "merchant_id" not in names
 
@@ -500,3 +527,59 @@ async def test_responses_never_contain_editorial_field_names_or_values() -> None
     for text in bodies:
         for name in EDITORIAL_ONLY:
             assert name not in text
+
+
+def test_category_merchant_and_expired_schemas_are_literal_allowlists() -> None:
+    assert set(CategoryData.model_fields) == CATEGORY_FIELDS
+    assert set(MerchantData.model_fields) == {"slug", "name", "logo_url"}
+    assert set(CategoryRef.model_fields) == {"slug", "name"}
+    assert set(ExpiredOfferData.model_fields) == {
+        "slug",
+        "title",
+        "category",
+        "ended_at",
+    }
+    assert set(ExpiredOfferResponse.model_fields) == {
+        "success",
+        "error",
+        "expired",
+        "data",
+    }
+
+
+def test_the_expired_stub_never_carries_the_verification_date() -> None:
+    assert "last_verified_at" not in _field_names(ExpiredOfferResponse)
+
+
+async def test_unverified_expired_offer_answers_the_same_404_as_an_unknown_slug() -> (
+    None
+):
+    unknown, _ = build(FakeCatalogueRepository())
+    unverified, _ = build(
+        FakeCatalogueRepository(
+            by_slug=make_offer(status=OfferStatus.EXPIRED, last_verified_at=None)
+        )
+    )
+
+    async with unknown, unverified:
+        missing = await unknown.get("/v1/catalogue/offers/x")
+        hidden = await unverified.get("/v1/catalogue/offers/x")
+
+    assert hidden.status_code == 404
+    assert hidden.content == missing.content
+
+
+async def test_a_410_is_not_turned_into_a_304_by_a_matching_if_none_match() -> None:
+    offer = make_offer(end_at=NOW - timedelta(days=1))
+    http, _ = build(FakeCatalogueRepository(by_slug=offer))
+
+    async with http:
+        first = await http.get("/v1/catalogue/offers/free-shampoo")
+        second = await http.get(
+            "/v1/catalogue/offers/free-shampoo",
+            headers={"If-None-Match": first.headers["ETag"]},
+        )
+
+    assert second.status_code == 410
+    assert second.json() == first.json()
+    assert second.json()["expired"] is True

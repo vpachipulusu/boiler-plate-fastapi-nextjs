@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from sqlalchemy.dialects import postgresql
 
-from app.models.platform.offer import OfferType
+from app.models.platform.offer import OfferStatus, OfferType
 from app.repositories.catalogue import (
     MAX_PAGE_SIZE,
     CatalogueRepository,
@@ -17,7 +17,15 @@ from app.repositories.catalogue import (
 from tests.fakes import FakeSessionProvider
 from tests.fakes_catalogue import NOW, RowsSession, make_category, make_offer
 
-FORBIDDEN_COLUMNS = ("publisher_notes", "destination_url", "tracking_id")
+# created_at is deliberately absent: the start date falls back to it inside coalesce().
+FORBIDDEN_COLUMNS = (
+    "publisher_notes",
+    "destination_url",
+    "tracking_id",
+    "source_url",
+    "website",
+    "updated_at",
+)
 
 
 def compiled(statement: Any) -> Any:
@@ -156,11 +164,43 @@ async def test_no_statement_selects_editorial_only_columns() -> None:
     detail = RowsSession(([], 0))
     async with FakeSessionProvider(detail).session() as active:
         await CatalogueRepository(active).find_visible_offer("x")
+    categories = RowsSession(([], 0))
+    async with FakeSessionProvider(categories).session() as active:
+        await CatalogueRepository(active).list_enabled_categories(NOW)
 
-    for statement in [*session.executed, *detail.executed]:
+    statements = [*session.executed, *detail.executed, *categories.executed]
+    assert len(statements) == 4
+    for statement in statements:
         sql = str(statement.compile())
         for column in FORBIDDEN_COLUMNS:
             assert column not in sql
+
+
+async def test_expiry_boundary_is_strict_and_status_is_published() -> None:
+    session, _, _ = await list_with(OfferFilters())
+
+    for statement in session.executed:
+        built = compiled(statement)
+        sql = str(built)
+        assert "offers.end_at > %(end_at_1)s" in sql
+        assert "offers.end_at >=" not in sql
+        assert built.params["end_at_1"] == NOW
+        assert OfferStatus.PUBLISHED in built.params.values()
+
+
+async def test_category_counts_apply_the_live_rule_and_merchant_activity() -> None:
+    session = RowsSession(([], 0))
+    async with FakeSessionProvider(session).session() as active:
+        await CatalogueRepository(active).list_enabled_categories(NOW)
+
+    built = compiled(session.executed[0])
+    sql = str(built)
+    assert "offers.status =" in sql
+    assert "offers.end_at IS NULL OR offers.end_at > %(end_at_1)s" in sql
+    assert "merchants.active IS true" in sql
+    assert "offers.end_at >=" not in sql
+    assert built.params["end_at_1"] == NOW
+    assert OfferStatus.PUBLISHED in built.params.values()
 
 
 async def test_find_visible_offer_is_none_when_nothing_matches() -> None:
@@ -178,6 +218,8 @@ async def test_find_visible_offer_does_not_filter_on_status() -> None:
     sql = str(session.executed[0].compile())
     assert "offers.status =" not in sql
     assert "offers.slug =" in sql
+    assert "categories.enabled IS true" in sql
+    assert "merchants.active IS true" in sql
 
 
 async def test_categories_are_enabled_only_in_display_order() -> None:

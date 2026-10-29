@@ -22,9 +22,12 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from app.api.deps import get_session_provider
+from app.api.v1.catalogue import get_catalogue_service
 from app.core.database import DefaultSessionProvider, build_engine
 from app.core.ids import new_id
 from app.main import create_app
+from app.repositories.catalogue import CatalogueRepository
+from app.services.catalogue import CatalogueService
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -481,10 +484,18 @@ async def test_categories_empty_database_is_an_empty_list(client: AsyncClient) -
 
 
 async def test_editorial_notes_and_links_never_appear_in_any_response(
-    client: AsyncClient, engine: AsyncEngine, shop: dict[str, str]
+    client: AsyncClient, engine: AsyncEngine
 ) -> None:
+    category = await add_category(engine, "beauty")
+    merchant = await add_merchant(
+        engine, "acme", website="https://merchant.example/secret-site"
+    )
     offer_id = await add_offer(
-        engine, shop["category"], shop["merchant"], "private-bits"
+        engine,
+        category,
+        merchant,
+        "private-bits",
+        source_url="https://source.example/secret-source",
     )
     await insert(
         engine,
@@ -512,8 +523,105 @@ async def test_editorial_notes_and_links_never_appear_in_any_response(
             "publisher_notes",
             "secret-destination",
             "track-123",
+            "secret-source",
+            "secret-site",
         ):
             assert secret not in body
+
+
+async def test_an_expired_row_that_never_went_live_is_the_same_404_as_unknown(
+    client: AsyncClient, engine: AsyncEngine, shop: dict[str, str]
+) -> None:
+    cat, mer = shop["category"], shop["merchant"]
+    await add_offer(
+        engine, cat, mer, "never-live", status="EXPIRED", last_verified_at=None
+    )
+    await add_offer(engine, cat, mer, "was-live", status="EXPIRED")
+
+    never = await client.get("/v1/catalogue/offers/never-live")
+    unknown = await client.get("/v1/catalogue/offers/unknown")
+    was = await client.get("/v1/catalogue/offers/was-live")
+
+    assert never.status_code == 404
+    assert never.content == unknown.content
+    assert was.status_code == 410
+
+
+async def test_an_expired_row_with_a_future_end_date_reports_no_end_date(
+    client: AsyncClient, engine: AsyncEngine, shop: dict[str, str]
+) -> None:
+    await add_offer(
+        engine,
+        shop["category"],
+        shop["merchant"],
+        "retired-early",
+        status="EXPIRED",
+        end_at=datetime.now(UTC) + 3 * DAY,
+    )
+
+    response = await client.get("/v1/catalogue/offers/retired-early")
+
+    assert response.status_code == 410
+    assert response.json()["data"]["ended_at"] is None
+
+
+async def test_a_matching_etag_never_turns_a_410_into_a_304(
+    client: AsyncClient, engine: AsyncEngine, shop: dict[str, str]
+) -> None:
+    await add_offer(
+        engine, shop["category"], shop["merchant"], "lapsed",
+        end_at=datetime.now(UTC) - DAY,
+    )  # fmt: skip
+    first = await client.get("/v1/catalogue/offers/lapsed")
+
+    second = await client.get(
+        "/v1/catalogue/offers/lapsed", headers={"If-None-Match": first.headers["ETag"]}
+    )
+
+    assert (first.status_code, second.status_code) == (410, 410)
+
+
+FIXED = datetime(2030, 1, 1, 12, 0, tzinfo=UTC)
+
+
+@pytest.fixture
+async def fixed_clock_client(engine: AsyncEngine) -> AsyncIterator[AsyncClient]:
+    app = create_app()
+    provider = DefaultSessionProvider(
+        async_sessionmaker(engine, expire_on_commit=False)
+    )
+
+    async def service() -> AsyncIterator[CatalogueService]:
+        async with provider.session() as session:
+            yield CatalogueService(CatalogueRepository(session), clock=lambda: FIXED)
+
+    app.dependency_overrides[get_catalogue_service] = service
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
+    async with AsyncClient(
+        transport=transport, base_url="http://test", headers={"X-Internal-Key": KEY}
+    ) as http:
+        yield http
+
+
+async def test_an_offer_ending_exactly_now_is_expired_and_one_second_later_is_live(
+    fixed_clock_client: AsyncClient, engine: AsyncEngine, shop: dict[str, str]
+) -> None:
+    cat, mer = shop["category"], shop["merchant"]
+    await add_offer(engine, cat, mer, "ends-now", end_at=FIXED)
+    await add_offer(
+        engine, cat, mer, "ends-in-a-second", end_at=FIXED + timedelta(seconds=1)
+    )
+
+    listed = await slugs(fixed_clock_client)
+    counts = (await fixed_clock_client.get("/v1/catalogue/categories")).json()["data"]
+    gone = await fixed_clock_client.get("/v1/catalogue/offers/ends-now")
+    live = await fixed_clock_client.get("/v1/catalogue/offers/ends-in-a-second")
+
+    assert listed == ["ends-in-a-second"]
+    assert [(c["slug"], c["offer_count"]) for c in counts] == [("beauty", 1)]
+    assert gone.status_code == 410
+    assert gone.json()["data"]["ended_at"] == "2030-01-01T12:00:00Z"
+    assert live.status_code == 200
 
 
 async def test_internal_key_is_required(engine: AsyncEngine) -> None:
