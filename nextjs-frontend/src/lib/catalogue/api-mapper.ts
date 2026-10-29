@@ -12,7 +12,6 @@ import {
   OFFER_TYPES,
   type Category,
   type ClaimStep,
-  type Freshness,
   type Merchant,
   type Offer,
   type OfferImage,
@@ -59,8 +58,53 @@ function toImage(api: ApiOffer['image']): OfferImage {
   return { tint: toTint(api.tint), label: api.label, alt: api.alt };
 }
 
+/** A merchant logo is shown as an image source, so only a plain https URL (no credentials) is accepted. */
+export function safeLogoUrl(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 function toMerchant(api: ApiOffer['merchant']): Merchant {
-  return { slug: api.slug, name: api.name, logoUrl: api.logo_url };
+  return { slug: api.slug, name: api.name, logoUrl: safeLogoUrl(api.logo_url) };
+}
+
+type Obj = Record<string, unknown>;
+const isObj = (value: unknown): value is Obj =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+const allStrings = (obj: Obj, fields: readonly string[]) =>
+  fields.every((field) => typeof obj[field] === 'string');
+
+/**
+ * The first field of an API offer that does not have the documented shape, or null. The generated types
+ * promise the shape; this guards the boundary at runtime so one malformed record is dropped and logged
+ * instead of throwing a TypeError that takes the whole page down.
+ */
+function malformedOfferField(api: unknown): string | null {
+  if (!isObj(api)) return 'record';
+  const text = ['id', 'slug', 'title', 'summary', 'eligibility', 'availability', 'start_at'];
+  const badText = text.find((field) => typeof api[field] !== 'string');
+  if (badText) return badText;
+  const objects = ['category', 'merchant', 'image', 'postage'];
+  const badObject = objects.find((field) => !isObj(api[field]));
+  if (badObject) return badObject;
+  const { category, merchant, image, postage } = api as { [key: string]: Obj };
+  if (!allStrings(category, ['slug', 'name'])) return 'category';
+  if (!allStrings(merchant, ['slug', 'name'])) return 'merchant';
+  if (!allStrings(image, ['tint', 'label', 'alt'])) return 'image';
+  if (typeof postage.kind !== 'string') return 'postage';
+  if (!Array.isArray(api.description) || !api.description.every((p) => typeof p === 'string')) {
+    return 'description';
+  }
+  const stepsOk =
+    Array.isArray(api.steps) && api.steps.every((s) => isObj(s) && allStrings(s, ['title', 'detail']));
+  if (!stepsOk) return 'steps';
+  if (typeof api.featured !== 'boolean' || typeof api.requires_card !== 'boolean') return 'flags';
+  return null;
 }
 
 function toSteps(steps: ApiOffer['steps']): ClaimStep[] {
@@ -80,6 +124,8 @@ function invalidSlug(api: ApiOffer): { field: string; value: unknown } | null {
  * unreadable date, or no verification date (the page says "Last checked", so it never invents one).
  */
 export function mapOffer(api: ApiOffer): Offer | null {
+  const malformed = malformedOfferField(api);
+  if (malformed) return drop('offer', malformed, null);
   const badSlug = invalidSlug(api);
   if (badSlug) return drop('offer', badSlug.field, badSlug.value);
 
@@ -112,7 +158,7 @@ export function mapOffer(api: ApiOffer): Offer | null {
     startAt,
     endAt,
     lastVerifiedAt,
-    freshness: (api.freshness as Freshness | null) ?? null,
+    freshness: api.freshness ?? null,
     steps: toSteps(api.steps),
     demo: false,
     source: 'api',
@@ -126,6 +172,10 @@ export function mapOffers(items: readonly ApiOffer[]): Offer[] {
 
 /** One API category as a `Category`, or null (logged) for an unsafe slug. */
 export function mapCategory(api: ApiCategory): Category | null {
+  const fields = ['slug', 'name', 'short_name', 'description', 'intro', 'tint'];
+  if (!isObj(api) || !allStrings(api as unknown as Obj, fields) || typeof api.sort_order !== 'number') {
+    return drop('category', 'record', null);
+  }
   if (!isValidSlug(api.slug)) return drop('category', 'slug', api.slug);
   return {
     slug: api.slug,
@@ -141,6 +191,11 @@ export function mapCategory(api: ApiCategory): Category | null {
 
 /** The 410 stub as an `EndedOffer`, or null (logged) when its slugs are unsafe. */
 export function mapEndedOffer(api: ApiEndedOffer): EndedOffer | null {
+  const shaped =
+    isObj(api) && allStrings(api as unknown as Obj, ['slug', 'title']) && isObj(api.category);
+  if (!shaped || !allStrings(api.category as unknown as Obj, ['slug', 'name'])) {
+    return drop('ended offer', 'record', null);
+  }
   if (!isValidSlug(api.slug)) return drop('ended offer', 'slug', api.slug);
   if (!isValidSlug(api.category.slug))
     return drop('ended offer', 'category.slug', api.category.slug);

@@ -3,6 +3,7 @@ import 'server-only';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { unstable_cache } from 'next/cache';
 import { CatalogueUnavailableError } from '@/lib/catalogue/errors';
+import { isValidSlug } from '@/lib/catalogue/slug';
 import { logger } from '@/lib/logger';
 import { callBackend, readTrustedClientIp, type ApiResult } from './server';
 import {
@@ -90,7 +91,7 @@ function fail(operation: string, result: Extract<ApiResult<unknown>, { success: 
 function toQuery(params: OfferListParams): ListQuery {
   const query: ListQuery = {};
   if (params.q) query.q = params.q;
-  if (params.category) query.category = params.category;
+  if (params.category && isValidSlug(params.category)) query.category = params.category;
   if (params.types && params.types.length > 0) query.type = [...params.types];
   if (params.postage) query.postage = params.postage;
   if (params.featured !== undefined) query.featured = params.featured;
@@ -157,6 +158,8 @@ export function fetchOffers(params: OfferListParams = {}): Promise<OfferListData
 
 /** One offer: found, ended (410 stub) or not found. Any other outcome throws. */
 export function fetchOffer(slug: string): Promise<OfferReadResult> {
+  // A slug that is not a plain slug cannot name an offer: no round trip, no path injection.
+  if (!isValidSlug(slug)) return Promise.resolve({ kind: 'not_found' });
   return withVisitorIp(() => cachedOffer(slug));
 }
 

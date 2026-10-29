@@ -56,12 +56,6 @@ export function lookupOffer(slug: string) {
   return backend().lookupOffer(slug);
 }
 
-/** A found offer, or null for an unknown, unpublished or ended one. Fixtures also return expired offers. */
-export async function getOfferBySlug(slug: string): Promise<Offer | null> {
-  const lookup = await backend().lookupOffer(slug);
-  return lookup.kind === 'found' ? lookup.offer : null;
-}
-
 export function getLiveOffers(): Promise<Offer[]> {
   return backend().getLiveOffers();
 }
