@@ -3,6 +3,9 @@ from fastapi import APIRouter
 from app.api.v1 import (
     admin_analytics,
     admin_audit_logs,
+    admin_categories,
+    admin_merchants,
+    admin_offers,
     admin_subscriptions,
     admin_users,
     auth,
@@ -27,6 +30,9 @@ api_router.include_router(totp.router)
 api_router.include_router(admin_users.router)
 api_router.include_router(admin_audit_logs.router)
 api_router.include_router(admin_analytics.router)
+api_router.include_router(admin_categories.router)
+api_router.include_router(admin_merchants.router)
+api_router.include_router(admin_offers.router)
 api_router.include_router(organizations.router)
 api_router.include_router(settings.router)
 
