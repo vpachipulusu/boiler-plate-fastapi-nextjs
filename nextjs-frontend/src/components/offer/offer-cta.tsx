@@ -91,13 +91,14 @@ export function OfferCta({ offerType, ended, categorySlug }: OfferCtaProps) {
         </DialogContent>
       </Dialog>
       <p className="mt-3 px-3 text-xs text-muted-foreground">
-        You&apos;ll go to the brand&apos;s website to request your {REQUEST_KIND[offerType]}.
+        Demo offer: this button stays on Freejoy. A real offer will take you to the brand&apos;s
+        website to request your {REQUEST_KIND[offerType]}.
       </p>
       <p className="mt-1 px-3 text-xs text-muted-foreground">
         <Link href="/affiliate-disclosure" className="underline underline-offset-2">
           Affiliate disclosure
         </Link>
-        : we may earn a commission if you qualify.
+        : on real offers we may earn a commission if you qualify.
       </p>
     </div>
   );

@@ -44,7 +44,7 @@ export function HomeHero() {
           </div>
           <p className="mt-5 flex items-center gap-2 text-xs font-bold text-accent-ink">
             <span aria-hidden="true" className="h-2 w-2 rounded-full bg-accent-ink" />
-            Fresh finds added regularly
+            Design preview with sample listings
           </p>
         </div>
         <HomeHeroArt className="mx-auto w-4/5 max-w-sm lg:w-full lg:max-w-none" />

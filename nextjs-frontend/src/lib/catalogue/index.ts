@@ -8,7 +8,7 @@ import type { CatalogueQuery, Category, Merchant, Offer, Page } from './types';
 
 export * from './types';
 export { DEFAULT_QUERY, parseCatalogueParams, toCatalogueHref, withQuery } from './offer-url';
-export { normaliseQuery } from './query';
+export { isLive, normaliseQuery } from './query';
 
 export async function getToday(): Promise<string> {
   return FIXTURE_TODAY;

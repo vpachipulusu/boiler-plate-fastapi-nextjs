@@ -27,7 +27,7 @@ export function CategoryIntro({ category, total }: CategoryIntroProps) {
       <nav aria-label="Breadcrumb">
         <ol className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-accent-ink">
           <li>
-            <Link href="/" className="inline-flex min-h-6 items-center hover:underline">
+            <Link href="/" className="inline-flex min-h-11 items-center hover:underline">
               Home
             </Link>
           </li>
@@ -53,7 +53,7 @@ export function CategoryIntro({ category, total }: CategoryIntroProps) {
             {category.intro}
           </p>
           <p className="mt-3 text-sm font-bold text-accent-ink">
-            {total} {total === 1 ? 'freebie' : 'freebies'} available now
+            {total} {total === 1 ? 'freebie' : 'freebies'} in this category
           </p>
         </div>
       </div>

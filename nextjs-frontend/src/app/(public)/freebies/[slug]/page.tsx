@@ -13,8 +13,8 @@ import {
   getOfferBySlug,
   getRelatedOffers,
   getToday,
+  isLive,
 } from '@/lib/catalogue';
-import { isLive } from '@/lib/catalogue/query';
 
 interface OfferPageProps {
   params: Promise<{ slug: string }>;

@@ -10,6 +10,8 @@ interface SearchFormProps {
   autoFocus?: boolean;
   className?: string;
   id?: string;
+  /** Extra query params to carry into the search, for example the active catalogue filters. */
+  hiddenParams?: [string, string][];
 }
 
 export const MAX_QUERY_LENGTH = 80;
@@ -25,6 +27,7 @@ export function SearchForm({
   autoFocus = false,
   className,
   id = 'site-search',
+  hiddenParams = [],
 }: SearchFormProps) {
   const isHero = variant === 'hero';
   return (
@@ -34,6 +37,9 @@ export function SearchForm({
       role="search"
       className={cn('flex items-center gap-2', className)}
     >
+      {hiddenParams.map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
       <label htmlFor={id} className="sr-only">
         Search freebies
       </label>

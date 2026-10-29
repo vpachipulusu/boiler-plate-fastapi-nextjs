@@ -56,10 +56,10 @@ export function HomeHeroArt({ className }: { className?: string }) {
         </span>
         <span className="min-w-0">
           <span className="block text-[10px] font-bold leading-tight text-foreground sm:text-xs">
-            Real freebies
+            Sample listings
           </span>
           <span className="block text-[9px] leading-tight text-muted-foreground sm:text-[11px]">
-            Checked by our editors
+            Design preview
           </span>
         </span>
       </div>

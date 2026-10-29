@@ -63,8 +63,8 @@ export async function CatalogueResults({ query, scopeCategory }: CatalogueResult
       </div>
 
       <p className="mt-8 text-sm text-muted-foreground">
-        Every offer is checked, but availability can change quickly. Always read the provider’s
-        terms.
+        Sample listings for the design preview. Availability can change quickly, so always read the
+        provider’s terms.
       </p>
     </section>
   );

@@ -19,7 +19,9 @@ export function FreshlyFound({ offers, merchants }: FreshlyFoundProps) {
           >
             Freshly found
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">These new offers are worth a look.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Featured picks from the sample catalogue.
+          </p>
         </div>
         <Link
           href="/freebies"

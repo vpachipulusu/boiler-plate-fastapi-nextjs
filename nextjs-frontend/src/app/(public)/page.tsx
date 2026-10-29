@@ -7,10 +7,12 @@ import { TrustStrip } from '@/components/home/trust-strip';
 import { getCategories, getFeaturedOffers, getMerchants } from '@/lib/catalogue';
 
 export const metadata: Metadata = {
-  title: 'Freejoy – genuine UK freebies, samples and offers',
+  title: 'Freejoy – UK freebies, samples and offers',
   description:
-    'Discover genuinely good UK freebies, samples, trials and offers from brands you will actually love, with clear terms and postage shown upfront.',
+    'Browse UK freebies, samples, trials and offers, with terms, postage and card requirements set out on every listing.',
   alternates: { canonical: '/' },
+  // Fixture-backed design preview: nothing here is a real offer yet, so keep it out of search.
+  robots: { index: false },
 };
 
 export default async function HomePage() {

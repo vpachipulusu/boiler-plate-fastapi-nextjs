@@ -16,8 +16,9 @@ export default function CookiesPage() {
     >
       <h2>Cookies in this release</h2>
       <p>
-        This release sets no non-essential cookies and runs no analytics. Nothing here tracks you
-        across pages or sites, so there is no cookie banner to accept.
+        This release is intended to set no non-essential cookies and run no analytics, so no cookie
+        banner is shown. The final list of what the framework and error reporting store in the
+        browser is still to be confirmed in review.
       </p>
       <h2>If that changes</h2>
       <p>

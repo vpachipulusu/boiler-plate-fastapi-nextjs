@@ -1,13 +1,12 @@
 import type { Metadata } from 'next';
 import { CatalogueHeader } from '@/components/catalogue/catalogue-header';
 import { CatalogueLayout } from '@/components/catalogue/catalogue-layout';
-import { hasActiveRefinement } from '@/components/catalogue/catalogue-links';
 import { parseCatalogueParams } from '@/lib/catalogue';
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 const DESCRIPTION =
-  'Browse free samples, trials and lovely surprises from UK brands. Every offer is checked, with the real terms spelled out.';
+  'Browse free samples, trials and lovely surprises from UK brands, with terms, postage and card needs set out on every listing.';
 
 export async function generateMetadata({
   searchParams,
@@ -19,8 +18,8 @@ export async function generateMetadata({
     title: query.q === '' ? 'All freebies' : `Search: ${query.q}`,
     description: DESCRIPTION,
     alternates: { canonical: '/freebies' },
-    // Filtered, searched and paged views duplicate the main listing, so keep them out of search.
-    robots: hasActiveRefinement(query) ? { index: false } : undefined,
+    // Fixture-backed design preview: nothing here is a real offer yet, so keep it out of search.
+    robots: { index: false },
   };
 }
 
@@ -29,7 +28,7 @@ export default async function FreebiesPage({ searchParams }: { searchParams: Sea
 
   return (
     <>
-      <CatalogueHeader q={query.q} />
+      <CatalogueHeader query={query} />
       <CatalogueLayout query={query} />
     </>
   );

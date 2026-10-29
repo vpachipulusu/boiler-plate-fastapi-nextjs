@@ -1,11 +1,11 @@
 import { Check } from 'lucide-react';
 
-/** Site promises, not metrics: no counts and no dates belong here. */
+/** Site intentions, not metrics: no counts, dates or verification claims belong here. */
 const TRUST_ITEMS = [
-  { title: 'Hand-checked offers', detail: 'Clear terms before you click' },
+  { title: 'Terms in plain words', detail: 'Postage, eligibility and card needs on each listing' },
   { title: 'UK freebies only', detail: 'Relevant local offers' },
-  { title: 'No hidden surprises', detail: 'Postage shown upfront' },
-  { title: 'Updated regularly', detail: 'New finds worth opening' },
+  { title: 'No hidden surprises', detail: 'What you pay and what you give, stated upfront' },
+  { title: 'Design preview', detail: 'Sample listings, not live offers' },
 ] as const;
 
 export function TrustStrip() {

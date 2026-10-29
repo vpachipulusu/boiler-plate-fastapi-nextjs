@@ -11,6 +11,7 @@ describe('filter drawer', () => {
     const user = userEvent.setup();
     render(
       <FilterDrawer>
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- stand-in for a filter link */}
         <a href="/freebies?type=cashback">Cashback</a>
       </FilterDrawer>
     );
@@ -31,6 +32,7 @@ describe('filter drawer', () => {
     const user = userEvent.setup();
     render(
       <FilterDrawer>
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- stand-in for a filter link */}
         <a href="/freebies?type=cashback" onClick={(event) => event.preventDefault()}>
           Cashback
         </a>

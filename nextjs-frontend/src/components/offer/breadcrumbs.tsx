@@ -7,7 +7,7 @@ interface BreadcrumbsProps {
 }
 
 const LINK_CLASS =
-  'inline-flex min-h-6 items-center rounded-sm hover:underline focus-visible:underline';
+  'inline-flex min-h-11 items-center rounded-sm hover:underline focus-visible:underline';
 
 /** Green caption-caps trail: HOME / CATEGORY / OFFER (design screens 03, 07). */
 export function Breadcrumbs({ category, offer }: BreadcrumbsProps) {

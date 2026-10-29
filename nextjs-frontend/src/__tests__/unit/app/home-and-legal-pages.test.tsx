@@ -67,7 +67,7 @@ describe('homepage', () => {
   it('describes freshness as regular and uses no counts in the trust strip', async () => {
     const { container } = await renderHome();
 
-    expect(screen.getByText('Fresh finds added regularly')).toBeInTheDocument();
+    expect(screen.getByText('Design preview with sample listings')).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/every day|daily dose|checked daily/i);
     const strip = screen.getByRole('region', { name: /our promises/i });
     expect(within(strip).getAllByRole('listitem')).toHaveLength(4);
@@ -97,7 +97,8 @@ describe('homepage', () => {
   });
 
   it('sets the canonical url and title in metadata', () => {
-    expect(homeMetadata.title).toBe('Freejoy – genuine UK freebies, samples and offers');
+    expect(homeMetadata.title).toBe('Freejoy – UK freebies, samples and offers');
+    expect(homeMetadata.robots).toEqual({ index: false });
     expect(homeMetadata.alternates?.canonical).toBe('/');
   });
 });
@@ -125,10 +126,12 @@ describe.each(LEGAL_PAGES)('$name page', ({ Page, metadata }) => {
 });
 
 describe('cookies page', () => {
-  it('states that this release sets no non-essential cookies and no analytics', () => {
+  it('states the intention to set no non-essential cookies, pending review', () => {
     render(<CookiesPage />);
 
-    expect(screen.getByText(/no non-essential cookies and runs no analytics/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/intended to set no non-essential cookies and run no analytics/i)
+    ).toBeInTheDocument();
   });
 });
 

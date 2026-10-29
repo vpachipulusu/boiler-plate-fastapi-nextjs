@@ -99,12 +99,12 @@ describe('catalogue results', () => {
 });
 
 describe('freebies page', () => {
-  it('titles the page "All freebies" and keeps the plain listing indexable', async () => {
+  it('titles the page "All freebies" and keeps the fixture listing out of search', async () => {
     const metadata = await freebiesMetadata({ searchParams: noParams });
 
     expect(metadata.title).toBe('All freebies');
     expect(metadata.alternates?.canonical).toBe('/freebies');
-    expect(metadata.robots).toBeUndefined();
+    expect(metadata.robots).toEqual({ index: false });
   });
 
   it('titles a search "Search: <q>" and asks search engines not to index it', async () => {

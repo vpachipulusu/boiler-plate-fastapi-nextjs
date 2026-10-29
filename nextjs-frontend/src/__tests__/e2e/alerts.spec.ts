@@ -32,7 +32,9 @@ for (const viewport of VIEWPORTS) {
       ).toHaveCount(6);
       await expect(page.getByLabel('Daily highlights')).toBeChecked();
       await expect(
-        page.getByText('No spam · No sold email lists · Unsubscribe in one click')
+        page.getByText(
+          'Planned for launch: no spam · no sold email lists · unsubscribe in one click'
+        )
       ).toBeVisible();
     });
 

@@ -94,8 +94,8 @@ export function FilterSidebar({ query, categories, scopeCategory }: FilterSideba
           <Check className="h-4 w-4" strokeWidth={3} />
         </span>
         <p className="text-xs leading-snug text-muted-foreground">
-          <span className="block text-sm font-bold text-accent-ink">Checked regularly</span>
-          Real terms, no guesswork.
+          <span className="block text-sm font-bold text-accent-ink">Terms on every listing</span>
+          Postage, eligibility and card needs, in plain words.
         </p>
       </div>
     </aside>

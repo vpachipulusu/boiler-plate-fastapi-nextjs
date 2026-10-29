@@ -88,8 +88,11 @@ export function AlertsForm({ categories, defaultEmail = '' }: AlertsFormProps) {
       <p className="mt-2 text-sm text-muted-foreground">
         Choose what you&apos;d like to hear about. You can change this anytime.
       </p>
+      <p className="mt-4 rounded-input bg-warn px-4 py-3 text-sm font-medium text-warn-foreground">
+        Design preview: alerts are not live yet. Nothing you enter here is sent or saved.
+      </p>
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-8">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6">
         <fieldset disabled={previewDone} className="space-y-7 border-0 p-0">
           <div>
             <label htmlFor="alerts-email" className={LABEL_CLASS}>
@@ -233,7 +236,7 @@ export function AlertsForm({ categories, defaultEmail = '' }: AlertsFormProps) {
       </form>
 
       <p className="mt-4 text-xs text-muted-foreground">
-        No spam · No sold email lists · Unsubscribe in one click
+        Planned for launch: no spam · no sold email lists · unsubscribe in one click
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
         Once alerts launch, every email will carry a one-click unsubscribe link.
