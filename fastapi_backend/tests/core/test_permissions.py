@@ -94,3 +94,38 @@ def test_super_admin_may_grant_wildcard_and_super_admin():
 def test_malformed_or_unknown_grants_are_refused(permissions):
     actor = _actor("super_admin", sorted(ADMIN_PERMISSIONS))
     assert not assert_can_grant(actor, "admin", permissions)
+
+
+CATALOGUE_PERMISSIONS = [
+    "offers.read",
+    "offers.write",
+    "offers.publish",
+    "categories.write",
+    "merchants.write",
+    "subscribers.read",
+]
+
+
+def test_catalogue_permissions_are_in_the_closed_registry():
+    assert set(CATALOGUE_PERMISSIONS) <= ADMIN_PERMISSIONS
+    assert validate_required(tuple(CATALOGUE_PERMISSIONS)) == set(CATALOGUE_PERMISSIONS)
+
+
+def test_super_admin_wildcard_covers_the_catalogue_permissions():
+    held = effective_permissions("super_admin", ["*"])
+
+    assert set(CATALOGUE_PERMISSIONS) <= held
+
+
+def test_an_admin_cannot_grant_themselves_or_anyone_a_catalogue_permission_they_lack():
+    actor = _actor("admin", ["admins.create", "offers.read"])
+
+    for permission in ("offers.publish", "offers.write", "categories.write"):
+        assert not assert_can_grant(actor, "admin", [permission])
+    assert assert_can_grant(actor, "admin", ["offers.read"])
+
+
+def test_catalogue_permissions_stored_on_a_plain_admin_are_honoured_and_unknown_ones_dropped():
+    held = effective_permissions("admin", ["offers.publish", "offers.superpower"])
+
+    assert held == {"offers.publish"}
