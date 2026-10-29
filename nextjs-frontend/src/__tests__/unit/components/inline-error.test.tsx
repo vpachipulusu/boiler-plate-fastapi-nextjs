@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const mocks = vi.hoisted(() => ({ refresh: vi.fn() }));
@@ -78,6 +78,74 @@ describe('RetryButton', () => {
     await user.click(busy);
     expect(mocks.refresh).toHaveBeenCalledTimes(1);
     mocks.refresh.mockReset();
+  });
+
+  describe('focus after a retry', () => {
+    const Page = ({ failed }: { failed: boolean }) => (
+      <>
+        <main id="main-content" tabIndex={-1}>
+          {failed ? <RetryButton /> : <p>Loaded</p>}
+        </main>
+      </>
+    );
+
+    // The previous test's cleanup unmounts a used button, whose deferred focus move must not land here.
+    beforeEach(() => new Promise((resolve) => setTimeout(resolve, 20)));
+
+    it('moves focus to the main landmark when the retry succeeds and the button disappears', async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(<Page failed />);
+      await user.tab();
+      await user.keyboard('{Enter}');
+
+      rerender(<Page failed={false} />);
+
+      await waitFor(() => expect(screen.getByRole('main')).toHaveFocus());
+    });
+
+    it('leaves focus alone while the button is still on the page', async () => {
+      const user = userEvent.setup();
+      render(<Page failed />);
+      await user.tab();
+      await user.keyboard('{Enter}');
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(screen.getByRole('button', { name: /try/i })).toHaveFocus();
+      expect(screen.getByRole('main')).not.toHaveFocus();
+    });
+
+    it('does not steal focus when it unmounts without having been used', async () => {
+      const { rerender } = render(<Page failed />);
+      rerender(<Page failed={false} />);
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(screen.getByRole('main')).not.toHaveFocus();
+    });
+
+    it('does not move focus that already went somewhere else', async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(
+        <>
+          <Page failed />
+          <input aria-label="other" />
+        </>
+      );
+      await user.tab();
+      await user.keyboard('{Enter}');
+      rerender(
+        <>
+          <Page failed={false} />
+          <input aria-label="other" />
+        </>
+      );
+      screen.getByLabelText('other').focus();
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(screen.getByLabelText('other')).toHaveFocus();
+    });
   });
 
   it('is large enough to tap', () => {

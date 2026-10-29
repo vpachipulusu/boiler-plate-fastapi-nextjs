@@ -102,9 +102,10 @@ test.describe('Journey 1: browsing real published offers', () => {
 });
 
 test.describe('Journey 5: missing and ended offers, and privacy', () => {
-  test('shows the not-found page, noindex, for an unknown offer', async ({ page }) => {
-    await page.goto('/freebies/no-such-offer-anywhere');
+  test('returns 404 and the not-found page, noindex, for an unknown offer', async ({ page }) => {
+    const response = await page.goto('/freebies/no-such-offer-anywhere');
 
+    expect(response?.status()).toBe(404);
     await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
     await expect(page.locator('meta[name="robots"][content*="noindex"]').first()).toBeAttached();
   });
@@ -165,7 +166,13 @@ test.describe('Journey 5: missing and ended offers, and privacy', () => {
     const alert = page.getByRole('alert');
     await expect(alert).toBeVisible();
     await expect(alert).not.toContainText(/psycopg|traceback|internal/i);
-    await page.keyboard.press('Tab');
-    await expect(alert.getByRole('button', { name: 'Try again' })).toBeVisible();
+    const retry = alert.getByRole('button', { name: 'Try again' });
+    for (let presses = 0; presses < 25; presses += 1) {
+      if (await retry.evaluate((el) => el === document.activeElement)) break;
+      await page.keyboard.press('Tab');
+    }
+    await expect(retry).toBeFocused();
+    const box = await retry.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
   });
 });

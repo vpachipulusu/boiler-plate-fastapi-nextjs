@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { EndedOffer, OfferLookup } from '@/lib/catalogue';
 import { CatalogueUnavailableError } from '@/lib/catalogue/errors';
 import type { Offer } from '@/lib/catalogue/types';
@@ -193,6 +194,23 @@ describe('once the catalogue is API-backed', () => {
   it('keeps the alerts page noindex until its form is live', () => {
     expect(alertsMetadata.robots).toEqual({ index: false });
   });
+
+  it('renders a real offer with no demo wording and an honest, coming-soon call to action', async () => {
+    const user = userEvent.setup();
+    render(await OfferPage(offerParams));
+
+    // The related offers below are fixtures in this test; the offer's own hero must be clean.
+    const hero = screen.getByRole('heading', { level: 1 }).closest('section') as HTMLElement;
+    expect(hero.textContent).not.toMatch(/demo|design preview|sample data/i);
+    const cta = screen.getByRole('button', { name: /^get this free sample, coming soon$/i });
+    expect(cta).toHaveTextContent('Coming soon');
+
+    await user.click(cta);
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Claim link coming soon' })
+    ).toBeInTheDocument();
+  });
 });
 
 describe('API offers that have ended', () => {
@@ -284,25 +302,31 @@ describe('page JSON-LD', () => {
   });
 });
 
-describe('when the catalogue cannot be read', () => {
+describe('when the catalogue cannot be read (API source)', () => {
   beforeEach(() => mocks.source.mockResolvedValue('api'));
 
-  it('marks the home page noindex and shows a retryable alert instead of the catalogue', async () => {
+  // An outage answers 200 with the error state and keeps the page's normal robots, so a short backend
+  // failure cannot de-index pages. Only a refined view is noindex, as it always is.
+  it('keeps the home page indexable and shows a retryable alert instead of the catalogue', async () => {
     mocks.featured.mockImplementation(outage);
 
-    expect((await homeMetadata()).robots).toEqual({ index: false });
+    expect((await homeMetadata()).robots).toMatchObject({ index: true });
     render(await HomeSections({ demo: false }));
     expect(screen.getByRole('alert')).toHaveTextContent(/could not load the freebies/i);
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 
-  it('marks /freebies and a category noindex when the results cannot be read', async () => {
+  it('keeps /freebies and a category on their normal robots when the results cannot be read', async () => {
     mocks.search.mockImplementation(outage);
 
-    expect((await freebiesMetadata(search({}))).robots).toEqual({ index: false });
+    expect((await freebiesMetadata(search({}))).robots).toMatchObject({ index: true });
+    expect((await freebiesMetadata(search({ q: 'tea' }))).robots).toEqual({
+      index: false,
+      follow: true,
+    });
     expect(
       (await categoryMetadata({ params: Promise.resolve({ slug: 'beauty' }) })).robots
-    ).toEqual({ index: false });
+    ).toMatchObject({ index: true });
     render(
       await CategoryPage({
         params: Promise.resolve({ slug: 'beauty' }),
@@ -313,22 +337,49 @@ describe('when the catalogue cannot be read', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Beauty freebies' })).toBeInTheDocument();
   });
 
-  it('marks an offer page noindex and shows the alert, never a 404, when the offer cannot be read', async () => {
+  it('adds no robots of its own when the offer cannot be read, and shows the alert, never a 404', async () => {
     mocks.lookup.mockImplementation(outage);
 
-    expect(await offerMetadata(offerParams)).toMatchObject({
-      title: 'Freebie unavailable',
-      robots: { index: false },
-    });
+    const metadata = await offerMetadata(offerParams);
+
+    expect(metadata.title).toBe('Freebie unavailable');
+    expect(metadata.robots).toBeUndefined();
     render(await OfferPage(offerParams));
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(mocks.notFound).not.toHaveBeenCalled();
+  });
+
+  it('adds no robots of its own when the category cannot be read', async () => {
+    mocks.search.mockImplementation(outage);
+    const { CatalogueUnavailableError: Outage } = await import('@/lib/catalogue/errors');
+    const lookupFails = vi.spyOn(await import('@/lib/catalogue'), 'getCategoryBySlug');
+    lookupFails.mockRejectedValue(new Outage());
+
+    const metadata = await categoryMetadata({ params: Promise.resolve({ slug: 'beauty' }) });
+
+    expect(metadata.title).toBe('Freebies unavailable');
+    expect(metadata.robots).toBeUndefined();
+    lookupFails.mockRestore();
   });
 
   it('lets an error that is not an outage through instead of calling it an outage', async () => {
     mocks.lookup.mockRejectedValue(new Error('a real bug'));
 
     await expect(offerMetadata(offerParams)).rejects.toThrow('a real bug');
+  });
+});
+
+describe('when the catalogue cannot be read (fixture source)', () => {
+  it('stays noindex', async () => {
+    mocks.source.mockResolvedValue('fixture');
+    mocks.search.mockImplementation(outage);
+    mocks.featured.mockImplementation(outage);
+
+    expect((await homeMetadata()).robots).toEqual({ index: false });
+    expect((await freebiesMetadata(search({}))).robots).toEqual({ index: false });
+    expect(
+      (await categoryMetadata({ params: Promise.resolve({ slug: 'beauty' }) })).robots
+    ).toEqual({ index: false });
   });
 });
 

@@ -93,19 +93,19 @@ for (const viewport of VIEWPORTS) {
 }
 
 test.describe('Offer detail routing and metadata', () => {
-  // The page renders per request behind the root loading boundary, so the 404 view streams with HTTP 200
-  // and Next.js adds a noindex tag (docs/developer/freejoy-seo.md, follow-up 4). Assert what a visitor
-  // and a crawler get: the not-found page and noindex.
-  for (const [name, slug] of [
-    ['an unknown slug', 'no-such-offer'],
-    ['a draft offer', 'cat-pouch-tasting-sample'],
-    ['a slug that is not a slug', 'Bad%20Slug'],
+  // No loading.tsx sits above the public pages, so notFound() runs before the response starts and the
+  // status really is 404 (src/__tests__/unit/config/loading-boundary.test.ts guards this).
+  for (const [name, route] of [
+    ['an unknown offer slug', '/freebies/no-such-offer'],
+    ['a draft offer', '/freebies/cat-pouch-tasting-sample'],
+    ['a slug that is not a slug', '/freebies/Bad%20Slug'],
+    ['an unknown category', '/category/no-such-category'],
   ] as const) {
-    test(`shows the not-found page, noindex, for ${name}`, async ({ page }) => {
-      await page.goto(`/freebies/${slug}`);
+    test(`returns 404 and the not-found page for ${name}`, async ({ page }) => {
+      const response = await page.goto(route);
 
+      expect(response?.status()).toBe(404);
       await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
-      await expect(page.locator('meta[name="robots"][content*="noindex"]').first()).toBeAttached();
     });
   }
 

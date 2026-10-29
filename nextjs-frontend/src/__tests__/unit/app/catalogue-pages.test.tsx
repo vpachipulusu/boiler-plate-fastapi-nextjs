@@ -35,7 +35,6 @@ async function getOfferBySlug(slug: string) {
   return lookup.kind === 'found' ? lookup.offer : null;
 }
 
-
 function cardSlugs(): string[] {
   return screen
     .getAllByRole('link', { name: /.+/ })

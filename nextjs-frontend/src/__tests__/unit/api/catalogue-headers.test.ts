@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   cookiesGet: vi.fn(),
   headerValues: new Map<string, string>(),
+  cacheArgs: [] as unknown[][],
 }));
 
 vi.mock('@/lib/logger', () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
@@ -15,9 +16,20 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn(async () => ({ get: mocks.cookiesGet })),
   headers: vi.fn(async () => ({ get: (name: string) => mocks.headerValues.get(name) ?? null })),
 }));
-vi.mock('next/cache', () => ({
-  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
-}));
+// Like Next.js, run the cached function inside its own AsyncLocalStorage context, and record the
+// arguments, which are what the real cache hashes into its key.
+vi.mock('next/cache', async () => {
+  const { AsyncLocalStorage } = await import('node:async_hooks');
+  const nextContext = new AsyncLocalStorage<string>();
+  return {
+    unstable_cache:
+      (fn: (...args: unknown[]) => unknown) =>
+      (...args: unknown[]) => {
+        mocks.cacheArgs.push(args);
+        return nextContext.run('unstable-cache', () => fn(...args));
+      },
+  };
+});
 
 import { fetchCategories, fetchOffer, fetchOffers } from '@/lib/api/catalogue';
 
@@ -36,6 +48,7 @@ beforeEach(() => {
   );
   mocks.cookiesGet.mockReturnValue({ value: 'visitor-session' });
   mocks.headerValues.clear();
+  mocks.cacheArgs.length = 0;
 });
 
 afterEach(() => {
@@ -79,6 +92,38 @@ describe('catalogue requests', () => {
   });
 });
 
+describe('the visitor address and the cache', () => {
+  it('survives the cache boundary but is never part of the cache key', async () => {
+    vi.stubEnv('VERCEL', '1');
+    mocks.headerValues.set('x-vercel-forwarded-for', '203.0.113.7');
+
+    await fetchOffers({ category: 'pets', limit: 12, offset: 0 });
+    await fetchOffer('free-tea');
+    await fetchCategories();
+
+    for (let index = 0; index < 3; index += 1) {
+      expect(sentRequest(index).headers.get('X-Client-IP')).toBe('203.0.113.7');
+    }
+    expect(mocks.cacheArgs).toEqual([
+      [{ category: 'pets', limit: 12, offset: 0 }],
+      ['free-tea'],
+      [],
+    ]);
+    expect(JSON.stringify(mocks.cacheArgs)).not.toContain('203.0.113.7');
+  });
+
+  it('does not leak one visitor’s address into the next read', async () => {
+    vi.stubEnv('VERCEL', '1');
+    mocks.headerValues.set('x-vercel-forwarded-for', '203.0.113.7');
+    await fetchOffers();
+    mocks.headerValues.delete('x-vercel-forwarded-for');
+    await fetchOffers({ limit: 5 });
+
+    expect(sentRequest(0).headers.get('X-Client-IP')).toBe('203.0.113.7');
+    expect(sentRequest(1).headers.get('X-Client-IP')).toBeNull();
+  });
+});
+
 describe('the visitor address', () => {
   it('forwards the platform address as X-Client-IP on Vercel', async () => {
     vi.stubEnv('VERCEL', '1');
@@ -107,6 +152,73 @@ describe('the visitor address', () => {
     await fetchOffers();
 
     expect(sentRequest().headers.get('X-Client-IP')).toBeNull();
+  });
+
+  it('forwards the one configured trusted header off Vercel', async () => {
+    vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'X-Real-IP');
+    mocks.headerValues.set('x-real-ip', '203.0.113.20');
+    mocks.headerValues.set('x-forwarded-for', '198.51.100.1');
+
+    await fetchOffers();
+
+    expect(sentRequest().headers.get('X-Client-IP')).toBe('203.0.113.20');
+  });
+
+  it('prefers the Vercel header, then falls back to the configured one', async () => {
+    vi.stubEnv('VERCEL', '1');
+    vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'x-real-ip');
+    mocks.headerValues.set('x-vercel-forwarded-for', '203.0.113.7');
+    mocks.headerValues.set('x-real-ip', '203.0.113.20');
+    await fetchOffers();
+    expect(sentRequest(0).headers.get('X-Client-IP')).toBe('203.0.113.7');
+
+    mocks.headerValues.delete('x-vercel-forwarded-for');
+    await fetchCategories();
+    expect(sentRequest(1).headers.get('X-Client-IP')).toBe('203.0.113.20');
+  });
+
+  it('omits it when neither a Vercel header nor a configured header applies', async () => {
+    mocks.headerValues.set('x-vercel-forwarded-for', '203.0.113.7');
+    mocks.headerValues.set('x-real-ip', '203.0.113.20');
+
+    await fetchOffers();
+
+    expect(sentRequest().headers.get('X-Client-IP')).toBeNull();
+  });
+
+  it.each([
+    ['a value that is not an address', 'not-an-ip'],
+    ['an address list', '203.0.113.20, 198.51.100.1'],
+  ])('ignores the configured header when it holds %s', async (_name, value) => {
+    vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'x-real-ip');
+    mocks.headerValues.set('x-real-ip', value);
+
+    await fetchOffers();
+
+    expect(sentRequest().headers.get('X-Client-IP')).toBeNull();
+  });
+
+  it.each(['x real ip', 'x-real-ip, x-evil', 'x_real_ip', '../x', ''])(
+    'ignores a configured header name that is not a header name: %j',
+    async (name) => {
+      vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', name);
+      mocks.headerValues.set(name.trim().toLowerCase(), '203.0.113.20');
+      mocks.headerValues.set('x-real-ip', '203.0.113.20');
+
+      await fetchOffers();
+
+      expect(sentRequest().headers.get('X-Client-IP')).toBeNull();
+    }
+  );
+
+  it('does not let a spoofed x-forwarded-for win over the configured header', async () => {
+    vi.stubEnv('TRUSTED_CLIENT_IP_HEADER', 'x-real-ip');
+    mocks.headerValues.set('x-forwarded-for', '198.51.100.1');
+    mocks.headerValues.set('x-real-ip', '203.0.113.20');
+
+    await fetchOffers();
+
+    expect(sentRequest().headers.get('X-Client-IP')).toBe('203.0.113.20');
   });
 
   it('omits it off Vercel, where no header can be trusted', async () => {

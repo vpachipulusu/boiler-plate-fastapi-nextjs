@@ -55,7 +55,7 @@ beforeEach(() => {
 describe('offer call to action for a real offer', () => {
   it('opens an honest "coming soon" dialog, with no demo wording and no external link', async () => {
     const user = userEvent.setup();
-    render(<OfferCta offerType="free_sample" ended={false} categorySlug="beauty" demo={false} />);
+    render(<OfferCta offerType="free_sample" demo={false} />);
 
     await user.click(screen.getByRole('button', { name: /get this free sample/i }));
 
@@ -67,8 +67,30 @@ describe('offer call to action for a real offer', () => {
     }
   });
 
+  it.each([
+    ['free_sample', 'Get this free sample'],
+    ['free_trial', 'Start the free trial'],
+    ['cashback', 'Get this cashback'],
+    ['voucher', 'Get this voucher'],
+    ['competition', 'Enter this competition'],
+  ] as const)('puts "coming soon" on the %s button face and in its name', (type, label) => {
+    render(<OfferCta offerType={type} demo={false} />);
+
+    const button = screen.getByRole('button', { name: `${label}, coming soon` });
+    expect(button).toHaveTextContent(label);
+    expect(button).toHaveTextContent('Coming soon');
+  });
+
+  it('leaves the demo button exactly as it was, with no coming-soon badge', () => {
+    render(<OfferCta offerType="free_sample" demo />);
+
+    const button = screen.getByRole('button', { name: 'Get this free sample' });
+    expect(button).not.toHaveTextContent(/coming soon/i);
+    expect(button).not.toHaveAttribute('aria-label');
+  });
+
   it('keeps the affiliate disclosure link', () => {
-    render(<OfferCta offerType="voucher" ended={false} categorySlug="beauty" demo={false} />);
+    render(<OfferCta offerType="voucher" demo={false} />);
 
     expect(screen.getByRole('link', { name: /affiliate disclosure/i })).toHaveAttribute(
       'href',
@@ -218,6 +240,15 @@ describe('catalogue results when the catalogue cannot be read', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'All freebies' })).toBeInTheDocument();
     expect(screen.queryByText(/in this collection/i)).toBeNull();
     expect(screen.queryByRole('article')).toBeNull();
+  });
+
+  it('keeps the category name in the heading when only the search fails', async () => {
+    mocks.search.mockRejectedValue(new CatalogueUnavailableError());
+
+    render(await CatalogueHeading({ query: { ...DEFAULT_QUERY, category: 'pets' } }));
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Pets' })).toBeInTheDocument();
+    expect(screen.queryByText(/in this collection/i)).toBeNull();
   });
 
   it('does not swallow an error that is not an outage', async () => {

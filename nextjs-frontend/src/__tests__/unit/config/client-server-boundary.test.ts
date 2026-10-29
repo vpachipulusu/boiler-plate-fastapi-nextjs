@@ -85,6 +85,33 @@ describe('Backend settings stay out of the browser', () => {
     });
   });
 
+  describe('Given the env templates', () => {
+    it('should never set VERCEL, which would make a non-Vercel host trust x-vercel-forwarded-for', () => {
+      const root = path.resolve(SRC_DIR, '..');
+      const templates = readdirSync(root).filter((name) =>
+        /^\.env(\..+)?\.(example|template|sample)$/.test(name)
+      );
+
+      expect(templates.length).toBeGreaterThan(0);
+      for (const name of templates) {
+        const uncommented = readFileSync(path.join(root, name), 'utf8')
+          .split(/\r?\n/)
+          .filter((line) => !line.trim().startsWith('#'));
+        expect(
+          uncommented.some((line) => /^\s*VERCEL\s*=/.test(line)),
+          name
+        ).toBe(false);
+      }
+    });
+
+    it('should leave TRUSTED_CLIENT_IP_HEADER commented out and never public', () => {
+      const example = readFileSync(path.resolve(SRC_DIR, '..', '.env.example'), 'utf8');
+
+      expect(example).toMatch(/^# TRUSTED_CLIENT_IP_HEADER=/m);
+      expect(example).not.toMatch(/NEXT_PUBLIC_TRUSTED/);
+    });
+  });
+
   describe('Given next.config.ts', () => {
     it('should not copy a backend setting into the client bundle through env', () => {
       const config = readFileSync(path.resolve(SRC_DIR, '..', 'next.config.ts'), 'utf8');

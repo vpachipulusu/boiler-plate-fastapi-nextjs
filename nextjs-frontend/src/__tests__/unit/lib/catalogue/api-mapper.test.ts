@@ -201,6 +201,78 @@ describe('mapOffer', () => {
   });
 });
 
+describe('merchant logos', () => {
+  const withLogo = (logo_url: string | null) =>
+    mapOffer(apiOffer({ merchant: { slug: 'tea-time', name: 'Tea Time', logo_url } }));
+
+  it('keeps a plain https logo', () => {
+    expect(withLogo('https://cdn.example/l.png')?.merchant?.logoUrl).toBe(
+      'https://cdn.example/l.png'
+    );
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'http://cdn.example/l.png',
+    'data:image/png;base64,AAAA',
+    'https://user:pass@cdn.example/l.png',
+    '//cdn.example/l.png',
+    'not a url',
+    '',
+  ])('drops %j to no logo', (logo) => {
+    expect(withLogo(logo)?.merchant?.logoUrl).toBeNull();
+  });
+
+  it('keeps a missing logo null', () => {
+    expect(withLogo(null)?.merchant?.logoUrl).toBeNull();
+  });
+});
+
+describe('malformed API records', () => {
+  const broken = (patch: Record<string, unknown>) => mapOffer(apiOffer(patch as Partial<ApiOffer>));
+
+  it.each([
+    ['a null category', { category: null }],
+    ['a null merchant', { merchant: null }],
+    ['no image', { image: undefined }],
+    ['a string postage', { postage: 'free' }],
+    ['no description list', { description: undefined }],
+    ['a description that is not text', { description: [1, 2] }],
+    ['no steps list', { steps: null }],
+    ['a step without a title', { steps: [{ detail: 'x' }] }],
+    ['a numeric title', { title: 42 }],
+    ['a missing summary', { summary: undefined }],
+    ['a non-boolean flag', { featured: 'yes' }],
+    ['a category without a name', { category: { slug: 'food-drink' } }],
+  ])('drops an offer with %s and logs it instead of throwing', (_name, patch) => {
+    expect(() => broken(patch)).not.toThrow();
+    expect(broken(patch)).toBeNull();
+    expect(mocks.warn).toHaveBeenCalledWith(
+      'Catalogue: dropped an API record',
+      expect.objectContaining({ kind: 'offer' })
+    );
+  });
+
+  it('drops a record that is not an object', () => {
+    expect(mapOffer(null as unknown as ApiOffer)).toBeNull();
+    expect(mapOffer('x' as unknown as ApiOffer)).toBeNull();
+    expect(mapOffers([null as unknown as ApiOffer, apiOffer()])).toHaveLength(1);
+  });
+
+  it('drops malformed categories and ended stubs', () => {
+    expect(mapCategory(null as unknown as ApiCategory)).toBeNull();
+    expect(mapCategory({ ...apiCategory(), name: undefined } as unknown as ApiCategory)).toBeNull();
+    expect(mapCategory({ ...apiCategory(), sort_order: '2' } as unknown as ApiCategory)).toBeNull();
+    expect(
+      mapEndedOffer({ slug: 'x', title: 'X', category: null } as unknown as ApiEndedOffer)
+    ).toBeNull();
+    expect(mapEndedOffer(null as unknown as ApiEndedOffer)).toBeNull();
+    expect(
+      mapEndedOffer({ slug: 'x', title: 'X', category: { slug: 'a' } } as unknown as ApiEndedOffer)
+    ).toBeNull();
+  });
+});
+
 describe('mapOffers', () => {
   it('keeps the good offers and drops the bad ones', () => {
     const offers = mapOffers([

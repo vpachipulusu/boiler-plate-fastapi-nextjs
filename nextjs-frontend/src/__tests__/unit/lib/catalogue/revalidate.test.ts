@@ -32,8 +32,17 @@ describe('revalidateCatalogue', () => {
     expect(mocks.revalidatePath.mock.calls).toEqual([['/freebies/free-tea'], ['/']]);
   });
 
-  it('rejects a path that is not a path before changing anything', () => {
-    expect(() => revalidateCatalogue(['/ok', 'freebies/oops'])).toThrow(TypeError);
+  it.each([
+    'freebies/oops',
+    '',
+    '/freebies/../admin',
+    '/freebies?x=1',
+    '/freebies#top',
+    '/free bies',
+    '/freebies	',
+    '//..',
+  ])('rejects %j before changing anything', (path) => {
+    expect(() => revalidateCatalogue(['/ok', path])).toThrow(TypeError);
 
     expect(mocks.revalidateTag).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).not.toHaveBeenCalled();

@@ -223,6 +223,28 @@ describe('fetchCategories', () => {
   });
 });
 
+describe('slugs that are not slugs', () => {
+  it.each(['../admin', 'Bad Slug', 'a/b', '', 'tea?x=1'])(
+    'answers not found for %j without calling the backend',
+    async (slug) => {
+      await expect(fetchOffer(slug)).resolves.toEqual({ kind: 'not_found' });
+
+      expect(mocks.readOffer).not.toHaveBeenCalled();
+      expect(offerCache).not.toHaveBeenCalled();
+    }
+  );
+
+  it('drops a category filter that is not a slug instead of sending it', async () => {
+    mocks.listOffers.mockResolvedValue(ok(LIST));
+
+    await fetchOffers({ category: '../etc', limit: 12 });
+    await fetchOffers({ category: 'pets', limit: 12 });
+
+    expect(mocks.listOffers.mock.calls[0][0].query).toEqual({ limit: 12 });
+    expect(mocks.listOffers.mock.calls[1][0].query).toEqual({ category: 'pets', limit: 12 });
+  });
+});
+
 describe('fetchOffer', () => {
   it('returns a found offer and asks the API for that slug', async () => {
     mocks.readOffer.mockResolvedValue(ok(OFFER));
