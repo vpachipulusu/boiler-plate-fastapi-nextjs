@@ -1,6 +1,5 @@
 import { SORT_KEYS, SORT_LABELS, type CatalogueQuery } from '@/lib/catalogue';
 import { cn } from '@/lib/utils';
-import { AutoSubmitSelect } from './auto-submit-select';
 import { catalogueBasePath } from './catalogue-links';
 
 interface SortSelectProps {
@@ -8,8 +7,6 @@ interface SortSelectProps {
   scopeCategory?: string;
   className?: string;
 }
-
-const SORT_OPTIONS = SORT_KEYS.map((key) => ({ value: key, label: SORT_LABELS[key] }));
 
 /** The active params the form must carry so changing the sort keeps search and filters. Page resets. */
 function hiddenParams(query: CatalogueQuery, scopeCategory?: string): [string, string][] {
@@ -22,8 +19,8 @@ function hiddenParams(query: CatalogueQuery, scopeCategory?: string): [string, s
 }
 
 /**
- * Sort control (design screen 02): a GET form with a native select. A tiny client component submits
- * on change; the Apply button keeps it usable without JavaScript.
+ * Sort control (design screen 02): a GET form with a native select and an Apply button. The
+ * select never submits on change, so keyboard users can arrow through the options (WCAG 3.2.2).
  */
 export function SortSelect({ query, scopeCategory, className }: SortSelectProps) {
   return (
@@ -38,13 +35,18 @@ export function SortSelect({ query, scopeCategory, className }: SortSelectProps)
       <label htmlFor="catalogue-sort" className="sr-only">
         Sort by
       </label>
-      <AutoSubmitSelect
+      <select
         id="catalogue-sort"
         name="sort"
         defaultValue={query.sort}
-        options={SORT_OPTIONS}
         className="h-11 rounded-input border border-border bg-card px-4 text-sm font-bold text-foreground shadow-sm hover:border-ring"
-      />
+      >
+        {SORT_KEYS.map((key) => (
+          <option key={key} value={key}>
+            {SORT_LABELS[key]}
+          </option>
+        ))}
+      </select>
       <button
         type="submit"
         className="h-11 rounded-pill px-3 text-sm font-bold text-accent-ink hover:underline"

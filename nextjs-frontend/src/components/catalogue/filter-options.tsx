@@ -27,6 +27,7 @@ export function OptionLink({ href, selected, kind, children, className }: Option
   return (
     <Link
       href={href}
+      scroll={false}
       aria-current={selected ? 'true' : undefined}
       className={cn(
         'flex min-h-11 items-center gap-3 rounded-pill px-3 text-sm transition-colors hover:bg-muted',

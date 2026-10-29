@@ -72,8 +72,9 @@ API without touching call sites.
 | `src/components/alerts/` | `AlertsForm` (client component, react-hook-form + Zod) |
 | `src/components/legal/` | `LegalPage` shell with draft banner and `ReviewerChecklist` |
 
-Only `offer-cta.tsx`, `alerts-form.tsx`, `auto-submit-select.tsx`, `filter-drawer.tsx` and the
-site header are client components.
+Only `offer-cta.tsx`, `alerts-form.tsx`, `filter-drawer.tsx`, the mobile tab bar and the site
+header are client components. The filter drawer and sort control render outside the keyed
+Suspense boundaries in `catalogue-layout.tsx` so they keep focus across filter navigations.
 
 ## Tests
 
@@ -89,7 +90,7 @@ site header are client components.
 
 - The newsletter band on the homepage is a GET form to `/alerts?email=`, so the address lands in
   the URL. Phase 3 replaces this with a POST server action.
-- The mobile filter drawer and the sort auto-submit need JavaScript; search, category chips and
+- The mobile filter drawer needs JavaScript; search, sort (Apply button), category chips and
   pagination work without it.
 - `/freebies` is served statically from fixtures; caching and revalidation arrive with Phase 2.
 - An unknown `/category/[slug]` renders the 404 page but answers HTTP 200. The template's root

@@ -44,6 +44,8 @@ export function FilterDrawer({ activeCount = 0, children, className }: FilterDra
         <DialogPrimitive.Content
           aria-describedby={undefined}
           onClick={(event) => {
+            // A modified click opens a new tab, so this sheet should stay as it is.
+            if (event.metaKey || event.ctrlKey || event.shiftKey) return;
             if ((event.target as HTMLElement).closest('a')) setOpen(false);
           }}
           className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-editorial border-t border-border bg-background p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom"

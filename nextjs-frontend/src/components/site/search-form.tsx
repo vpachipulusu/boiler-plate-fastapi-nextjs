@@ -35,6 +35,7 @@ export function SearchForm({
       action="/freebies"
       method="get"
       role="search"
+      aria-label={isHero ? 'Search the catalogue' : 'Search freebies'}
       className={cn('flex items-center gap-2', className)}
     >
       {hiddenParams.map(([name, value]) => (

@@ -15,7 +15,7 @@ import CategoryPage, {
   generateStaticParams,
 } from '@/app/(public)/category/[slug]/page';
 import FreebiesPage, { generateMetadata as freebiesMetadata } from '@/app/(public)/freebies/page';
-import { CatalogueResults } from '@/components/catalogue/catalogue-results';
+import { CatalogueHeading, CatalogueResults } from '@/components/catalogue/catalogue-results';
 import { FilterSidebar } from '@/components/catalogue/filter-sidebar';
 import {
   CATALOGUE_PAGE_SIZE,
@@ -49,7 +49,12 @@ describe('catalogue results', () => {
   it('lists one page of live offers with the real total for the default query', async () => {
     const expected = await searchOffers(DEFAULT_QUERY);
 
-    render(await CatalogueResults({ query: DEFAULT_QUERY }));
+    render(
+      <>
+        {await CatalogueHeading({ query: DEFAULT_QUERY })}
+        {await CatalogueResults({ query: DEFAULT_QUERY })}
+      </>
+    );
 
     expect(screen.getByRole('heading', { level: 2, name: 'All freebies' })).toBeInTheDocument();
     expect(screen.getByText(`${expected.total} freebies in this collection`)).toBeInTheDocument();
@@ -92,7 +97,7 @@ describe('catalogue results', () => {
   it('shows a zero count in the heading row when nothing matches', async () => {
     const query = parseCatalogueParams({ q: 'zzzz' });
 
-    render(await CatalogueResults({ query }));
+    render(await CatalogueHeading({ query }));
 
     expect(screen.getByText('0 freebies in this collection')).toBeInTheDocument();
   });

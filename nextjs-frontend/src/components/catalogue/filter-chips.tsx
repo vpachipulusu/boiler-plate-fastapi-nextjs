@@ -45,6 +45,7 @@ export function FilterChips({ query, categories, scopeCategory, className }: Fil
             <li>
               <Link
                 href={catalogueHref(query, { category: null })}
+                scroll={false}
                 aria-current={query.category === null ? 'true' : undefined}
                 className={chipClass(query.category === null)}
               >
@@ -57,6 +58,7 @@ export function FilterChips({ query, categories, scopeCategory, className }: Fil
                 <li key={category.slug}>
                   <Link
                     href={catalogueHref(query, { category: category.slug })}
+                    scroll={false}
                     aria-current={selected ? 'true' : undefined}
                     className={chipClass(selected)}
                   >

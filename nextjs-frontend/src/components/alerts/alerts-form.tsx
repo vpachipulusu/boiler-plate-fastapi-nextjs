@@ -49,7 +49,7 @@ const CARD_CLASS =
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
   return (
-    <p id={id} className={ERROR_CLASS}>
+    <p id={id} role="alert" className={ERROR_CLASS}>
       {message}
     </p>
   );
@@ -65,6 +65,7 @@ export function AlertsForm({ categories, defaultEmail = '' }: AlertsFormProps) {
     register,
     control,
     handleSubmit,
+    setFocus,
     formState: { errors, isSubmitting },
   } = useForm<AlertsValues>({
     resolver: zodResolver(alertsSchema),
@@ -100,7 +101,7 @@ export function AlertsForm({ categories, defaultEmail = '' }: AlertsFormProps) {
             </label>
             <Input
               id="alerts-email"
-              type="text"
+              type="email"
               inputMode="email"
               autoComplete="email"
               placeholder="you@example.com"
@@ -122,13 +123,15 @@ export function AlertsForm({ categories, defaultEmail = '' }: AlertsFormProps) {
               name="categories"
               render={({ field }) => (
                 <ul className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {categories.map((category) => {
+                  {categories.map((category, index) => {
                     const checked = field.value.includes(category.slug);
                     return (
                       <li key={category.slug}>
                         <label className={cn(CARD_CLASS, 'w-full')}>
                           <input
                             type="checkbox"
+                            // The first box carries the field ref so a failed submit can focus the group.
+                            ref={index === 0 ? field.ref : undefined}
                             className="peer sr-only"
                             value={category.slug}
                             checked={checked}
@@ -199,7 +202,12 @@ export function AlertsForm({ categories, defaultEmail = '' }: AlertsFormProps) {
 
         <div aria-live="polite" className="mt-8">
           {previewDone ? (
-            <div className="rounded-card bg-warn p-5 text-warn-foreground">
+            <div
+              // The submit button unmounts on success, so the panel takes focus as it mounts.
+              ref={(node) => node?.focus()}
+              tabIndex={-1}
+              className="rounded-card bg-warn p-5 text-warn-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               <p className="font-bold">
                 Alerts aren&apos;t live yet. Nothing was saved — this is a design preview of the
                 Freejoy alerts flow.
@@ -214,7 +222,11 @@ export function AlertsForm({ categories, defaultEmail = '' }: AlertsFormProps) {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => setPreviewDone(false)}
+                  onClick={() => {
+                    setPreviewDone(false);
+                    // This button unmounts with the panel; the email field is re-enabled on commit.
+                    requestAnimationFrame(() => setFocus('email'));
+                  }}
                   className="inline-flex min-h-11 items-center rounded-pill px-3 text-sm font-bold underline underline-offset-4"
                 >
                   Change my answers

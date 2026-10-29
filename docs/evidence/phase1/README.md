@@ -71,4 +71,4 @@ Deliberate differences:
   `docs/developer/freejoy-frontend.md`).
 - Newsletter band passes the email to `/alerts` in the query string; replaced by a POST action in
   Phase 3.
-- Mobile filter drawer and sort auto-submit need JavaScript.
+- Mobile filter drawer needs JavaScript (sort uses an Apply button and works without it).
