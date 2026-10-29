@@ -117,7 +117,8 @@ domain outside the allowed research list; it is treated here as a product decisi
 - **Acceptance criteria:**
   1. Every anchor whose `href` starts with `/go/` has `rel="sponsored nofollow"` (plus `noopener` if `target="_blank"` is used), enforced by one shared link component and a unit test that fails if any `/go/` anchor lacks it.
   2. `/go/` is disallowed in `robots.txt` and absent from the sitemap.
-  3. The redirect sets no cookie, performs no interstitial that hides the destination, and answers a non-live or unknown offer with a normal 404 or a page that says the offer has ended, never a redirect.
+  3. The redirect destination comes only from the stored offer record: no query string, header or request body can influence it. The response carries `Referrer-Policy: no-referrer`.
+  4. The redirect sets no cookie, performs no interstitial that hides the destination, and answers a non-live or unknown offer with a normal 404 or a page that says the offer has ended, never a redirect.
 
 ### A6. Sponsored or paid placements
 
@@ -149,7 +150,7 @@ domain outside the allowed research list; it is treated here as a product decisi
 - **Freejoy:** `postageText()` shows "Free", "£x.xx" or "Check terms"; the offer page shows a POSTAGE chip and a "Cost & postage" row. Postage "Check terms" is honest but must be resolved to a figure or "Free" before an offer goes live.
 - **Where:** `src/components/offer/offer-format.ts`, `important-bits.tsx`, `offer-trust-panel.tsx`.
 - **Status:** `Done` for display. `Pending Phase 3` for the call-to-action: see acceptance criteria.
-- **Acceptance criteria:** A free-sample CTA never appears without the postage amount in the same viewport block ("Get this sample. Postage £2.99."); an offer with `postage.kind = 'check_terms'` cannot be published live.
+- **Acceptance criteria:** A free-sample CTA never appears without the postage amount rendered inside the same `<section>` as the CTA, after the button in DOM order, at every breakpoint ("Get this sample. Postage £2.99."); an offer with `postage.kind = 'check_terms'` cannot be published live.
 
 ### B3. Free trial that converts to a paid plan
 
@@ -182,7 +183,7 @@ domain outside the allowed research list; it is treated here as a product decisi
 - **Rule:** An entry is not a prize. Never imply a visitor has won, or will win (CAP 8.19 to 8.21; Schedule 20 paragraph 22). Free-entry requirements: section G.
 - **Source:** S3; S8 paragraph 22.
 - **Freejoy:** CTA reads "Enter this competition"; steps say "entering is no guarantee".
-- **Status:** `Done` for Phase 1 copy; `Pending Phase 3` for alert and email wording (acceptance criteria D8).
+- **Status:** `Done` for Phase 1 copy; `Pending Phase 3` for alert and email wording (acceptance criteria D6).
 
 ### B7. Site-level "free" and "zero spend" slogans
 
@@ -275,14 +276,18 @@ domain outside the allowed research list; it is treated here as a product decisi
   3. A confirmation click moves the record to confirmed and stores the confirmation time; a second click is harmless.
   4. Pending records that are never confirmed are deleted after the token expiry plus a short grace period, and the privacy notice says so.
   5. The confirmation email contains the sender identity and the sign-up details, and is the only email sent before confirmation.
-  6. The email address is submitted by POST (server action), never in a URL (finding N-07).
+  6. The email address is submitted by POST (server action), never in a URL, so it cannot reach hosting request logs, browser history or Sentry transaction and breadcrumb URLs (findings N-07, N-12). The homepage newsletter band becomes a POST/server-action form; alternatively, until it is converted, the `email` query parameter is scrubbed from every URL Sentry sends (`beforeSend`, `beforeSendTransaction`, `beforeBreadcrumb`). The coordinator will file the scrubber as its own story; this checklist only records it.
+  7. Subscribe is rate limited per IP and has a per-address cooldown, and returns the same response whether or not the address is already known (no enumeration).
+  8. The confirmation token is generated with a CSPRNG, is at least 128 bits, is stored hashed, is compared by hash with a constant-time comparison and is invalidated on use.
+  9. The confirmation link survives mail-scanner prefetch: the link opens a GET landing page that changes nothing, and a POST from that page confirms.
+  10. Subscribe, confirm and unsubscribe are reachable only through server actions or POST requests.
 
 ### D4. Records of consent
 
 - **Rule:** Keep records showing who consented, when and how (ICO email guidance; UK GDPR Article 7(1): be able to show consent).
 - **Source:** S13; S15 Article 7(1).
 - **Status:** `Pending Phase 3`
-- **Acceptance criteria:** Each subscriber record stores: email, the categories and frequency chosen, the consent statement version, the date and time of the request, the date and time of confirmation, and the source page. Whether to store an IP address or user agent as extra proof is a judgement for `Needs professional review`; do not store them by default. Unsubscribed addresses stay on a suppression list holding only a hash or the address, so a later import cannot re-add them (the ICO advises keeping a do-not-contact list).
+- **Acceptance criteria:** Each subscriber record stores: email, the categories and frequency chosen, the consent statement version, the date and time of the request, the date and time of confirmation, and the source route (the path only, never a full URL or query string). Whether to store an IP address or user agent as extra proof is a judgement for `Needs professional review`; do not store them by default. Unsubscribed addresses stay on a suppression list holding only a hash or the address, so a later import cannot re-add them (the ICO advises keeping a do-not-contact list).
 
 ### D5. Unsubscribe in every email
 
@@ -295,6 +300,7 @@ domain outside the allowed research list; it is treated here as a product decisi
   2. Unsubscribing takes effect immediately for the next send, and the confirmation page does not try to re-sell the alerts.
   3. The email footer shows the sender name, a postal address and a reply address (S19 regulation 7(b); S4 rule 10.7).
   4. The unsubscribe endpoint is rate limited and idempotent, and the token reveals nothing about the address.
+  5. There is one unsubscribe token per subscriber record; re-subscribing revokes any earlier unsubscribe token.
 
 ### D6. Email content: recognisable, labelled, honest
 
@@ -312,12 +318,14 @@ domain outside the allowed research list; it is treated here as a product decisi
 ### D8. Children
 
 - **Rule:** The age at which a child can consent to an online service, and any under-18 limits on offers, are a legal judgement; some fixtures use "aged 16 or over" and "aged 18 or over".
+- **Source:** UK GDPR Article 8 (not fetched: unverified, to confirm).
 - **Status:** `Needs professional review`
 - **Acceptance criteria:** The alerts form states the minimum age for sign-up once the reviewer sets it.
 
 ### D9. Transactional email versus marketing
 
 - **Rule:** A confirmation or unsubscribe acknowledgement is a service message and must not carry promotion.
+- **Source:** S13 (the ICO email guidance on direct marketing; whether service messages sit outside it is for the reviewer to confirm).
 - **Status:** `Pending Phase 3`
 - **Acceptance criteria:** The double-opt-in confirmation and unsubscribe acknowledgement contain no offers, banners or affiliate links.
 
@@ -337,29 +345,31 @@ Method: searched `nextjs-frontend/src` and `package.json` for `cookie`, `cookies
 
 | Item | Where | Public catalogue pages? | PECR position (for the reviewer) |
 | --- | --- | --- | --- |
-| `session` cookie (httpOnly, `secure` in production, SameSite=Lax, 5 days) | `src/app/actions/auth-actions.ts` (`setSessionCookie`), name in `src/lib/api/server.ts:20` | No. Set only when a person signs in. | Strictly necessary for a service the user asked for (Schedule A1 para 4: authentication). No consent needed; named in the cookie notice. |
+| `session` cookie (httpOnly, `secure` in production, SameSite=Lax, 5 days) | `src/app/actions/auth-actions.ts` (`setSessionCookie`), name in `src/lib/api/server.ts:20` | No. Set only when a person signs in. | Strictly necessary for a service the user asked for (Schedule A1 para 4: authentication). No consent needed; named on the cookie notice ("called `session`", kept for up to five days). |
 | `email-verified` cookie | Deleted by `setSessionCookie` ("any left over from an older deployment") | No | Not set any more. |
 | Third-party analytics, advertising pixels, tag managers, social widgets | No match anywhere in `src` or `package.json` | No | None to consent to. |
-| Theme preference in `localStorage` (key `theme`) | `src/components/providers/theme-provider.tsx` (next-themes) | Read only. next-themes writes the key only inside its `setTheme` function, and no component calls `setTheme`; there is no theme toggle on the public pages. | Nothing is written on public pages today. If a toggle is added: appearance exception (para 6) with a simple means of objecting, or consent. |
-| Firebase client SDK state | `src/lib/firebase/client.ts`, imported by the sign-in, sign-up, password-reset and dashboard components | Not imported by the public layout or providers | The SDK keeps sign-in state in browser storage after a person signs in (behaviour to confirm in a browser). Strictly necessary for sign-in, same reasoning as the session cookie. |
-| Sentry browser SDK | `src/instrumentation-client.ts` (`enabled` only when `NEXT_PUBLIC_SENTRY_DSN` is set; replay sample rates 0) | Runs on every page when enabled | Writes no cookie. The only `sessionStorage` use is `linkPreviousTrace: "session-storage"`; the installed default is `"in-memory"` (`@sentry/browser` `browserTracingIntegration.js:33`), so nothing is written. This is a UK GDPR matter instead: the SDK sends error and performance events, which normally include the IP address, to Sentry. See F4. |
+| Theme preference in `localStorage` (key `theme`) | `src/components/providers/theme-provider.tsx` (next-themes) | Nothing is written on public pages: next-themes writes the key only inside its `setTheme` function, and no component calls `setTheme`; there is no theme toggle. But the provider reads the `theme` key on every page load. | A read is "access" under PECR regulation 6(1). Reviewer to confirm the appearance exception or strictly-necessary covers reading a key that is never written (section J item 9). If a toggle is added: appearance exception (para 6) with a simple means of objecting, or consent. |
+| Firebase client SDK state | `src/lib/firebase/client.ts`, imported by the sign-in, sign-up, password-reset and dashboard components | Not imported by the public layout or providers. Initialised on the sign-in pages (`/login`, `/signup`), before sign-in (confirm in browser) | Opening a sign-in page prepares Firebase Auth storage (IndexedDB) even if the visitor never signs in (confirm in browser, K6). Strictly necessary for sign-in, same reasoning as the session cookie; the cookie notice says so. |
+| Sentry browser SDK | `src/instrumentation-client.ts` (`enabled` only when `NEXT_PUBLIC_SENTRY_DSN` is set; replay sample rates 0) | Runs on every page when enabled | Writes no cookie. The only `sessionStorage` use is `linkPreviousTrace: "session-storage"`; the installed default is `"in-memory"` (`@sentry/browser` `browserTracingIntegration.js:33`), so nothing is written. This is a UK GDPR matter instead: the SDK sends error and performance events, which normally include the IP address, to Sentry, and transaction and breadcrumb URLs can include the `email` query parameter that the homepage band puts in the `/alerts` URL (N-07). See D3.6 and F4. |
 | `sentry-trace` and `baggage` headers on same-origin requests | Sentry tracing | Yes when enabled | Not storage or access to the device; no identifier is stored. Reviewer to confirm. |
 | Fonts | `next/font` (self-hosted at build) | Yes | No request to a font provider. |
 | Vercel hosting request logs | Platform | Yes | Server-side, not PECR regulation 6, but personal data (IP address). See F4. |
+| Winston application logs | `src/lib/logger.ts`: daily rotating files in `logs/` on the server (app log kept 7 days in development and 14 in production, error log 30 days); emails and tokens are redacted at logger level | Server-side only | Not PECR regulation 6. Personal data may still reach them despite redaction; list in the privacy notice. See F4. |
 
 ### E3. Is a cookie banner needed?
 
-- **Conclusion for now:** Not on the public pages. The audit finds no storage on a visitor's device for a person who only browses, no analytics, and no advertising. The cookie notice therefore says the site intends to set no non-essential cookies and shows no banner. This stays an engineering conclusion, not a compliance claim, until the reviewer signs the cookie notice off.
+- **Conclusion for now:** Not on the public pages. The audit finds nothing written to a visitor's device for a person who only browses (the `theme` key is read but never written: see the next-themes row), no analytics, and no advertising. The cookie notice therefore says the site intends to set no non-essential cookies and shows no banner. This stays an engineering conclusion, not a compliance claim, until the reviewer signs the cookie notice off.
 - **Status:** `Done` for the audit and the draft notice (`src/app/(public)/cookies/page.tsx`); `Needs professional review` for sign-off.
 - **Re-open this decision when any of these change:** an analytics tool is added (even a cookieless one: check the statistical-purposes exception, which needs clear information and a simple means of objecting, S11 para 5); an embedded video or map; a theme toggle that writes to storage; any affiliate network pixel; any advertising; Sentry Replay or `linkPreviousTrace: "session-storage"`.
 
 ### E4. Phase 3 constraints on storage
 
+- **Rule:** As E1: any storage or access needs consent or an exception (PECR regulation 6, Schedule A1).
 - **Status:** `Pending Phase 3`
 - **Acceptance criteria:**
   1. The `/go/` redirect and click-event recording set no cookie, write no `localStorage`/`sessionStorage`, and read no identifier from the device. The click-event table keeps no IP address, cookie id or user id (owner design decision; see F3).
   2. Any added analytics or affiliate tracking script is listed on `/cookies` before release, goes through a consent mechanism unless the reviewer confirms an exception, and does not load before consent.
-  3. A unit test fails if `document.cookie`, `localStorage`, `sessionStorage` or `indexedDB` appears in `src/components`, `src/app/(public)` or `src/lib/catalogue` without an allow-list entry naming the cookie-notice row it belongs to.
+  3. A unit test fails if `document.cookie`, `localStorage`, `sessionStorage` or `indexedDB` appears in `src/components`, `src/app/(public)` or `src/lib/catalogue` without an allow-list entry naming the cookie-notice row it belongs to. The same test also covers `src/app/(auth)` and `src/lib/firebase`, where the allowed entries are the sign-in storage items.
 
 ---
 
@@ -378,6 +388,7 @@ Method: searched `nextjs-frontend/src` and `package.json` for `cookie`, `cookies
 | Suppress after unsubscribe | Email or hash | Legal obligation / legitimate interests (reviewer to choose) |
 | Count outbound clicks (offer id, time) | No IP, cookie id or user id | Likely not personal data; if the reviewer disagrees, legitimate interests |
 | Error monitoring and security logs | Technical data including IP | Legitimate interests |
+| Accounts: email, name, sign-in times, IP address and browser of each sign-in, two-factor settings | Held by the backend (`users`, `login_history`) | Contract or legitimate interests (reviewer to choose); retention to be set |
 | Contact form replies | Name, email, message | Legitimate interests or consent (the form is off today) |
 
 - **Status:** `Needs professional review`
@@ -395,17 +406,18 @@ Method: searched `nextjs-frontend/src` and `package.json` for `cookie`, `cookies
 - **Rule:** Collect only what is needed (UK GDPR data-minimisation principle). The design deliberately keeps IP address, cookie id and user id out of the click-event table.
 - **Source:** Owner design decision; UK GDPR principles (Article 5, not separately fetched: unverified, to confirm).
 - **Status:** `Pending Phase 3`
-- **Acceptance criteria:** The click-event insert takes only offer id, a timestamp and (optionally) the referring route; a backend test asserts the table has no IP, cookie or user-id column. The request is not logged with IP at application level beyond what the platform does by default, and the privacy notice mentions that platform logs exist (F4).
+- **Acceptance criteria:** The click-event insert takes only offer id, a timestamp and (optionally) the referring route; a backend test asserts the table has no IP, cookie or user-id column. The request is not logged with IP at application level beyond what the platform does by default, and the privacy notice mentions that platform logs exist (F4). An offer id plus a second-precision timestamp can be joined with hosting request logs to single out a visitor: truncate the timestamp to the hour, or list the join risk for the reviewer.
 
 ### F4. Processors, logs and transfers
 
 - **Rule:** The notice must name recipients and describe transfers outside the UK.
-- **Freejoy:** Hosting provider logs (IP address, user agent) and, if the DSN is set, Sentry events (IP, browser, page) are processed today on any deployed instance. The email provider for Phase 3 is not chosen.
+- **Freejoy:** Hosting provider logs (IP address, user agent), server-side Winston application logs (7/14/30-day rotation, emails and tokens redacted at logger level) and, if the DSN is set, Sentry events (IP, browser, page and URL) are processed today on any deployed instance. The email provider for Phase 3 is not chosen.
 - **Status:** `Needs professional review`; `Owner action` K4 (choose and list providers, check data-processing terms and transfer mechanism).
 
 ### F5. Data subject requests and retention
 
 - **Rule:** People can ask for access, correction and deletion; the notice must say how and for how long data is kept.
+- **Source:** S16; S15 Article 21 for objection. Retention periods are set by the owner and the reviewer (K8), not by this checklist.
 - **Status:** `Pending Phase 3` for the mechanism. Acceptance criteria: a documented route (the contact page, once live) handles access and deletion requests; subscriber records and tokens have retention periods set by the owner and enforced by a scheduled job.
 
 ### F6. Contact form
@@ -498,12 +510,12 @@ is owned by someone else and the coordinator should apply the suggested wording.
 | N-04 | `src/components/offer/offer-format.ts:24-25` (chips) and `:32-33` (CTA labels) | Medium | "FREE PRODUCT", "Get this free sample" and "Start the free trial" appear with no postage or card information in the CTA block, even for a sample with £2.99 postage or a trial that needs a card. CAP 3.23 allows delivery cost but 3.24 needs the commitment to be clear; the owner rule is stricter. | Chips: "SAMPLE", "TRIAL". CTAs: "Request this sample", "Start the trial", followed by a generated line "Postage £2.99." / "Card required. £X a month after day N unless you cancel." |
 | N-05 | `src/lib/catalogue/types.ts:136-142` (labels) and `fixtures.ts:219,373,626` (popular), `:296,550,798` (limited), `:425,474,675` (ends_soon) | Medium | "Popular" is an unevidenced popularity claim (CAP 3.7). "Limited" and "Ends soon" read as urgency (CAP 3.30; Schedule 20 paragraph 7) if they are editorial toggles rather than facts. | Remove `popular`. Compute "Ends soon" from the real `endAt`; allow "Limited" only when the provider states a cap. See C1/C2. |
 | N-06 | `src/components/home/trust-strip.tsx:6-7` | Medium | "No hidden surprises" is an absolute promise; "UK freebies only" excludes vouchers and cashback from the description. | "Terms upfront: postage, eligibility and card needs on each listing". "UK offers: samples, trials, cashback, vouchers and competitions". |
-| N-07 | `src/components/home/newsletter-band.tsx:24`, `:28`, `:49` | Medium | "No spam" and "Unsubscribe anytime" describe a service that does not exist yet. The form is a GET form, so the visitor's email address lands in the URL, in hosting logs and in browser history; there is no consent box on the band. | Until Phase 3: "Alerts are not live yet. See how we plan to use your email in the privacy notice." In Phase 3: POST server action, consent checkbox, "We will email you to confirm" (see D2, D3). |
+| N-07 | `src/components/home/newsletter-band.tsx:24`, `:28`, `:49` | Medium | "No spam" and "Unsubscribe anytime" describe a service that does not exist yet. The form is a GET form, so the visitor's email address lands in the URL, in hosting logs, in browser history and, if Sentry is enabled, in Sentry transaction and breadcrumb URLs; there is no consent box on the band. | Until Phase 3: "Alerts are not live yet. See how we plan to use your email in the privacy notice." In Phase 3: POST server action, consent checkbox, "We will email you to confirm" (see D2, D3). |
 | N-08 | `src/components/alerts/alerts-form.tsx:90`, `:191-194` | Low | "You can change this anytime" promises a preferences page that does not exist. The consent label says "privacy policy" while the page is titled "Privacy notice". | Phase 3: "Yes, send me Freejoy's freebie alerts by email. I can unsubscribe at any time." and link text "privacy notice". |
 | N-09 | `src/components/offer/offer-cta.tsx:101` | Medium | "we may earn a commission if you qualify" is vague ("may") and wrong in substance (commission is paid on a click or sale, not "if you qualify"). | See A2: an "Ad" label before the button and "Freejoy is paid a commission by the brand if you take up this offer through this link." |
 | N-10 | `src/components/catalogue/offer-card.tsx` (whole card) | Medium (Phase 3) | No "Ad" label on cards. Not a problem now (no affiliate links) but required once offers link through `/go/`. | See A1. |
 | N-11 | `src/components/offer/offer-trust-panel.tsx:27` | Medium (Phase 2) | "Last checked <date>" prints a fixture date, shielded today by the demo badge. | See C4: real editor check only. |
-| N-12 | `src/app/(public)/alerts/page.tsx:17-20` | Medium | Email address is read from the query string and prefilled; it appears in URLs and logs (a known Phase 1 deviation). | Phase 3: POST action; do not accept `?email=`. |
+| N-12 | `src/app/(public)/alerts/page.tsx:17-20` | Medium | Email address is read from the query string and prefilled; it appears in URLs, hosting logs and, if Sentry is enabled, Sentry transaction and breadcrumb URLs (a known Phase 1 deviation). | Phase 3: POST action; do not accept `?email=`. |
 | N-13 | `src/components/catalogue/catalogue-header.tsx:41` | Low | "Find your next little free thing." covers cashback and vouchers, which are not free. | "Find your next little treat." |
 | N-14 | `src/components/site/site-footer.tsx` | Medium (launch) | No operator name, address or company number. | See H1 once the owner supplies details. |
 
@@ -524,6 +536,7 @@ these. Engineers must not.
 7. Lawful bases per purpose, whether click events are personal data, retention periods, processors and any
    transfer outside the UK, including Sentry and the hosting provider (F1, F2, F4).
 8. Whether to store any IP address or user agent as consent evidence (D4).
+9. Whether the appearance exception or strictly-necessary covers the theme provider reading the `theme` key on every page load when nothing is ever written (E2).
 9. The cookie notice, the conclusion that no banner is needed, and any future analytics choice (E3).
 10. Whether Freejoy may ever run its own competition or free draw, and the Gambling Act 2005 position (G1).
 11. Company-law disclosures required on the site for the chosen legal form (H1) and the ICO fee exemption position (H2).
@@ -542,10 +555,11 @@ them or enter credentials.
 | K3 | Run the ICO data protection fee self-assessment and pay or record the exemption; keep the registration number. | Before processing subscriber data |
 | K4 | Choose the email-sending provider, the hosting and error-monitoring set-up; get each provider's data-processing terms; note the transfer mechanism for any provider outside the UK. | Phase 3 |
 | K5 | Join the affiliate networks (or direct programmes), read their disclosure terms, and keep the signed terms for the reviewer. | Phase 3 |
-| K6 | Verify the cookie and storage audit in a browser against a production build with the real environment variables set (Application tab and network log), and record the result in `docs/evidence/`. | Before launch |
+| K6 | Verify the cookie and storage audit in a browser against a production build with the real environment variables set (Application tab and network log), including `/login` and `/signup` (Firebase Auth IndexedDB before sign-in), and record the result in `docs/evidence/`. | Before launch |
 | K7 | Appoint the qualified legal reviewer, give them the Needs professional review list, and keep their written sign-off. | Before launch |
 | K8 | Decide the minimum sign-up age, the retention periods and the "last checked" freshness threshold. | Phase 3 |
 | K9 | Decide whether Freejoy will ever run its own giveaways. Until the reviewer answers G1, it does not. | Any time |
+| K10 | At launch, remove `robots: { index: false }` from the about, contact, privacy, cookies, terms and affiliate-disclosure pages (after the reviewer signs each off) and flip the unit tests that assert it. | Launch |
 
 ## L. Limits of this research
 
