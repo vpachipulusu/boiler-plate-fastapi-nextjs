@@ -5,6 +5,7 @@ import { ClaimSteps } from '@/components/offer/claim-steps';
 import { ImportantBits } from '@/components/offer/important-bits';
 import { OfferHero } from '@/components/offer/offer-hero';
 import { RelatedOffers } from '@/components/offer/related-offers';
+import { JsonLd } from '@/components/seo/json-ld';
 import {
   getCategoryBySlug,
   getLiveOffers,
@@ -14,7 +15,14 @@ import {
   getRelatedOffers,
   getToday,
   isLive,
+  type Offer,
 } from '@/lib/catalogue';
+import { expiredIndexingPolicy } from '@/lib/seo/indexing';
+import { buildBreadcrumbList } from '@/lib/seo/json-ld';
+import { offerRobots, openGraphFor } from '@/lib/seo/metadata';
+
+/** Re-rendered at most hourly so an offer that has just ended shows its ended state and noindex. */
+export const revalidate = 3600;
 
 interface OfferPageProps {
   params: Promise<{ slug: string }>;
@@ -25,17 +33,32 @@ export async function generateStaticParams(): Promise<{ slug: string }[]> {
   return offers.map((offer) => ({ slug: offer.slug }));
 }
 
+/**
+ * An API-backed offer more than 30 days past its end date is gone (policy: 410). Next.js cannot
+ * set a 410 from a page, so it answers 404 via `notFound()` until Phase 3 adds a real 410; see
+ * docs/developer/freejoy-seo.md. Fixture offers keep rendering so the design preview stays intact.
+ */
+function isGone(offer: Offer, today: string): boolean {
+  return offer.source === 'api' && expiredIndexingPolicy(offer, today).state === 'gone';
+}
+
 export async function generateMetadata({ params }: OfferPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const offer = await getOfferBySlug(slug);
-  if (!offer) return { title: 'Offer not found', robots: { index: false } };
+  const [offer, today] = await Promise.all([getOfferBySlug(slug), getToday()]);
+  if (!offer || isGone(offer, today)) return { title: 'Offer not found', robots: { index: false } };
+  const path = `/freebies/${offer.slug}`;
   return {
     title: offer.title,
     description: offer.summary,
-    alternates: { canonical: `/freebies/${offer.slug}` },
-    openGraph: { title: offer.title, description: offer.summary, type: 'article' },
-    // Fixture-backed demo content stays out of search engines until real offers replace it.
-    robots: { index: false },
+    alternates: { canonical: path },
+    openGraph: openGraphFor({
+      title: offer.title,
+      description: offer.summary,
+      path,
+      type: 'article',
+    }),
+    // Indexable only for a live API offer; ended offers are noindex, follow (see lib/seo).
+    robots: offerRobots(offer, today),
   };
 }
 
@@ -51,12 +74,19 @@ export default async function OfferPage({ params }: OfferPageProps) {
     getMerchants(),
     getToday(),
   ]);
-  if (!merchant || !category) notFound();
+  if (!merchant || !category || isGone(offer, today)) notFound();
 
   const ended = !isLive(offer, today);
 
   return (
     <div className="mx-auto max-w-content px-4 py-6 sm:px-6 sm:py-10">
+      <JsonLd
+        data={buildBreadcrumbList([
+          { name: 'Home', path: '/' },
+          { name: category.name, path: `/category/${category.slug}` },
+          { name: offer.title, path: `/freebies/${offer.slug}` },
+        ])}
+      />
       <Breadcrumbs category={category} offer={offer} />
       <div className="mt-6 space-y-12 sm:mt-8 sm:space-y-16">
         <OfferHero offer={offer} merchant={merchant} category={category} ended={ended} />

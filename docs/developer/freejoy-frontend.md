@@ -23,7 +23,9 @@ All public pages live in the `(public)` route group under `src/app/(public)/` an
 | `/about`, `/contact`, `/privacy`, `/cookies`, `/terms`, `/affiliate-disclosure` | – | Editorial and legal scaffolding, each with a visible "draft, pending legal review" banner |
 | `not-found.tsx` | – | Freejoy-styled 404 |
 
-Every Phase 1 page sets `robots: { index: false }` because the content is fixture data.
+Every Phase 1 page is `noindex` because the content is fixture data. Indexing is now driven by the
+catalogue data and flips on its own when the API supplies real offers; see
+[freejoy-seo.md](freejoy-seo.md).
 
 ## Fixture catalogue
 
