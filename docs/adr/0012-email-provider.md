@@ -49,9 +49,10 @@ transport):
   `List-Unsubscribe-Post: List-Unsubscribe=One-Click` as custom headers.
 - `POST /v3/contacts` with `updateEnabled: true` adds the contact to the alerts list on confirmation. The text
   attributes `FREQUENCY` and `CATEGORIES` must exist in the Brevo account first.
-- `PUT /v3/contacts/{id}?identifierType=contact_id` with `unlinkListIds` removes it from the list on unsubscribe, and
-  `DELETE /v3/contacts/{id}` removes it when retention purges the row. We unlink rather than blocklist, because a
-  blocklisted address would also block a later re-subscribe confirmation.
+- `DELETE /v3/contacts/{id}` (`identifierType=contact_id`, or `email_id` when we only have the address) erases the
+  contact on unsubscribe, so the provider keeps nothing once someone leaves; our table keeps the suppression row.
+  We erase rather than blocklist, because a blocklisted address would also block a later re-subscribe
+  confirmation.
 
 Configuration is backend-only (the frontend never sees a provider key): `EMAIL_PROVIDER`, `EMAIL_PROVIDER_API_KEY`,
 `EMAIL_FROM`, plus `EMAIL_PROVIDER_LIST_ID`, `EMAIL_FROM_NAME`, `PUBLIC_SITE_URL` and `SUBSCRIBER_TOKEN_SECRET`.

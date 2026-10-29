@@ -68,6 +68,10 @@ class SubscribeBody(BaseModel):
     @field_validator("email", mode="after")
     @classmethod
     def normalise_email(cls, value: str) -> str:
+        # ASCII only: Python's and Postgres's lower() disagree on some other characters, which would
+        # trip the table's lower-case CHECK (platform-models.md).
+        if not value.isascii():
+            raise ValueError("email must be ASCII")
         return value.strip().lower()
 
     @field_validator("categories", mode="after")

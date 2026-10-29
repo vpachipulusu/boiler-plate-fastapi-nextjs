@@ -19,7 +19,7 @@ All public pages live in the `(public)` route group under `src/app/(public)/` an
 | `/freebies` | 02 / 06 | Search, category/type/postage filters, sort, pagination, empty state |
 | `/category/[slug]` | 02 | Category intro plus the same catalogue controls scoped to one category |
 | `/freebies/[slug]` | 03 / 07 | Hero, claim steps, "important bits", trust panel, related offers, demo CTA |
-| `/alerts` | 04 | Preferences form; validates in the browser, never sends |
+| `/alerts` | 04 | Preferences form; starts a double opt-in through a server action ([backend-subscribers.md](backend-subscribers.md)) |
 | `/about`, `/contact`, `/privacy`, `/cookies`, `/terms`, `/affiliate-disclosure` | – | Editorial and legal scaffolding, each with a visible "draft, pending legal review" banner |
 | `not-found.tsx` | – | Freejoy-styled 404 |
 
@@ -49,8 +49,10 @@ API without touching call sites.
 - "Last checked" and freshness labels come only from fixture fields (`lastVerifiedAt`,
   `freshness`). There are no visitor counts, testimonials, scarcity cues or verification claims.
 - The offer CTA opens a "Demo offer" dialog. No element on any page has an external `href`.
-- The alerts form validates with Zod, requires consent, and ends in a plainly worded
-  "nothing was saved" state. There is no network call and nothing is logged.
+- The alerts form validates with Zod, requires consent, and submits through a server action
+  (FREEJ-24). It answers "check your inbox" the same way for every address, and nothing starts until
+  the visitor opens the emailed link and presses the button on `/alerts/confirm`. No address or token
+  is ever logged.
 - Legal pages carry a draft banner and a reviewer checklist instead of compliance claims.
 
 ## Theme and typography
@@ -90,8 +92,9 @@ Suspense boundaries in `catalogue-layout.tsx` so they keep focus across filter n
 
 ## Known Phase 1 deviations
 
-- The newsletter band on the homepage is a GET form to `/alerts?email=`, so the address lands in
-  the URL. Phase 3 replaces this with a POST server action.
+- (Fixed in FREEJ-24.) The newsletter band used to be a GET form to `/alerts?email=`; it is now a
+  plain link to `/alerts` and `/alerts` ignores any `email` parameter, so an address never travels in a
+  page address.
 - The mobile filter drawer needs JavaScript; search, sort (Apply button), category chips and
   pagination work without it.
 - `/freebies` is served statically from fixtures; caching and revalidation arrive with Phase 2.

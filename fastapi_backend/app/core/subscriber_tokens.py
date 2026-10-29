@@ -54,7 +54,7 @@ class SubscriberTokens:
         self, purpose: TokenPurpose, subject_id: str, expires_at: datetime | None
     ) -> str:
         expiry = NO_EXPIRY if expires_at is None else int(expires_at.timestamp())
-        nonce = secrets.token_hex(8)
+        nonce = secrets.token_hex(16)
         payload = _SEPARATOR.join((purpose.value, subject_id, str(expiry), nonce))
         raw = payload.encode("utf-8")
         return f"{_b64(raw)}.{_b64(self._sign(raw))}"

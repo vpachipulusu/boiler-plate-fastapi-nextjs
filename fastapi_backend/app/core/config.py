@@ -1,7 +1,7 @@
 from typing import Annotated
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.totp import TotpCodec, TotpUnavailable
@@ -110,6 +110,12 @@ class Settings(BaseSettings):
                     "TOTP_ENCRYPTION_KEY must be a valid Fernet key"
                 ) from None
         return self
+
+    @field_validator("SUBSCRIBER_TOKEN_SECRET", "EMAIL_PROVIDER_API_KEY", mode="before")
+    @classmethod
+    def blank_secret_is_unset(cls, value: object) -> object:
+        """A blank value (``NAME=`` copied from .env.example) means "not set", never an empty secret."""
+        return None if value == "" else value
 
     @model_validator(mode="after")
     def validate_email_config(self) -> "Settings":

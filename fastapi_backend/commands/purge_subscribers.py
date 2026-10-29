@@ -85,7 +85,9 @@ async def purge_subscribers(
         for candidate in batch:
             try:
                 if candidate.provider_subscriber_id:
-                    await provider.delete_contact(candidate.provider_subscriber_id)
+                    await provider.delete_contact(
+                        candidate.provider_subscriber_id, None
+                    )
             except EmailProviderError:
                 failures += 1
                 continue

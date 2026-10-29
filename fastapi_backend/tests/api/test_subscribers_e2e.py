@@ -189,7 +189,9 @@ async def test_the_whole_opt_in_lifecycle(
     assert unsubscribed_response.status_code == 200
     assert unsubscribed["status"] == "UNSUBSCRIBED"
     assert unsubscribed["unsubscribed_at"] is not None
-    assert provider.removed == [("fake-1", EMAIL)]
+    assert provider.deleted == [("fake-1", EMAIL)]
+    assert unsubscribed["categories"] == []
+    assert unsubscribed["provider_subscriber_id"] is None
 
 
 async def test_only_a_hash_of_the_token_reaches_the_database(
@@ -469,7 +471,7 @@ async def test_retention_removes_stale_pending_and_old_unsubscribed_rows_only(
     assert done.deleted == 2
     assert remaining == {fresh_pending, fresh_unsub, ancient_confirmed}
     assert old_pending not in remaining and old_unsub not in remaining
-    assert provider.deleted == ["p-old"]
+    assert provider.deleted == [("p-old", None)]
 
 
 async def test_retention_keeps_a_row_whose_provider_erase_fails(

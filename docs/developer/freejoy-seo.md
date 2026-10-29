@@ -9,7 +9,7 @@ the pages under `src/app/(public)/`.
 
 Indexability is decided by the catalogue data, not by a flag in the code. The one exception is
 `ALERTS_FORM_LIVE = false` in `src/app/(public)/alerts/page.tsx`: a deliberate pre-launch hold that
-keeps `/alerts` noindex until the form really subscribes people, because the page has no catalogue
+keeps `/alerts` noindex until alerts are live in production (the form now subscribes for real; flip the flag once a provider is configured), because the page has no catalogue
 data to decide from. Flip it in the same change that makes the form live.
 
 | Helper (`lib/seo/indexing.ts`) | Rule |

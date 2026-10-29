@@ -271,7 +271,9 @@ async def test_unsubscribe_marks_the_row_and_removes_the_provider_contact() -> N
     (row,) = harness.store.rows.values()
     assert row.status is SubscriberStatus.UNSUBSCRIBED
     assert row.unsubscribed_at == harness.clock.now
-    assert harness.provider.removed == [("fake-1", EMAIL)]
+    assert harness.provider.deleted == [("fake-1", EMAIL)]
+    assert row.categories == ()
+    assert row.provider_subscriber_id is None
 
 
 async def test_unsubscribing_twice_succeeds_twice_and_keeps_the_first_time() -> None:
@@ -284,7 +286,7 @@ async def test_unsubscribing_twice_succeeds_twice_and_keeps_the_first_time() -> 
     await harness.service.unsubscribe(token)
 
     assert next(iter(harness.store.rows.values())).unsubscribed_at == first
-    assert len(harness.provider.removed) == 2
+    assert len(harness.provider.deleted) == 2
 
 
 async def test_a_pending_subscriber_can_unsubscribe_from_the_confirmation_email() -> (
@@ -326,7 +328,7 @@ async def test_unsubscribe_after_the_row_was_purged_succeeds_quietly() -> None:
 
     await harness.service.unsubscribe(token)
 
-    assert harness.provider.removed == []
+    assert harness.provider.deleted == []
 
 
 async def test_a_provider_failure_on_unsubscribe_still_unsubscribes_locally() -> None:
@@ -341,4 +343,18 @@ async def test_a_provider_failure_on_unsubscribe_still_unsubscribes_locally() ->
     assert row.status is SubscriberStatus.UNSUBSCRIBED
     harness.provider.error = None
     await harness.service.unsubscribe(token)
-    assert harness.provider.removed == [("fake-1", EMAIL)]
+    assert harness.provider.deleted == [(None, EMAIL)]
+
+
+async def test_a_token_older_than_the_stored_send_time_allows_is_rejected() -> None:
+    harness = await subscribed()
+    token = harness.last_links()["confirm"]
+    (row,) = harness.store.rows.values()
+    harness.clock.advance(timedelta(hours=23))
+    # The row says the link went out 25 hours ago (for example a clock correction), whatever the token says.
+    await harness.store.update(
+        row.id, {"confirmation_sent_at": harness.clock.now - timedelta(hours=25)}
+    )
+
+    with pytest.raises(InvalidToken):
+        await harness.service.confirm(token)

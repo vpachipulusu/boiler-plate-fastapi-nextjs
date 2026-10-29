@@ -175,10 +175,13 @@ class SubscriberService:
             raise InvalidToken
         record = await self._store.get(subscriber_id, lock=True)
         stored = record.confirmation_token_hash if record else None
+        sent = record.confirmation_sent_at if record else None
         if (
             record is None
             or record.status is not SubscriberStatus.PENDING
             or stored is None
+            or sent is None
+            or now - sent >= CONFIRM_TOKEN_TTL
             or not hmac.compare_digest(stored, token_digest(token))
         ):
             await self._session.rollback()
@@ -203,10 +206,11 @@ class SubscriberService:
         await self._session.commit()
 
     async def unsubscribe(self, token: str) -> None:
-        """Mark UNSUBSCRIBED and take the address off the provider's list. Idempotent.
+        """Mark UNSUBSCRIBED, keep only the suppression row, and erase the provider contact. Idempotent.
 
         The local change is committed first, so we never mail the address again from our side even if
         the provider is down; the provider call is repeated on every retry until it succeeds.
+        Only ``email``, ``status``, the consent record and ``unsubscribed_at`` survive (platform-models.md).
         """
         now = self._clock()
         subscriber_id = self._tokens.verify(token, TokenPurpose.UNSUBSCRIBE, now)
@@ -224,11 +228,13 @@ class SubscriberService:
                     "status": SubscriberStatus.UNSUBSCRIBED,
                     "unsubscribed_at": now,
                     "confirmation_token_hash": None,
+                    "categories": [],
+                    "provider_subscriber_id": None,
                 },
             )
         await self._session.commit()
         try:
-            await self._provider.remove_contact(
+            await self._provider.delete_contact(
                 record.provider_subscriber_id, record.email
             )
         except EmailProviderError as exc:

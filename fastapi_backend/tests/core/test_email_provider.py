@@ -59,8 +59,7 @@ async def test_disabled_provider_sends_nothing_and_logs_without_the_address(
     with caplog.at_level(logging.INFO, logger="yourapp.email"):
         await provider.send(MESSAGE)
         assert await provider.upsert_contact(CONTACT) is None
-        await provider.remove_contact(None, "sam@example.com")
-        await provider.delete_contact("1")
+        await provider.delete_contact("1", "sam@example.com")
 
     assert "message dropped" in caplog.text
     assert "sam@example.com" not in caplog.text
@@ -71,14 +70,12 @@ async def test_fake_provider_records_every_call() -> None:
 
     await provider.send(MESSAGE)
     first = await provider.upsert_contact(CONTACT)
-    await provider.remove_contact("fake-1", "sam@example.com")
-    await provider.delete_contact("fake-1")
+    await provider.delete_contact("fake-1", "sam@example.com")
 
     assert provider.sent == [MESSAGE]
     assert provider.upserts == [CONTACT]
     assert first == "fake-1"
-    assert provider.removed == [("fake-1", "sam@example.com")]
-    assert provider.deleted == ["fake-1"]
+    assert provider.deleted == [("fake-1", "sam@example.com")]
 
 
 async def test_fake_provider_fails_every_call_when_told_to() -> None:
@@ -88,8 +85,7 @@ async def test_fake_provider_fails_every_call_when_told_to() -> None:
     for call in (
         provider.send(MESSAGE),
         provider.upsert_contact(CONTACT),
-        provider.remove_contact(None, "a@example.com"),
-        provider.delete_contact("1"),
+        provider.delete_contact("1", "a@example.com"),
     ):
         with pytest.raises(EmailProviderError):
             await call
@@ -173,36 +169,32 @@ async def test_brevo_upsert_tolerates_an_unreadable_id(body: bytes) -> None:
     assert len(recorder.requests) == 1
 
 
-async def test_brevo_remove_unlinks_by_contact_id() -> None:
+async def test_brevo_delete_erases_the_contact_by_id() -> None:
     recorder = Recorder(httpx.Response(204))
 
-    await recorder.provider().remove_contact("42", "sam@example.com")
+    await recorder.provider().delete_contact("42", "sam@example.com")
 
     request = recorder.requests[0]
-    assert (request.method, request.url.path) == ("PUT", "/v3/contacts/42")
+    assert (request.method, request.url.path) == ("DELETE", "/v3/contacts/42")
     assert request.url.params["identifierType"] == "contact_id"
-    assert recorder.body() == {"unlinkListIds": [7]}
 
 
-async def test_brevo_remove_falls_back_to_the_address_and_accepts_404() -> None:
+async def test_brevo_delete_falls_back_to_the_address_and_accepts_404() -> None:
     recorder = Recorder(httpx.Response(404))
 
-    await recorder.provider().remove_contact(None, "sam@example.com")
+    await recorder.provider().delete_contact(None, "sam@example.com")
 
     request = recorder.requests[0]
     assert request.url.raw_path.startswith(b"/v3/contacts/sam%40example.com")
     assert request.url.params["identifierType"] == "email_id"
 
 
-async def test_brevo_delete_erases_the_contact_and_accepts_404() -> None:
-    recorder = Recorder(httpx.Response(204), httpx.Response(404))
-    provider = recorder.provider()
+async def test_brevo_delete_without_any_identifier_does_nothing() -> None:
+    recorder = Recorder()
 
-    await provider.delete_contact("42")
-    await provider.delete_contact("43")
+    await recorder.provider().delete_contact(None, None)
 
-    assert [r.method for r in recorder.requests] == ["DELETE", "DELETE"]
-    assert recorder.requests[0].url.path == "/v3/contacts/42"
+    assert recorder.requests == []
 
 
 async def test_brevo_errors_carry_the_status_but_never_the_body_or_address() -> None:

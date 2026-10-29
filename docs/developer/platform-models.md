@@ -76,13 +76,15 @@ where.
 
 - **Token lifecycle.** Tokens are at least 128 bits of randomness, stored as a SHA-256 hash. `confirmation_sent_at`
   anchors the expiry: the service rejects tokens older than 24 hours and nulls `confirmation_token_hash` once the
-  subscriber is `CONFIRMED`.
+  subscriber is `CONFIRMED`. (Implemented in `app/services/subscribers.py`: the token also carries its own signed
+  expiry, and the service checks both.)
 - **Lower-casing.** Python `str.lower()` and Postgres `lower()` differ on some non-ASCII input (for example the dotted
   capital I), which would trip the CHECK. The Phase 2 service writes `func.lower(email)` or rejects non-ASCII local parts.
 - **Retention.** On `UNSUBSCRIBED` the service sets `categories` to `[]` and nulls `provider_subscriber_id` and
   `confirmation_token_hash`, keeping only the suppression row (`email`, `status`, `consent_at`, `unsubscribed_at`). A
-  scheduled purge of `UNSUBSCRIBED` rows older than 12 months is a later story (recorded on FREEJ-24).
-- **No enumeration.** The subscribe endpoint (a later story) returns the same response whether the row was created or
+  manual purge command (`commands.purge_subscribers`) removes `UNSUBSCRIBED` rows older than 12 months and `PENDING`
+  rows older than 30 days ([backend-subscribers.md](backend-subscribers.md)).
+- **No enumeration.** The subscribe endpoint (`POST /v1/subscribers`) returns the same response whether the row was created or
   already existed, and is rate limited.
 
 ### Sample data

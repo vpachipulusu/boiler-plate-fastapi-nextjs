@@ -65,12 +65,12 @@ class EmailProvider(Protocol):
         """Add the contact to the alerts list (idempotent); the provider's id for it, if any."""
         ...
 
-    async def remove_contact(self, provider_id: str | None, email: str) -> None:
-        """Take the contact off the alerts list (idempotent; an unknown contact is fine)."""
-        ...
+    async def delete_contact(self, provider_id: str | None, email: str | None) -> None:
+        """Erase the contact at the provider, which also takes it off every list.
 
-    async def delete_contact(self, provider_id: str) -> None:
-        """Erase the contact at the provider (retention); an unknown contact is fine."""
+        Idempotent: an unknown contact is fine. Names the contact by ``provider_id`` when known, else by
+        ``email``.
+        """
         ...
 
 
@@ -84,10 +84,7 @@ class DisabledEmailProvider:
         logger.info("email provider not configured: contact not synced")
         return None
 
-    async def remove_contact(self, provider_id: str | None, email: str) -> None:
-        logger.info("email provider not configured: contact not removed")
-
-    async def delete_contact(self, provider_id: str) -> None:
+    async def delete_contact(self, provider_id: str | None, email: str | None) -> None:
         logger.info("email provider not configured: contact not deleted")
 
 
@@ -97,8 +94,7 @@ class FakeEmailProvider:
     def __init__(self, outbox: Path | None = None) -> None:
         self.sent: list[EmailMessage] = []
         self.upserts: list[ContactDetails] = []
-        self.removed: list[tuple[str | None, str]] = []
-        self.deleted: list[str] = []
+        self.deleted: list[tuple[str | None, str | None]] = []
         self.error: EmailProviderError | None = None
         self._outbox = outbox
 
@@ -126,13 +122,9 @@ class FakeEmailProvider:
         self.upserts.append(contact)
         return f"fake-{len(self.upserts)}"
 
-    async def remove_contact(self, provider_id: str | None, email: str) -> None:
+    async def delete_contact(self, provider_id: str | None, email: str | None) -> None:
         self._check()
-        self.removed.append((provider_id, email))
-
-    async def delete_contact(self, provider_id: str) -> None:
-        self._check()
-        self.deleted.append(provider_id)
+        self.deleted.append((provider_id, email))
 
 
 class BrevoEmailProvider:
@@ -213,25 +205,18 @@ class BrevoEmailProvider:
         )
         return _contact_id(existing)
 
-    async def remove_contact(self, provider_id: str | None, email: str) -> None:
-        identifier, kind = (
-            (provider_id, "contact_id") if provider_id else (email, "email_id")
-        )
-        await self._request(
-            "remove",
-            "PUT",
-            f"/contacts/{quote(identifier, safe='')}",
-            json_body={"unlinkListIds": [self._list_id]},
-            params={"identifierType": kind},
-            tolerate=frozenset({404}),
-        )
-
-    async def delete_contact(self, provider_id: str) -> None:
+    async def delete_contact(self, provider_id: str | None, email: str | None) -> None:
+        if provider_id:
+            identifier, kind = provider_id, "contact_id"
+        elif email:
+            identifier, kind = email, "email_id"
+        else:
+            return
         await self._request(
             "delete",
             "DELETE",
-            f"/contacts/{quote(provider_id, safe='')}",
-            params={"identifierType": "contact_id"},
+            f"/contacts/{quote(identifier, safe='')}",
+            params={"identifierType": kind},
             tolerate=frozenset({404}),
         )
 

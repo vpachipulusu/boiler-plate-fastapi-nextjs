@@ -339,3 +339,15 @@ async def test_production_without_a_provider_refuses_signups_but_not_unsubscribe
 
     assert signup.status_code == 503
     assert unsubscribe.status_code == 200
+
+
+async def test_a_non_ascii_address_is_refused_before_anything_is_stored() -> None:
+    http, harness, _ = build()
+
+    async with http:
+        response = await http.post(
+            "/v1/subscribers", json={**VALID, "email": "såm@example.com"}
+        )
+
+    assert response.status_code == 422
+    assert harness.provider.sent == []

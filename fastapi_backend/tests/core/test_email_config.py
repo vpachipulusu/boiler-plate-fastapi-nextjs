@@ -120,3 +120,12 @@ def test_production_with_everything_set_loads(monkeypatch: pytest.MonkeyPatch) -
     )
 
     assert load(monkeypatch, **env).EMAIL_PROVIDER == "brevo"
+
+
+def test_blank_secrets_copied_from_the_example_file_count_as_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load(monkeypatch, SUBSCRIBER_TOKEN_SECRET="", EMAIL_PROVIDER_API_KEY="")
+
+    assert settings.SUBSCRIBER_TOKEN_SECRET is None
+    assert settings.EMAIL_PROVIDER_API_KEY is None

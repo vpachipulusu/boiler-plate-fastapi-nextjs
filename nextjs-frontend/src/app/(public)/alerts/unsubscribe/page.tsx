@@ -17,7 +17,7 @@ const COPY: TokenActionCopy = {
   doneHeading: 'You are unsubscribed',
   doneBody:
     'We will not send you any more alerts. We keep your address on a do-not-email list for 12 months so it is not emailed again, then delete it.',
-  doneLink: { href: '/alerts', label: 'Sign up again' },
+  doneLink: { href: '/', label: 'Back to Freejoy' },
 };
 
 export default function UnsubscribeAlertsPage() {

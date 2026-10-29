@@ -82,7 +82,7 @@ async def test_rows_are_deleted_after_their_provider_contact() -> None:
     summary = await purge_subscribers(store, committer, provider, NOW, dry_run=False)
 
     assert store.deleted == ["a", "b", "c"]
-    assert provider.deleted == ["p1", "p3"]
+    assert provider.deleted == [("p1", None), ("p3", None)]
     assert summary.deleted == 3
     assert committer.commits == 1
 
