@@ -4,16 +4,30 @@ import { FreshlyFound } from '@/components/home/freshly-found';
 import { HomeHero } from '@/components/home/home-hero';
 import { NewsletterBand } from '@/components/home/newsletter-band';
 import { TrustStrip } from '@/components/home/trust-strip';
-import { getCategories, getFeaturedOffers, getMerchants } from '@/lib/catalogue';
+import { JsonLd } from '@/components/seo/json-ld';
+import { getCategories, getFeaturedOffers, getLiveOffers, getMerchants } from '@/lib/catalogue';
+import { isCatalogueApiBacked } from '@/lib/seo/indexing';
+import { buildOrganization, buildWebSite } from '@/lib/seo/json-ld';
+import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
-export const metadata: Metadata = {
-  title: 'Freejoy – UK freebies, samples and offers',
-  description:
-    'Browse UK freebies, samples, trials and offers, with terms, postage and card requirements set out on every listing.',
-  alternates: { canonical: '/' },
-  // Fixture-backed design preview: nothing here is a real offer yet, so keep it out of search.
-  robots: { index: false },
-};
+/** Re-rendered at most hourly so the featured offers and the indexing state track the catalogue. */
+export const revalidate = 3600;
+
+const TITLE = 'Freejoy – UK freebies, samples and offers';
+const DESCRIPTION =
+  'Browse UK freebies, samples, trials and offers, with terms, postage and card requirements set out on every listing.';
+
+export async function generateMetadata(): Promise<Metadata> {
+  // Indexable only once the catalogue is API-backed; the fixture preview stays out of search.
+  const indexable = isCatalogueApiBacked(await getLiveOffers());
+  return {
+    title: TITLE,
+    description: DESCRIPTION,
+    alternates: { canonical: '/' },
+    openGraph: openGraphFor({ title: TITLE, description: DESCRIPTION, path: '/' }),
+    robots: listingRobots({ indexable }),
+  };
+}
 
 export default async function HomePage() {
   const [categories, offers, merchants] = await Promise.all([
@@ -24,6 +38,7 @@ export default async function HomePage() {
 
   return (
     <div className="mx-auto max-w-content px-4 py-6 sm:px-6 lg:py-8">
+      <JsonLd data={[buildWebSite(), buildOrganization()]} />
       <HomeHero />
       <TrustStrip />
       <CategoryGrid categories={categories} />

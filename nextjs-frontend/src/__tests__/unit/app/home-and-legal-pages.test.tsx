@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 
 vi.mock('@/app/globals.css', () => ({}));
 
-import HomePage, { metadata as homeMetadata } from '@/app/(public)/page';
+import HomePage, { generateMetadata as homeGenerateMetadata } from '@/app/(public)/page';
 import AboutPage, { metadata as aboutMetadata } from '@/app/(public)/about/page';
 import PrivacyPage, { metadata as privacyMetadata } from '@/app/(public)/privacy/page';
 import CookiesPage, { metadata as cookiesMetadata } from '@/app/(public)/cookies/page';
@@ -96,7 +96,9 @@ describe('homepage', () => {
     expect(container.querySelectorAll('a[href^="http"]')).toHaveLength(0);
   });
 
-  it('sets the canonical url and title in metadata', () => {
+  it('sets the canonical url and title in metadata', async () => {
+    const homeMetadata = await homeGenerateMetadata();
+
     expect(homeMetadata.title).toBe('Freejoy – UK freebies, samples and offers');
     expect(homeMetadata.robots).toEqual({ index: false });
     expect(homeMetadata.alternates?.canonical).toBe('/');

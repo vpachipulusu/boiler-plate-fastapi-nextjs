@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { CatalogueHeader } from '@/components/catalogue/catalogue-header';
 import { CatalogueLayout } from '@/components/catalogue/catalogue-layout';
-import { parseCatalogueParams } from '@/lib/catalogue';
+import { getLiveOffers, parseCatalogueParams } from '@/lib/catalogue';
+import { isCatalogueApiBacked, isRefinedQuery } from '@/lib/seo/indexing';
+import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -14,12 +16,16 @@ export async function generateMetadata({
   searchParams: SearchParams;
 }): Promise<Metadata> {
   const query = parseCatalogueParams(await searchParams);
+  const title = query.q === '' ? 'All freebies' : `Search: ${query.q}`;
+  // Page 1 with no filter or search is the one indexable view, and only once the catalogue is
+  // API-backed. Every other view is noindex but followable; all canonicalise to /freebies.
+  const indexable = isCatalogueApiBacked(await getLiveOffers());
   return {
-    title: query.q === '' ? 'All freebies' : `Search: ${query.q}`,
+    title,
     description: DESCRIPTION,
     alternates: { canonical: '/freebies' },
-    // Fixture-backed design preview: nothing here is a real offer yet, so keep it out of search.
-    robots: { index: false },
+    openGraph: openGraphFor({ title, description: DESCRIPTION, path: '/freebies' }),
+    robots: listingRobots({ indexable, refined: isRefinedQuery(query) }),
   };
 }
 
