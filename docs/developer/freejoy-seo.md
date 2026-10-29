@@ -62,10 +62,11 @@ outage cannot freeze a page, because a failed read is thrown and never cached. S
 
 - The page shows its outage state (`InlineError`, a retry button, curated copy) and answers **HTTP 200 for
   as long as the outage lasts**. It does **not** add `noindex`: `generateMetadata` does not read the
-  catalogue for its robots, so the page keeps the robots it would have had (indexable in API mode, a refined
-  view still `noindex, follow`, fixtures always `noindex`). A short outage therefore cannot de-index pages.
-  For a page whose own record could not be read (an offer or category title) the metadata is only a
-  generic title and the site default robots apply. Dynamic responses are
+  catalogue for its robots, so the listing pages (`/`, `/freebies`) keep the robots they would have had
+  (indexable in API mode, a refined view still `noindex, follow`, fixtures always `noindex`). A short
+  outage therefore cannot de-index them. The two slug pages (`/freebies/[slug]`, `/category/[slug]`) cannot
+  know their own record during an outage, so they answer `noindex, follow` with a generic title; they are
+  re-crawled and re-evaluated once the backend is back. Dynamic responses are
   `Cache-Control: private, no-cache, no-store`, so nothing stores the error page, and the next request
   after the backend recovers renders normally.
 - **Follow-up: answer 5xx during an outage.** A 200 with an error body is a soft error to crawlers; a 503

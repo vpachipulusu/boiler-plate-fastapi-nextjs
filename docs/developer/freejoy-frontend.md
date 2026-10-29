@@ -104,7 +104,10 @@ else). Contract: [backend-catalogue.md](backend-catalogue.md).
   server-only `TRUSTED_CLIENT_IP_HEADER` (no default; the name must match `/^[a-z0-9-]+$/i`), never
   `X-Forwarded-For` or any other header a client can set, and only if the value is a single IP address.
   Set `TRUSTED_CLIENT_IP_HEADER` only when your reverse proxy overwrites that header on every request;
-  otherwise clients can spoof rate-limit keys. The wrapper reads it before the cache boundary and carries it to the request in an
+  otherwise clients can spoof rate-limit keys. `x-forwarded-for`, `forwarded`, `via` and
+  `x-vercel-forwarded-for` are refused as its value (a one-time warning is logged), and a value with an IPv6
+  zone (`fe80::1%eth0`) or brackets is not forwarded. This only fixes the key the **backend** limiter sees:
+  the edge proxy limiter (`client-identifier.ts`) still buckets non-Vercel visitors together. The wrapper reads it before the cache boundary and carries it to the request in an
   `AsyncLocalStorage`, so it is **not** part of the cache key (one entry per read, not per visitor) and is
   used only when the read actually reaches the backend. `shared: true` still reads no request headers
   itself; the address arrives through the new `clientIp` option. With no trusted header the header is
