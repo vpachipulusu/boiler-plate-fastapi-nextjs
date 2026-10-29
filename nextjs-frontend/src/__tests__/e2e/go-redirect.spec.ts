@@ -59,10 +59,21 @@ test.describe('/go/[offerId]', () => {
     const response = await request.get(`/go/${ENDED}${HOSTILE_QUERY}`, { maxRedirects: 0 });
 
     expect(response.status()).toBe(302);
-    const location = new URL(response.headers()['location']);
-    expect(location.pathname).toMatch(/^\/freebies\/[a-z0-9-]+$/);
-    expect(location.search).toBe('?ended=1');
+    const location = response.headers()['location'];
+    // Relative on purpose: no Host or X-Forwarded-Host can put another origin into it.
+    expect(location).toMatch(/^\/freebies\/[a-z0-9-]+\?ended=1$/);
     expect(response.headers()['set-cookie']).toBeUndefined();
+  });
+
+  test('does not count a request that is not a top-level navigation', async ({ page }) => {
+    await page.goto('/pricing');
+
+    const status = await page.evaluate(
+      async (id) => (await fetch(`/go/${id}`, { redirect: 'manual' })).status,
+      LIVE
+    );
+
+    expect(status).toBe(204);
   });
 
   test('answers a draft or archived offer exactly like an unknown one', async ({ request }) => {

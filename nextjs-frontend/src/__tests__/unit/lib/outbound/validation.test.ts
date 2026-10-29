@@ -50,6 +50,17 @@ describe('parseHttpsDestination', () => {
     expect(url?.protocol).toBe('https:');
   });
 
+  it('accepts a punycode host: it is ASCII', () => {
+    expect(parseHttpsDestination('https://xn--bcher-kva.example/x')?.hostname).toBe(
+      'xn--bcher-kva.example'
+    );
+  });
+
+  it('accepts a host whose last label only starts with a digit', () => {
+    expect(parseHttpsDestination('https://shop.example/1')?.hostname).toBe('shop.example');
+    expect(parseHttpsDestination('https://a.co.uk/x')?.hostname).toBe('a.co.uk');
+  });
+
   it('accepts the default port written out', () => {
     expect(parseHttpsDestination('https://shop.example:443/x')?.host).toBe('shop.example');
   });
@@ -74,6 +85,19 @@ describe('parseHttpsDestination', () => {
     ['NUL', 'https://good.example/\u0000'],
     ['C1 control', 'https://good.example/\u0085'],
     ['custom port', 'https://good.example:8443/'],
+    ['IPv6 literal', 'https://[::1]/x'],
+    ['IPv4', 'https://127.0.0.1/x'],
+    ['decimal IPv4', 'https://2130706433/'],
+    ['hex IPv4', 'https://0x7f.0.0.1/'],
+    ['numeric last label', 'https://shop.example.123/'],
+    ['hex last label', 'https://shop.0x1f/'],
+    ['single label', 'https://localhost/x'],
+    ['trailing dot', 'https://good.example./x'],
+    ['trailing dot with port', 'https://good.example.:443/x'],
+    ['IDN host', 'https://bücher.example/'],
+    ['Cyrillic lookalike', 'https://аwin1.com/x'],
+    ['non-ASCII path', 'https://good.example/café'],
+    ['fullwidth dot', 'https://www.awin1.com。evil.example/'],
     ['empty host', 'https:///path'],
     ['no slashes', 'https:good.example/x'],
     ['one slash', 'https:/good.example/x'],

@@ -23,7 +23,7 @@ import {
 
 export const REFERRER_POLICY = 'strict-origin-when-cross-origin';
 const NO_STORE = 'no-store';
-const RATE_LIMIT_RETRY_SECONDS = '60';
+const UNAVAILABLE_RETRY_SECONDS = '30';
 const ENDED_REDIRECT_STATUS = 302;
 const REDIRECT_STATUS = 307;
 
@@ -31,6 +31,12 @@ function textResponse(status: number, body: string | null, headers: Record<strin
   return new NextResponse(body, {
     status,
     headers: { 'Cache-Control': NO_STORE, 'Content-Type': 'text/plain; charset=utf-8', ...headers },
+  });
+}
+
+function unavailable() {
+  return textResponse(503, 'This link is not available right now. Please try again later.', {
+    'Retry-After': UNAVAILABLE_RETRY_SECONDS,
   });
 }
 
@@ -43,16 +49,28 @@ function isPrefetch(request: NextRequest): boolean {
   return /prefetch|prerender/i.test(purpose);
 }
 
-function endedRedirect(request: NextRequest, slug: string): NextResponse {
+/**
+ * Fetch Metadata: only a top-level navigation is a click. An image, iframe, script, fetch() or other
+ * subresource request carries `Sec-Fetch-Mode` / `Sec-Fetch-Dest` values other than `navigate` /
+ * `document`, so a hostile page cannot inflate click counts with them. A client that sends neither
+ * header (an old browser, curl) is allowed.
+ */
+function isNavigation(request: NextRequest): boolean {
+  const mode = request.headers.get('sec-fetch-mode');
+  const dest = request.headers.get('sec-fetch-dest');
+  return (mode === null || mode === 'navigate') && (dest === null || dest === 'document');
+}
+
+/**
+ * A RELATIVE Location (`/freebies/<slug>?ended=1`): the browser resolves it against the host it asked,
+ * so neither `Host` nor `X-Forwarded-Host` can put another origin into the redirect. The slug is checked
+ * against the slug pattern first, so nothing else can enter the path.
+ */
+function endedRedirect(slug: string): NextResponse {
   if (!isOfferSlug(slug)) return notFound();
-  const target = request.nextUrl.clone();
-  target.pathname = `/freebies/${slug}`;
-  target.search = '';
-  target.hash = '';
-  target.searchParams.set('ended', '1');
-  return NextResponse.redirect(target, {
+  return new NextResponse(null, {
     status: ENDED_REDIRECT_STATUS,
-    headers: { 'Cache-Control': NO_STORE },
+    headers: { Location: `/freebies/${slug}?ended=1`, 'Cache-Control': NO_STORE },
   });
 }
 
@@ -61,7 +79,7 @@ function destinationRedirect(offerId: string, destination: string): NextResponse
   if (target === null) {
     // Never log the destination: it can carry a query string.
     logger.error('Outbound destination refused by the route', { offerId });
-    return textResponse(503, 'This link is not available right now. Please try again later.');
+    return unavailable();
   }
   return NextResponse.redirect(target, {
     status: REDIRECT_STATUS,
@@ -78,17 +96,15 @@ function respondTo(
     case 'redirect':
       return destinationRedirect(offerId, result.destination);
     case 'ended':
-      return endedRedirect(request, result.slug);
+      return endedRedirect(result.slug);
     case 'not_found':
       return notFound();
     case 'rate_limited':
       return textResponse(429, 'Too many requests. Please try again shortly.', {
-        'Retry-After': RATE_LIMIT_RETRY_SECONDS,
+        'Retry-After': String(result.retryAfterSeconds),
       });
     default:
-      return textResponse(503, 'This link is not available right now. Please try again later.', {
-        'Retry-After': '30',
-      });
+      return unavailable();
   }
 }
 
@@ -98,8 +114,8 @@ export async function handleOutboundRequest(
   offerId: string
 ): Promise<NextResponse> {
   if (!isOfferId(offerId)) return notFound();
-  // Browsers that speculatively load a link must not count as a click.
-  if (isPrefetch(request)) return textResponse(204, null);
+  // Neither a subresource request nor a speculative load of the link is a click.
+  if (!isNavigation(request) || isPrefetch(request)) return textResponse(204, null);
   const result = await recordOutboundClick(offerId, {
     referrerHost: referrerHost(request.headers.get('referer')),
     userAgentClass: classifyUserAgent(request.headers.get('user-agent')),

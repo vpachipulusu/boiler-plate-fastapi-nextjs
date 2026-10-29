@@ -107,13 +107,38 @@ describe('recordOutboundClick', () => {
     await expect(recordOutboundClick('offer_1', DETAILS)).resolves.toEqual({ kind: 'not_found' });
   });
 
-  it('maps 429 to rate_limited', async () => {
-    fetchMock.mockResolvedValue(json({ success: false, error: 'Too many requests' }, 429));
+  it('maps 429 to rate_limited and passes the backend Retry-After on', async () => {
+    fetchMock.mockResolvedValue(
+      new Response('{"success":false,"error":"Too many requests"}', {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': '17' },
+      })
+    );
 
     await expect(recordOutboundClick('offer_1', DETAILS)).resolves.toEqual({
       kind: 'rate_limited',
+      retryAfterSeconds: 17,
     });
   });
+
+  it.each([[null], ['soon'], ['-3'], ['0'], ['1.5'], ['99999']])(
+    'falls back to a safe Retry-After for the backend value %s',
+    async (value) => {
+      fetchMock.mockResolvedValue(
+        new Response('{"success":false}', {
+          status: 429,
+          headers: value === null ? {} : { 'Retry-After': value },
+        })
+      );
+
+      const result = await recordOutboundClick('offer_1', DETAILS);
+
+      expect(result).toEqual({
+        kind: 'rate_limited',
+        retryAfterSeconds: value === '99999' ? 3600 : 60,
+      });
+    }
+  );
 
   it.each([401, 422, 500, 503])('maps %s to unavailable', async (status) => {
     fetchMock.mockResolvedValue(json({ success: false, error: 'secret backend text' }, status));

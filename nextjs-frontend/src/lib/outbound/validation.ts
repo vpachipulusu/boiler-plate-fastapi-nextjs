@@ -26,13 +26,32 @@ export function isOfferSlug(value: unknown): value is string {
   return typeof value === 'string' && value.length <= MAX_SLUG_LENGTH && SLUG_PATTERN.test(value);
 }
 
-/** Space, C0 and C1 control characters, DEL, and backslash: none belongs in a URL we redirect to. */
+const BACKSLASH = 0x5c;
+
+/**
+ * Space, every control character, DEL, anything outside ASCII, and backslash: none belongs in a URL we
+ * redirect to. Non-ASCII hosts must arrive as punycode (as the backend requires), so an IDN lookalike
+ * such as a Cyrillic "a" is refused here rather than normalised.
+ */
 function hasForbiddenCharacter(value: string): boolean {
-  for (const char of value) {
-    const code = char.codePointAt(0) ?? 0;
-    if (code <= 0x20 || (code >= 0x7f && code <= 0x9f) || char === '\\') return true;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x20 || code >= 0x7f || code === BACKSLASH) return true;
   }
   return false;
+}
+
+/** The WHATWG "ends in a number" rule: decimal digits, or 0x and hex digits (IPv4 in any spelling). */
+const NUMERIC_LABEL = /^(?:\d+|0x[0-9a-f]*)$/i;
+
+/**
+ * Same host rule as the backend (`validate_https_url`): a DNS name with at least two labels, no
+ * trailing dot, no IP literal and a last label that is not a number.
+ */
+function isPlainDnsHost(hostname: string): boolean {
+  if (hostname.startsWith('[') || hostname.endsWith('.') || !hostname.includes('.')) return false;
+  const lastLabel = hostname.slice(hostname.lastIndexOf('.') + 1);
+  return !NUMERIC_LABEL.test(lastLabel);
 }
 
 /**
@@ -52,7 +71,7 @@ export function parseHttpsDestination(raw: unknown): URL | null {
   }
   const clean =
     url.protocol === 'https:' &&
-    url.hostname !== '' &&
+    isPlainDnsHost(url.hostname) &&
     url.username === '' &&
     url.password === '' &&
     url.port === '';

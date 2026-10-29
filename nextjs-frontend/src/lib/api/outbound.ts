@@ -17,12 +17,14 @@ import { recordClick } from './generated';
  */
 
 export const CLICK_REQUEST_TIMEOUT_MS = 5_000;
+export const DEFAULT_RETRY_AFTER_SECONDS = 60;
+const MAX_RETRY_AFTER_SECONDS = 3_600;
 
 export type OutboundClickResult =
   | { kind: 'redirect'; destination: string }
   | { kind: 'ended'; slug: string }
   | { kind: 'not_found' }
-  | { kind: 'rate_limited' }
+  | { kind: 'rate_limited'; retryAfterSeconds: number }
   | { kind: 'unavailable' };
 
 export interface ClickDetails {
@@ -51,11 +53,25 @@ function slugOf(body: unknown): OutboundClickResult {
   return typeof slug === 'string' ? { kind: 'ended', slug } : { kind: 'not_found' };
 }
 
-function outcomeOf(status: number, body: unknown): OutboundClickResult {
+/** The backend's Retry-After in whole seconds, clamped; anything unusable becomes the default. */
+function retryAfterOf(header: string | null): number {
+  if (header === null || !/^\d+$/.test(header.trim())) return DEFAULT_RETRY_AFTER_SECONDS;
+  const seconds = Number.parseInt(header.trim(), 10);
+  if (seconds < 1) return DEFAULT_RETRY_AFTER_SECONDS;
+  return Math.min(seconds, MAX_RETRY_AFTER_SECONDS);
+}
+
+function outcomeOf(response: Response, body: unknown): OutboundClickResult {
+  const status = response.status;
   if (status === 200) return destinationOf(body);
   if (status === 404) return { kind: 'not_found' };
   if (status === 410) return slugOf(body);
-  if (status === 429) return { kind: 'rate_limited' };
+  if (status === 429) {
+    return {
+      kind: 'rate_limited',
+      retryAfterSeconds: retryAfterOf(response.headers.get('Retry-After')),
+    };
+  }
   return UNAVAILABLE;
 }
 
@@ -73,7 +89,7 @@ export async function recordOutboundClick(
     });
     if (!result.response) return UNAVAILABLE;
     const body: unknown = result.response.ok ? result.data : result.error;
-    return outcomeOf(result.response.status, body);
+    return outcomeOf(result.response, body);
   } catch (error) {
     logger.warn('Outbound click request failed', {
       reason: error instanceof Error ? error.name : 'unknown',

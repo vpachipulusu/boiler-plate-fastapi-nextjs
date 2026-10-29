@@ -46,7 +46,7 @@ describe('GET /go/[offerId]', () => {
       { kind: 'redirect', destination: DESTINATION },
       { kind: 'ended', slug: 'free-shampoo' },
       { kind: 'not_found' },
-      { kind: 'rate_limited' },
+      { kind: 'rate_limited', retryAfterSeconds: 60 },
       { kind: 'unavailable' },
     ];
     for (const outcome of outcomes) {
@@ -116,16 +116,30 @@ describe('GET /go/[offerId]', () => {
     expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain('evil');
   });
 
-  it('sends an ended offer to its page with ?ended=1 and drops every other query parameter', async () => {
+  it('sends an ended offer to its page with a RELATIVE Location, ?ended=1 and no other parameter', async () => {
     backendAnswers({ kind: 'ended', slug: 'free-shampoo' });
 
     const response = await call('/go/offer_1?url=//evil.example&utm=x');
 
     expect(response.status).toBe(302);
-    expect(response.headers.get('Location')).toBe(
-      'http://localhost:3000/freebies/free-shampoo?ended=1'
-    );
+    expect(response.headers.get('Location')).toBe('/freebies/free-shampoo?ended=1');
     expect(response.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('never puts a host in the ended Location, whatever Host or X-Forwarded-Host says', async () => {
+    backendAnswers({ kind: 'ended', slug: 'free-shampoo' });
+
+    const response = await call('/go/offer_1', {
+      host: 'evil.example',
+      'x-forwarded-host': 'evil.example',
+      'x-forwarded-proto': 'https',
+      forwarded: 'host=evil.example',
+    });
+
+    const location = response.headers.get('Location') ?? '';
+    expect(location).toBe('/freebies/free-shampoo?ended=1');
+    expect(location).not.toContain('evil');
+    expect(location.startsWith('/') && !location.startsWith('//')).toBe(true);
   });
 
   it.each(['../admin', 'a/b', 'Free Shampoo', '//evil.example', 'x?y=1', ''])(
@@ -150,13 +164,26 @@ describe('GET /go/[offerId]', () => {
     expect(response.headers.get('Location')).toBeNull();
   });
 
-  it('passes a rate limit on as 429 with Retry-After', async () => {
-    backendAnswers({ kind: 'rate_limited' });
+  it('passes a rate limit on as 429 with the backend Retry-After', async () => {
+    backendAnswers({ kind: 'rate_limited', retryAfterSeconds: 17 });
 
     const response = await call();
 
     expect(response.status).toBe(429);
-    expect(response.headers.get('Retry-After')).toBe('60');
+    expect(response.headers.get('Retry-After')).toBe('17');
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('gives both 503 answers the same Retry-After', async () => {
+    backendAnswers({ kind: 'unavailable' });
+    const down = await call();
+    backendAnswers({ kind: 'redirect', destination: 'javascript:alert(1)' });
+    const refused = await call();
+
+    expect(down.status).toBe(503);
+    expect(refused.status).toBe(503);
+    expect(down.headers.get('Retry-After')).toBe('30');
+    expect(refused.headers.get('Retry-After')).toBe(down.headers.get('Retry-After'));
   });
 
   it('answers 503 when the backend is unavailable, with no backend text', async () => {
@@ -189,6 +216,41 @@ describe('GET /go/[offerId]', () => {
     expect(response.status).toBe(204);
     expect(response.headers.get('Location')).toBeNull();
     expect(recordMock).not.toHaveBeenCalled();
+  });
+
+  describe('Fetch Metadata', () => {
+    it.each<Record<string, string>>([
+      { 'sec-fetch-mode': 'no-cors', 'sec-fetch-dest': 'image' },
+      { 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'iframe' },
+      { 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'embed' },
+      { 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' },
+      { 'sec-fetch-mode': 'same-origin', 'sec-fetch-dest': 'empty' },
+      { 'sec-fetch-mode': 'no-cors', 'sec-fetch-dest': 'script' },
+      { 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'object' },
+      { 'sec-fetch-mode': 'websocket' },
+      { 'sec-fetch-dest': 'image' },
+    ])('answers 204 uncached and never calls the backend for %j', async (headers) => {
+      const response = await call('/go/offer_1', headers);
+
+      expect(response.status).toBe(204);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(response.headers.get('Location')).toBeNull();
+      expect(recordMock).not.toHaveBeenCalled();
+    });
+
+    it.each<Record<string, string>>([
+      { 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' },
+      { 'sec-fetch-mode': 'navigate' },
+      { 'sec-fetch-dest': 'document' },
+      {},
+    ])('counts a top-level navigation or a client without the headers: %j', async (headers) => {
+      backendAnswers({ kind: 'redirect', destination: DESTINATION });
+
+      const response = await call('/go/offer_1', headers);
+
+      expect(response.status).toBe(307);
+      expect(recordMock).toHaveBeenCalledOnce();
+    });
   });
 
   it('answers HEAD with 405 and never records a click', () => {
