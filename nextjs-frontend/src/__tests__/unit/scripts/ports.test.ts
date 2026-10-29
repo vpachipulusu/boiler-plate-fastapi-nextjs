@@ -59,6 +59,18 @@ describe('toNextProcessEnv ports', () => {
   });
 });
 
+describe('toNextProcessEnv catalogue source', () => {
+  it('serves the fixture catalogue in e2e unless real data is asked for', () => {
+    expect(toNextProcessEnv({}).CATALOGUE_SOURCE).toBe('fixture');
+    expect(toNextProcessEnv({ E2E_LIVE_CATALOGUE: '0' }).CATALOGUE_SOURCE).toBe('fixture');
+    expect(toNextProcessEnv({ CATALOGUE_SOURCE: 'api' }).CATALOGUE_SOURCE).toBe('fixture');
+  });
+
+  it('serves the API catalogue when E2E_LIVE_CATALOGUE=1', () => {
+    expect(toNextProcessEnv({ E2E_LIVE_CATALOGUE: '1' }).CATALOGUE_SOURCE).toBe('api');
+  });
+});
+
 describe('listeningPidsFromNetstat', () => {
   const output = [
     '  TCP    0.0.0.0:3000           0.0.0.0:0              LISTENING       111',

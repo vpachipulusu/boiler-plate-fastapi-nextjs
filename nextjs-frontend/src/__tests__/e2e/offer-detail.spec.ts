@@ -2,9 +2,16 @@ import { test, expect } from './helpers/fixtures';
 import { waitForPageReady } from './helpers/e2e-utils';
 
 /**
- * Offer detail (`/freebies/[slug]`) journey. Fixture offers have no destination, so the call to
- * action opens a "Demo offer" dialog and the page never links to an external site.
+ * Offer detail (`/freebies/[slug]`) journey on the FIXTURE catalogue (the e2e server runs with
+ * CATALOGUE_SOURCE=fixture unless E2E_LIVE_CATALOGUE=1; see catalogue-live.spec.ts for real data).
+ * Fixture offers have no destination, so the call to action opens a "Demo offer" dialog and the page
+ * never links to an external site.
  */
+
+test.skip(
+  process.env.E2E_LIVE_CATALOGUE === '1',
+  'Fixture specs: the server is on the live catalogue'
+);
 
 const SAMPLE = '/freebies/glow-boosting-face-cream-sample';
 const TRIAL = '/freebies/overnight-sheet-mask-trial';
@@ -86,17 +93,21 @@ for (const viewport of VIEWPORTS) {
 }
 
 test.describe('Offer detail routing and metadata', () => {
-  test('returns 404 for an unknown slug', async ({ page }) => {
-    const response = await page.goto('/freebies/no-such-offer');
+  // The page renders per request behind the root loading boundary, so the 404 view streams with HTTP 200
+  // and Next.js adds a noindex tag (docs/developer/freejoy-seo.md, follow-up 4). Assert what a visitor
+  // and a crawler get: the not-found page and noindex.
+  for (const [name, slug] of [
+    ['an unknown slug', 'no-such-offer'],
+    ['a draft offer', 'cat-pouch-tasting-sample'],
+    ['a slug that is not a slug', 'Bad%20Slug'],
+  ] as const) {
+    test(`shows the not-found page, noindex, for ${name}`, async ({ page }) => {
+      await page.goto(`/freebies/${slug}`);
 
-    expect(response?.status()).toBe(404);
-  });
-
-  test('returns 404 for a draft offer', async ({ page }) => {
-    const response = await page.goto('/freebies/cat-pouch-tasting-sample');
-
-    expect(response?.status()).toBe(404);
-  });
+      await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
+      await expect(page.locator('meta[name="robots"][content*="noindex"]').first()).toBeAttached();
+    });
+  }
 
   test('is noindex with a canonical link while fixture-backed', async ({ page }) => {
     await page.goto(SAMPLE);

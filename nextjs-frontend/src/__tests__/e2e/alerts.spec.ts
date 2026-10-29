@@ -3,8 +3,14 @@ import { waitForPageReady } from './helpers/e2e-utils';
 
 /**
  * Alerts preferences (`/alerts`) journey. The form validates in the browser and ends in a
- * "not live yet" demo panel: no request is made and nothing is saved.
+ * "not live yet" demo panel: no request is made and nothing is saved. The category checkboxes come from
+ * the fixture catalogue (the e2e server runs with CATALOGUE_SOURCE=fixture unless E2E_LIVE_CATALOGUE=1).
  */
+
+test.skip(
+  process.env.E2E_LIVE_CATALOGUE === '1',
+  'Fixture specs: the server is on the live catalogue'
+);
 
 const VIEWPORTS = [
   { name: 'desktop 1440', width: 1440, height: 900 },

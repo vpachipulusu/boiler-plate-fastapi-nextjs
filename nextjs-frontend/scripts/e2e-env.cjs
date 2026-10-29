@@ -111,6 +111,9 @@ function toNextProcessEnv(env) {
     PORT: String(ports.getE2ePort(env)),
     BACKEND_API_URL: ports.getBackendApiUrl(env),
     NEXT_PUBLIC_SENTRY_DSN: '',
+    // The public catalogue reads fixtures in e2e, so the fixture specs need no seeded data. Specs that need
+    // real offers (catalogue-live.spec.ts) opt in with E2E_LIVE_CATALOGUE=1 and a seeded backend.
+    CATALOGUE_SOURCE: env.E2E_LIVE_CATALOGUE === '1' ? 'api' : 'fixture',
     NEXT_DIST_DIR: E2E_DIST_DIR,
     E2E_RATE_LIMIT_TEST_MODE: '1',
   };

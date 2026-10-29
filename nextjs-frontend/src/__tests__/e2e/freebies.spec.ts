@@ -5,8 +5,14 @@ import type { Page } from '@playwright/test';
 /**
  * Catalogue (/freebies) journey, on desktop and at 390px: search, filter by offer type, open a
  * result, come Back with the filters intact, and reach the empty state with a working way out.
- * The catalogue is fixture-backed, so no backend or account is needed beyond the running app.
+ * The catalogue is fixture-backed (the e2e server runs with CATALOGUE_SOURCE=fixture unless
+ * E2E_LIVE_CATALOGUE=1), so no seeded data is needed beyond the running app.
  */
+
+test.skip(
+  process.env.E2E_LIVE_CATALOGUE === '1',
+  'Fixture specs: the server is on the live catalogue'
+);
 
 const VIEWPORTS = [
   { name: 'desktop', width: 1440, height: 900 },
