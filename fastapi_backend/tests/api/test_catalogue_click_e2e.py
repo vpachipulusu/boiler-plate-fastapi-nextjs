@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from app.api.deps import get_session_provider
 from app.core.database import DefaultSessionProvider, build_engine
 from app.main import create_app
+from commands.prune_click_events import prune_click_events
 from tests.api.test_catalogue_e2e import add_category, add_merchant, add_offer, insert
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
@@ -403,3 +404,31 @@ async def test_the_sample_provider_is_followed_in_the_test_environment(
 
     assert response.status_code == 200
     assert len(await click_rows(engine)) == 1
+
+
+# --- retention --------------------------------------------------------------------
+
+
+async def test_pruning_deletes_only_clicks_older_than_the_period(
+    engine: AsyncEngine, shop: dict[str, str]
+) -> None:
+    offer = await add_offer(engine, shop["category"], shop["merchant"], "lipstick")
+    now = datetime.now(UTC)
+    ages = {"old": 400, "just_over": 396, "kept": 394, "new": 0}
+    for name, days in ages.items():
+        await insert(
+            engine,
+            "click_events",
+            {
+                "offer_id": offer,
+                "occurred_at": now - timedelta(days=days),
+                "referrer_host": name,
+            },
+        )
+
+    async with async_sessionmaker(engine)() as session, session.begin():
+        deleted = await prune_click_events(session, days=395)
+
+    assert deleted == 2
+    remaining = {row.referrer_host for row in await click_rows(engine)}
+    assert remaining == {"kept", "new"}
