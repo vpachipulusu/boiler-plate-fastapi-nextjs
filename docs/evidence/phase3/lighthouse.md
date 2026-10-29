@@ -4,10 +4,22 @@ Measured 2026-10-29 on branch `feat/freej-25-seo-completeness`, fixture catalogu
 
 ## How it was run
 
-- `npm run build`, then `next start -p 3100` from `nextjs-frontend/` (port 3100 instead of the default
-  3000; the page canonicals still say `http://localhost:3000` because `NEXT_PUBLIC_APP_URL` was unset).
+- `npm run build`, then `npx next start -p 3100` from `nextjs-frontend/` (port 3100 instead of the
+  default 3000; the page canonicals still say `http://localhost:3000` because `NEXT_PUBLIC_APP_URL`
+  comes from `.env.local`).
 - `npx lighthouse@12` (version 12.8.2, not added to `package.json`), mobile form factor, simulated
   throttling, categories performance, accessibility, best-practices and SEO, headless Google Chrome.
+  Exact command, run once per page with `CHROME_PATH` pointing at the installed Chrome:
+
+  ```bash
+  npx --yes lighthouse@12 http://localhost:3100/<path> --form-factor=mobile \
+    --only-categories=performance,accessibility,best-practices,seo \
+    --chrome-flags="--headless=new --no-sandbox" --output=json --output-path=<file>.json --quiet
+  ```
+
+- Chrome version: `HeadlessChrome/156.0.0.0`, read from the report's `environment.hostUserAgent`.
+  `chrome --version` could not be used: on this Windows machine it hands off to the already running
+  browser instead of printing a version.
 - One run per page, on a developer laptop. Performance numbers vary by a few points between runs;
   treat them as a baseline, not a guarantee.
 

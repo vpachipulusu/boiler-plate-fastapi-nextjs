@@ -7,12 +7,15 @@ the pages under `src/app/(public)/`.
 
 ## Indexing policy
 
-Indexability is decided by the catalogue data, never by a flag in the code.
+Indexability is decided by the catalogue data, not by a flag in the code. The one exception is
+`ALERTS_FORM_LIVE = false` in `src/app/(public)/alerts/page.tsx`: a deliberate pre-launch hold that
+keeps `/alerts` noindex until the form really subscribes people, because the page has no catalogue
+data to decide from. Flip it in the same change that makes the form live.
 
 | Helper (`lib/seo/indexing.ts`) | Rule |
 |---|---|
 | `isIndexableOffer(offer, today)` | `source === 'api'`, not `demo`, `status === 'published'` and `isLive(offer, today)` |
-| `isCatalogueApiBacked(offers)` | at least one offer has `source === 'api'` |
+| `isCatalogueApiBacked(offers)` | at least one offer has `source === 'api'` and is not `demo` |
 | `isIndexableCategory(category, offers)` | the category is enabled and the catalogue is API-backed |
 | `isRefinedQuery(query)` | any search, category, type, postage, non-default sort, or page above 1 |
 | `expiredIndexingPolicy(offer, today)` | see "Expired offers" |
@@ -49,10 +52,22 @@ Pages revalidate hourly (`export const revalidate = 3600` on `/`, `/freebies/[sl
 so a data change reaches search engines within an hour without a deploy. `/freebies` and
 `/category/[slug]` render on demand because they read the URL query.
 
-One consequence to know about: "API-backed" is a property of the whole catalogue (any API offer), as
-specified for FREEJ-25. A category with no live offers is therefore still indexable once the catalogue
-is API-backed. If thin category pages become a problem, tighten `isIndexableCategory` to require an
-indexable offer in that category.
+Two consequences to know about:
+
+- "API-backed" is a property of the whole catalogue (any live, non-demo API offer), as specified for
+  FREEJ-25. A category with no live offers is therefore still indexable once the catalogue is
+  API-backed. If thin category pages become a problem, tighten `isIndexableCategory` to require an
+  indexable offer in that category.
+- "API-backed" is derived from the **live** offers list. If the API is in use but there are zero live
+  offers (launch day, or a lull between campaigns), the list is empty, the catalogue reads as not
+  API-backed, and `/`, `/freebies` and every category go `noindex` until a live offer exists. A test
+  pins this. The same happens, deliberately, when the live-offers read fails: the SEO code logs the
+  error (`lib/seo/live-offers.ts`) and falls back to `noindex` and a sitemap of the static pages
+  only, so a catalogue outage never throws from `generateMetadata` or the sitemap.
+  **FREEJ-21 should add a facade function `getCatalogueSource()`** that says whether the catalogue is
+  fixture- or API-backed independent of what is live, and `lib/seo` should switch to it. FREEJ-21
+  must also make `getToday()` return the **Europe/London calendar date** (not the UTC date), because
+  `isLive` and the 30-day expiry policy compare calendar days.
 
 ## Expired offers
 
@@ -65,7 +80,15 @@ indexable offer in that category.
 | `gone` | more than 30 days after `endAt` | 410 by policy | `noindex` |
 | `unavailable` | draft or archived | 404 | n/a |
 
-An expired offer with no `endAt` has no date to count from, so it stays `ended`.
+Edge cases, all pinned by tests:
+
+- An expired offer with no `endAt`, or an `endAt` that is not a readable date (for example `soon`),
+  has no date to count from, so it stays `ended`.
+- An offer marked `expired` whose `endAt` is still in the future stays `ended`, and only becomes
+  `gone` once `today` is more than 30 days after `endAt`.
+- Day counting uses calendar dates in UTC arithmetic, so BST starting or ending and year boundaries
+  do not shift the count.
+- `OfferIndexingPolicy.httpStatus` is reserved for the Phase 3 410 ticket: no page reads it yet.
 
 **What actually ships for `gone`: a 404, not a 410.** A Next.js page cannot set its own status code;
 `notFound()` always answers 404. A 410 needs a route handler or the proxy, and the proxy runs without
@@ -92,15 +115,20 @@ uses the wall clock, and an entry without a date simply has no `lastmod`.
 Search Console will flag "submitted URL marked noindex" if the sitemap is submitted before real data
 exists. Do not submit it until the API is live.
 
-`/robots.txt` allows `/` and disallows `/admin`, `/dashboard`, `/go/`, `/api/`, `/login` and
-`/signup`, and points at `<site url>/sitemap.xml`. `/go/` is the affiliate redirect that Phase 3 adds.
+Sitemap URLs are built with each path segment percent-encoded, so a slug containing a space, `?` or
+`#` cannot change the URL.
+
+`/robots.txt` allows `/` and disallows `/admin`, `/dashboard`, `/settings`, `/profile`, `/security`,
+`/go/`, `/api/`, `/login`, `/signup`, `/reset-password` and `/verify-email`, and points at `<site url>/sitemap.xml`. `/go/` is the affiliate redirect that Phase 3 adds.
 `robots.txt` is not a security control and it does not remove already indexed URLs; the noindex meta
 tags above do that job for public pages.
 
 ## Structured data (JSON-LD)
 
-Emitted by `<JsonLd>` (`components/seo/json-ld.tsx`), a server component that serialises with `<`
-escaped as `<` so page text cannot close the script tag. It adds no visible content.
+Emitted by `<JsonLd>` (`components/seo/json-ld.tsx`), a server component that serialises with every
+`<` replaced by its JSON unicode escape (backslash, `u003c`) so page text such as `</script>` cannot
+close the script tag; the U+2028 and U+2029 line separators are escaped the same way. It adds no
+visible content.
 
 | Page | Schemas |
 |---|---|
@@ -129,6 +157,13 @@ fits (for example `Event` for a dated competition) and data the editors verify.
 - Canonical and Open Graph (`og:url`, title, description, `en_GB`, site name) are set per page
   through `openGraphFor`. A page-level `openGraph` replaces the root layout's, so the root
   `og-image.png` is not inherited (see the follow-ups: that file does not exist).
+- The site origin comes from `NEXT_PUBLIC_APP_URL` (`lib/seo/urls.ts`, read at call time and
+  shared by canonicals, the sitemap, robots.txt and JSON-LD). In production off Vercel, rendering
+  throws if it is unset, and a value must be a valid https URL (a loopback host is allowed over
+  http because CI and the local e2e build use `http://localhost:3000`). On Vercel with it unset the
+  deployment URL is used; in development and test it falls back to `http://localhost:3000`. A
+  trailing slash is stripped. The Open Graph title on `/freebies` is always "All freebies"; the
+  `<title>` still follows the search text.
 - Page-level `robots` replaces the root layout's, so indexable pages repeat the snippet and
   image-preview allowances (`INDEXABLE_ROBOTS`).
 
@@ -139,15 +174,14 @@ These need a human, a public URL or a decision, and were not done in FREEJ-25:
 1. **Google Rich Results Test and Search Console.** The Rich Results Test needs a public URL. Once a
    real deployment has API data, run it on `/` (WebSite, Organization) and on one offer and one
    category page (BreadcrumbList), then submit `/sitemap.xml` and spot-check URL Inspection.
-2. **Set `NEXT_PUBLIC_APP_URL`** to the production origin. Canonicals, the sitemap, robots.txt and
-   JSON-LD all use it and fall back to `http://localhost:3000`.
-3. **Favicons and the share image are missing.** `src/app/layout.tsx` references `/favicon.ico`,
+2. **Favicons and the share image are missing.** `src/app/layout.tsx` references `/favicon.ico`,
    `/favicon-16x16.png`, `/favicon-32x32.png`, `/apple-touch-icon.png` and `/og-image.png`, none of
    which exist in `public/` (the first three 404 in Lighthouse). Add real brand assets, then pass the
    logo path to `buildOrganization` and an image to `openGraphFor`.
-4. **Real 410 for gone offers** (Phase 3): replace the 404 described under "Expired offers".
-5. **Unknown `/category/[slug]` answers HTTP 200** with the 404 page (the root `loading.tsx` streams
-   the shell first; see `freejoy-frontend.md`). Fix by scoping or removing that boundary.
-6. **Re-run Lighthouse** once the catalogue is API-backed; the SEO score is capped by the deliberate
+3. **Real 410 for gone offers** (Phase 3): replace the 404 described under "Expired offers".
+4. **Unknown `/category/[slug]` answers HTTP 200** with the 404 page (the root `loading.tsx` streams
+   the shell first; confirmed with `curl -I /category/nope` on the production build, which answers
+   200; see `freejoy-frontend.md`). Fix by scoping or removing that boundary.
+5. **Re-run Lighthouse** once the catalogue is API-backed; the SEO score is capped by the deliberate
    noindex today. Numbers so far: `docs/evidence/phase3/lighthouse.md`.
-7. Decide whether thin categories (no live offers) should stay indexable.
+6. Decide whether thin categories (no live offers) should stay indexable.
