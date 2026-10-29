@@ -54,10 +54,27 @@ export interface BackendOptions {
   requireInternalKey?: boolean;
   /**
    * For reads shared by every visitor inside `unstable_cache` (a public catalogue): no session, no
-   * request headers read (so no `X-Client-IP`), and no `cache: 'no-store'`, which would make a cached page
-   * dynamic. Never use it for anything that depends on who is asking.
+   * request headers read (the caller supplies `clientIp` instead), and no `cache: 'no-store'`, which would
+   * make a cached page dynamic. Never use it for anything that depends on who is asking.
    */
   shared?: boolean;
+  /**
+   * With `shared`, the visitor address to forward as `X-Client-IP`. `shared` reads no request headers, so the
+   * caller reads it before the cache boundary with `readTrustedClientIp()` and passes it through. Never pass
+   * an address from a header the client can set.
+   */
+  clientIp?: string;
+}
+
+/**
+ * The visitor's address from the hosting platform's trusted header, or undefined (not on Vercel, header
+ * absent or not an IP). Only Vercel's `x-vercel-forwarded-for` is trusted: it cannot be set by the client,
+ * unlike X-Forwarded-For. Needs a request scope; callers outside one must catch the error.
+ */
+export async function readTrustedClientIp(): Promise<string | undefined> {
+  if (process.env.VERCEL !== '1') return undefined;
+  const value = (await headers()).get('x-vercel-forwarded-for')?.trim();
+  return value && isIP(value) ? value : undefined;
 }
 
 /** A fresh client per call, so one request's session can never leak into another. */
@@ -65,6 +82,7 @@ export async function getBackendClient({
   withSession = true,
   requireInternalKey = false,
   shared = false,
+  clientIp,
 }: BackendOptions = {}): Promise<Client> {
   const sessionToken =
     withSession && !shared ? (await cookies()).get(SESSION_COOKIE_NAME)?.value : undefined;
@@ -73,10 +91,8 @@ export async function getBackendClient({
     throw notConfigured('BACKEND_INTERNAL_KEY');
   }
   // Caller headers are trusted only at Vercel's boundary, never raw X-Forwarded-For.
-  const forwardedIp =
-    internalKey && !shared && process.env.VERCEL === '1'
-      ? (await headers()).get('x-vercel-forwarded-for')?.trim()
-      : undefined;
+  let forwardedIp: string | undefined;
+  if (internalKey) forwardedIp = shared ? clientIp : await readTrustedClientIp();
   return createClient(
     createConfig({
       baseUrl: getBackendUrl(),

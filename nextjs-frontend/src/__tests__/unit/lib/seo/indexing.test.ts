@@ -5,6 +5,7 @@ import type { Category, Offer } from '@/lib/catalogue/types';
 import {
   daysBetween,
   EXPIRED_NOINDEX_DAYS,
+  endedOfferState,
   expiredIndexingPolicy,
   isCatalogueApiBacked,
   isIndexableCategory,
@@ -60,25 +61,30 @@ describe('isIndexableOffer', () => {
 });
 
 describe('isCatalogueApiBacked and isIndexableCategory', () => {
-  it('treats an all-fixture catalogue as not API-backed', () => {
-    expect(isCatalogueApiBacked(OFFERS)).toBe(false);
-    expect(isIndexableCategory(category(), OFFERS)).toBe(false);
+  it('treats the fixture source as not API-backed', () => {
+    expect(isCatalogueApiBacked('fixture')).toBe(false);
+    expect(isIndexableCategory(category(), 'fixture')).toBe(false);
   });
 
-  it('does not count a demo API offer as API-backed', () => {
-    expect(isCatalogueApiBacked([apiOffer({ demo: true })])).toBe(false);
-    expect(isCatalogueApiBacked([])).toBe(false);
-  });
-
-  it('treats any API offer as an API-backed catalogue', () => {
-    const offers = [fixtureOffer, apiOffer()];
-
-    expect(isCatalogueApiBacked(offers)).toBe(true);
-    expect(isIndexableCategory(category(), offers)).toBe(true);
+  it('treats the API source as API-backed whatever is live, so zero live offers does not noindex', () => {
+    expect(isCatalogueApiBacked('api')).toBe(true);
+    expect(isIndexableCategory(category(), 'api')).toBe(true);
   });
 
   it('never indexes a disabled category', () => {
-    expect(isIndexableCategory(category({ enabled: false }), [apiOffer()])).toBe(false);
+    expect(isIndexableCategory(category({ enabled: false }), 'api')).toBe(false);
+  });
+});
+
+describe('endedOfferState', () => {
+  it('is ended up to 30 days after the end date and gone after that', () => {
+    expect(endedOfferState({ endedAt: '2026-10-24' }, TODAY)).toBe('ended');
+    expect(endedOfferState({ endedAt: '2026-09-29' }, TODAY)).toBe('ended');
+    expect(endedOfferState({ endedAt: '2026-09-28' }, TODAY)).toBe('gone');
+  });
+
+  it('stays ended when there is no end date to count from', () => {
+    expect(endedOfferState({ endedAt: null }, TODAY)).toBe('ended');
   });
 });
 

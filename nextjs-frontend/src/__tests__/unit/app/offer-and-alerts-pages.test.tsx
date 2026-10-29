@@ -7,13 +7,26 @@ const notFoundMock = vi.fn(() => {
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   notFound: () => notFoundMock(),
+  useRouter: () => ({ refresh: vi.fn() }),
 }));
 
-import OfferPage, {
-  generateMetadata,
-  generateStaticParams,
-} from '@/app/(public)/freebies/[slug]/page';
+const catalogueMocks = vi.hoisted(() => ({ categories: vi.fn() }));
+vi.mock('@/lib/catalogue', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/catalogue')>();
+  return {
+    ...actual,
+    getCategories: () =>
+      catalogueMocks.categories.getMockImplementation()
+        ? catalogueMocks.categories()
+        : actual.getCategories(),
+  };
+});
+
+import { CatalogueUnavailableError } from '@/lib/catalogue/errors';
+import OfferPage, * as offerRoute from '@/app/(public)/freebies/[slug]/page';
 import AlertsPage from '@/app/(public)/alerts/page';
+
+const generateMetadata = offerRoute.generateMetadata;
 
 const SAMPLE = 'glow-boosting-face-cream-sample';
 const TRIAL = 'overnight-sheet-mask-trial';
@@ -32,6 +45,7 @@ function externalHrefs(): string[] {
 
 beforeEach(() => {
   notFoundMock.mockClear();
+  catalogueMocks.categories.mockReset();
 });
 
 describe('offer detail page', () => {
@@ -111,13 +125,9 @@ describe('offer detail page', () => {
     expect(metadata.openGraph).toMatchObject({ type: 'article' });
   });
 
-  it('generates static params for live offers only', async () => {
-    const params = await generateStaticParams();
-    const slugs = params.map((entry) => entry.slug);
-
-    expect(slugs).toContain(SAMPLE);
-    expect(slugs).not.toContain(DRAFT);
-    expect(slugs).not.toContain(EXPIRED);
+  it('renders per request, so the build never needs the catalogue', () => {
+    expect(offerRoute.dynamic).toBe('force-dynamic');
+    expect('generateStaticParams' in offerRoute).toBe(false);
   });
 });
 
@@ -141,6 +151,19 @@ describe('alerts page', () => {
     await renderAlerts('sam@example.com');
 
     expect(screen.getByLabelText(/email address/i)).toHaveValue('sam@example.com');
+  });
+
+  it('shows a retryable alert instead of the form when the categories cannot be read', async () => {
+    catalogueMocks.categories.mockRejectedValue(new CatalogueUnavailableError());
+
+    await renderAlerts();
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/could not load the categories/i);
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /interested in/i })).toBeNull();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Good things. Straight to you.' })
+    ).toBeInTheDocument();
   });
 
   it.each(['not an email', ['a@b.co', 'c@d.co'], undefined])(

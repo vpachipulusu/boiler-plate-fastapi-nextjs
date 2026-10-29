@@ -1,0 +1,166 @@
+import 'server-only';
+
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { unstable_cache } from 'next/cache';
+import { CatalogueUnavailableError } from '@/lib/catalogue/errors';
+import { logger } from '@/lib/logger';
+import { callBackend, readTrustedClientIp, type ApiResult } from './server';
+import {
+  listCategories,
+  listOffers,
+  readOffer,
+  type CategoryData,
+  type ExpiredOfferData,
+  type ListOffersData,
+  type OfferData,
+  type OfferListData,
+} from './generated';
+
+/**
+ * Server-only reads of the public catalogue (`GET /v1/catalogue/*`, internal key, no session).
+ *
+ * Every read goes through `callBackend(..., { withSession: false, shared: true })` inside
+ * `unstable_cache` (tag `catalogue`, 60 s), so a popular page costs the backend one request a minute
+ * however many visitors arrive. Failures THROW `CatalogueUnavailableError` instead of returning an
+ * empty result: `unstable_cache` never stores a thrown error, so an outage is not remembered and the
+ * next request tries again. Backend text never leaves this module; it is logged and replaced by the
+ * curated message in `@/lib/catalogue/errors`.
+ *
+ * Searches with text (`q`) skip the cache so a visitor's words are never a cache key; they are still
+ * rate limited per visitor through `X-Client-IP`.
+ */
+
+export type {
+  CategoryData as ApiCategory,
+  ExpiredOfferData as ApiEndedOffer,
+  OfferData as ApiOffer,
+};
+
+export const CATALOGUE_CACHE_TAG = 'catalogue';
+export const CATALOGUE_REVALIDATE_SECONDS = 60;
+export const CATALOGUE_REQUEST_TIMEOUT_MS = 3_000;
+
+type ListQuery = NonNullable<ListOffersData['query']>;
+
+/** The filters a catalogue read can carry. Every field optional; omitted means "no filter". */
+export interface OfferListParams {
+  q?: string;
+  category?: string;
+  types?: readonly NonNullable<ListQuery['type']>[number][];
+  postage?: 'free';
+  featured?: boolean;
+  sort?: 'newest' | 'ending_soon' | 'a_z';
+  limit?: number;
+  offset?: number;
+}
+
+export type OfferReadResult =
+  | { kind: 'found'; offer: OfferData }
+  | { kind: 'gone'; ended: ExpiredOfferData | null }
+  | { kind: 'not_found' };
+
+/** The visitor address for the read in flight. Held outside the cache key on purpose. */
+const visitorIp = new AsyncLocalStorage<string | undefined>();
+
+async function withVisitorIp<T>(run: () => Promise<T>): Promise<T> {
+  let ip: string | undefined;
+  try {
+    ip = await readTrustedClientIp();
+  } catch {
+    ip = undefined; // no request scope (build, tests): nothing to forward
+  }
+  return visitorIp.run(ip, run);
+}
+
+function backendOptions() {
+  return { withSession: false, shared: true, clientIp: visitorIp.getStore() } as const;
+}
+
+function timeoutSignal(): AbortSignal {
+  return AbortSignal.timeout(CATALOGUE_REQUEST_TIMEOUT_MS);
+}
+
+/** Logs the failure (never the search text) and throws the typed error callers turn into an error state. */
+function fail(operation: string, result: Extract<ApiResult<unknown>, { success: false }>): never {
+  logger.warn('Catalogue read failed', { operation, status: result.status, error: result.error });
+  throw new CatalogueUnavailableError();
+}
+
+/** Stable key order and no undefined values, so equal filters share one cache entry. */
+function toQuery(params: OfferListParams): ListQuery {
+  const query: ListQuery = {};
+  if (params.q) query.q = params.q;
+  if (params.category) query.category = params.category;
+  if (params.types && params.types.length > 0) query.type = [...params.types];
+  if (params.postage) query.postage = params.postage;
+  if (params.featured !== undefined) query.featured = params.featured;
+  if (params.sort) query.sort = params.sort;
+  if (params.limit !== undefined) query.limit = params.limit;
+  if (params.offset !== undefined) query.offset = params.offset;
+  return query;
+}
+
+async function loadOffers(query: ListQuery): Promise<OfferListData> {
+  const result = await callBackend(
+    (client) => listOffers({ client, query, signal: timeoutSignal() }),
+    backendOptions()
+  );
+  if (!result.success) fail('list_offers', result);
+  return result.data;
+}
+
+async function loadCategories(): Promise<CategoryData[]> {
+  const result = await callBackend(
+    (client) => listCategories({ client, signal: timeoutSignal() }),
+    backendOptions()
+  );
+  if (!result.success) fail('list_categories', result);
+  return result.data;
+}
+
+/** Reads the 410 stub; null when the body is not the documented shape. */
+function parseEnded(body: unknown): ExpiredOfferData | null {
+  const data = (body as { data?: Partial<ExpiredOfferData> } | null | undefined)?.data;
+  if (!data || typeof data.slug !== 'string' || typeof data.title !== 'string') return null;
+  const category = data.category;
+  if (!category || typeof category.slug !== 'string' || typeof category.name !== 'string') {
+    return null;
+  }
+  const endedAt = typeof data.ended_at === 'string' ? data.ended_at : null;
+  return { slug: data.slug, title: data.title, category, ended_at: endedAt };
+}
+
+async function loadOffer(slug: string): Promise<OfferReadResult> {
+  // callBackend folds an error body into a message; the 410 stub is the one body we need, so keep it.
+  let goneBody: unknown;
+  const result = await callBackend(async (client) => {
+    const response = await readOffer({ client, path: { slug }, signal: timeoutSignal() });
+    if (response.response?.status === 410) goneBody = response.error;
+    return response;
+  }, backendOptions());
+  if (result.success) return { kind: 'found', offer: result.data };
+  if (result.status === 404) return { kind: 'not_found' };
+  if (result.status === 410) return { kind: 'gone', ended: parseEnded(goneBody) };
+  return fail('read_offer', result);
+}
+
+const cacheOptions = { tags: [CATALOGUE_CACHE_TAG], revalidate: CATALOGUE_REVALIDATE_SECONDS };
+const cachedOffers = unstable_cache(loadOffers, ['catalogue', 'offers'], cacheOptions);
+const cachedCategories = unstable_cache(loadCategories, ['catalogue', 'categories'], cacheOptions);
+const cachedOffer = unstable_cache(loadOffer, ['catalogue', 'offer'], cacheOptions);
+
+/** A page of published, live offers plus the total before paging. */
+export function fetchOffers(params: OfferListParams = {}): Promise<OfferListData> {
+  const query = toQuery(params);
+  return withVisitorIp(() => (query.q ? loadOffers(query) : cachedOffers(query)));
+}
+
+/** One offer: found, ended (410 stub) or not found. Any other outcome throws. */
+export function fetchOffer(slug: string): Promise<OfferReadResult> {
+  return withVisitorIp(() => cachedOffer(slug));
+}
+
+/** Enabled categories in display order, each with its live offer count. */
+export function fetchCategories(): Promise<CategoryData[]> {
+  return withVisitorIp(() => cachedCategories());
+}

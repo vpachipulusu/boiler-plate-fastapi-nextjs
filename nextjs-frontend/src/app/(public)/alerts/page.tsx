@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { AlertsForm } from '@/components/alerts/alerts-form';
+import { InlineError } from '@/components/catalogue/inline-error';
 import { Spark } from '@/components/site/brand-mark';
-import { getCategories } from '@/lib/catalogue';
+import { getCategories, settle } from '@/lib/catalogue';
 import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
 /** Flip to true when the alerts form really subscribes people; until then the page stays noindex. */
@@ -37,7 +38,9 @@ export default async function AlertsPage({
 }: {
   searchParams: Promise<{ email?: string | string[] }>;
 }) {
-  const [params, categories] = await Promise.all([searchParams, getCategories()]);
+  // Read the query first: the page is dynamic, so a build never reaches the catalogue.
+  const params = await searchParams;
+  const categories = await settle(getCategories());
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-14">
@@ -70,10 +73,17 @@ export default async function AlertsPage({
           </div>
         </section>
         <section className="px-6 py-10 sm:px-10 sm:py-12">
-          <AlertsForm
-            categories={categories.map(({ slug, name }) => ({ slug, name }))}
-            defaultEmail={prefillEmail(params.email)}
-          />
+          {categories.ok ? (
+            <AlertsForm
+              categories={categories.data.map(({ slug, name }) => ({ slug, name }))}
+              defaultEmail={prefillEmail(params.email)}
+            />
+          ) : (
+            <InlineError
+              title="The alerts form is not loading"
+              message="We could not load the categories for your alerts. Please try again in a moment."
+            />
+          )}
         </section>
       </div>
     </div>

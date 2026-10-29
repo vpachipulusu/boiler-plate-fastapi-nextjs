@@ -38,12 +38,16 @@ describe('parseCatalogueParams', () => {
     expect(parseCatalogueParams({ q: ['first', 'second'] }).q).toBe('first');
   });
 
-  it('accepts a known category slug', () => {
+  it('accepts a well-formed category slug and leaves it to the data source to judge', () => {
     expect(parseCatalogueParams({ category: 'pets' }).category).toBe('pets');
+    expect(parseCatalogueParams({ category: 'cars' }).category).toBe('cars');
   });
 
-  it('drops an unknown category slug', () => {
-    expect(parseCatalogueParams({ category: 'cars' }).category).toBeNull();
+  it('drops a malformed category slug', () => {
+    expect(parseCatalogueParams({ category: 'Cars!' }).category).toBeNull();
+    expect(parseCatalogueParams({ category: '../admin' }).category).toBeNull();
+    expect(parseCatalogueParams({ category: 'a'.repeat(101) }).category).toBeNull();
+    expect(parseCatalogueParams({ category: '' }).category).toBeNull();
   });
 
   it('reads comma-separated types and drops unknown ones', () => {

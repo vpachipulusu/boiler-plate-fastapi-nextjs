@@ -7,7 +7,7 @@ import { Spark } from '@/components/site/brand-mark';
  * raw colours are allowed); the floating cards are theme-token HTML so their text stays crisp and
  * readable at every size.
  */
-export function HomeHeroArt({ className }: { className?: string }) {
+export function HomeHeroArt({ className, demo }: { className?: string; demo: boolean }) {
   return (
     <div className={cn('relative aspect-[520/440]', className)}>
       <svg viewBox="0 0 520 440" className="absolute inset-0 h-full w-full" aria-hidden="true">
@@ -56,10 +56,10 @@ export function HomeHeroArt({ className }: { className?: string }) {
         </span>
         <span className="min-w-0">
           <span className="block text-[10px] font-bold leading-tight text-foreground sm:text-xs">
-            Sample listings
+            {demo ? 'Sample listings' : 'UK freebies'}
           </span>
           <span className="block text-[9px] leading-tight text-muted-foreground sm:text-[11px]">
-            Design preview
+            {demo ? 'Design preview' : 'Terms in plain words'}
           </span>
         </span>
       </div>

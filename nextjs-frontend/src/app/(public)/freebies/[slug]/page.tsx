@@ -1,51 +1,70 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { CatalogueUnavailablePage } from '@/components/catalogue/inline-error';
 import { Breadcrumbs } from '@/components/offer/breadcrumbs';
 import { ClaimSteps } from '@/components/offer/claim-steps';
+import { EndedOfferView } from '@/components/offer/ended-offer';
 import { ImportantBits } from '@/components/offer/important-bits';
 import { OfferHero } from '@/components/offer/offer-hero';
 import { RelatedOffers } from '@/components/offer/related-offers';
 import { JsonLd } from '@/components/seo/json-ld';
 import {
   getCategoryBySlug,
-  getLiveOffers,
   getMerchantBySlug,
   getMerchants,
-  getOfferBySlug,
   getRelatedOffers,
   getToday,
   isLive,
-  type Offer,
+  lookupOffer,
+  settle,
 } from '@/lib/catalogue';
-import { expiredIndexingPolicy } from '@/lib/seo/indexing';
+import { endedOfferState } from '@/lib/seo/indexing';
 import { buildBreadcrumbList } from '@/lib/seo/json-ld';
-import { offerRobots, openGraphFor } from '@/lib/seo/metadata';
+import {
+  NOINDEX_FOLLOW_ROBOTS,
+  NOINDEX_ROBOTS,
+  offerRobots,
+  openGraphFor,
+} from '@/lib/seo/metadata';
 
-/** Re-rendered at most hourly so an offer that has just ended shows its ended state and noindex. */
-export const revalidate = 3600;
+/**
+ * Rendered per request. The offer read behind it is cached for a minute, so an offer that has just
+ * ended shows its ended state and `noindex` within that time, and an outage is never baked into a
+ * prerendered page.
+ */
+export const dynamic = 'force-dynamic';
 
 interface OfferPageProps {
   params: Promise<{ slug: string }>;
 }
 
-export async function generateStaticParams(): Promise<{ slug: string }[]> {
-  const offers = await getLiveOffers();
-  return offers.map((offer) => ({ slug: offer.slug }));
-}
-
-/**
- * An API-backed offer more than 30 days past its end date is gone (policy: 410). Next.js cannot
- * set a 410 from a page, so it answers 404 via `notFound()` until Phase 3 adds a real 410; see
- * docs/developer/freejoy-seo.md. Fixture offers keep rendering so the design preview stays intact.
- */
-function isGone(offer: Offer, today: string): boolean {
-  return offer.source === 'api' && expiredIndexingPolicy(offer, today).state === 'gone';
-}
+const NOT_FOUND_METADATA: Metadata = { title: 'Offer not found', robots: { index: false } };
+const UNAVAILABLE_METADATA: Metadata = { title: 'Freebie unavailable', robots: NOINDEX_ROBOTS };
 
 export async function generateMetadata({ params }: OfferPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const [offer, today] = await Promise.all([getOfferBySlug(slug), getToday()]);
-  if (!offer || isGone(offer, today)) return { title: 'Offer not found', robots: { index: false } };
+  const [lookup, today] = await Promise.all([settle(lookupOffer(slug)), getToday()]);
+  if (!lookup.ok) return UNAVAILABLE_METADATA;
+
+  const result = lookup.data;
+  if (result.kind === 'not_found') return NOT_FOUND_METADATA;
+  if (result.kind === 'ended') {
+    // More than 30 days after it ended the page is gone: a 404 for now (no real 410, see the SEO doc).
+    if (endedOfferState(result.ended, today) === 'gone') return NOT_FOUND_METADATA;
+    const path = `/freebies/${result.ended.slug}`;
+    const description = `This offer has ended. See more ${result.ended.categoryName} freebies on Freejoy.`;
+    return {
+      title: result.ended.title,
+      description,
+      alternates: { canonical: path },
+      openGraph: openGraphFor({ title: result.ended.title, description, path, type: 'article' }),
+      robots: NOINDEX_FOLLOW_ROBOTS,
+    };
+  }
+
+  const { offer } = result;
+  // The page shows an error when its category cannot be read; it must not be indexed then.
+  if (!(await settle(getCategoryBySlug(offer.categorySlug))).ok) return UNAVAILABLE_METADATA;
   const path = `/freebies/${offer.slug}`;
   return {
     title: offer.title,
@@ -64,18 +83,31 @@ export async function generateMetadata({ params }: OfferPageProps): Promise<Meta
 
 export default async function OfferPage({ params }: OfferPageProps) {
   const { slug } = await params;
-  const offer = await getOfferBySlug(slug);
-  if (!offer) notFound();
+  const lookup = await settle(lookupOffer(slug));
+  if (!lookup.ok) return <CatalogueUnavailablePage heading="This freebie" />;
 
-  const [merchant, category, related, merchants, today] = await Promise.all([
-    getMerchantBySlug(offer.merchantSlug),
-    getCategoryBySlug(offer.categorySlug),
-    getRelatedOffers(offer, 4),
-    getMerchants(),
+  const result = lookup.data;
+  if (result.kind === 'not_found') notFound();
+  if (result.kind === 'ended') {
+    if (endedOfferState(result.ended, await getToday()) === 'gone') notFound();
+    return <EndedOfferView ended={result.ended} />;
+  }
+
+  const { offer } = result;
+  const [categoryRead, relatedRead, merchantsRead, today] = await Promise.all([
+    settle(getCategoryBySlug(offer.categorySlug)),
+    settle(getRelatedOffers(offer, 4)),
+    settle(getMerchants()),
     getToday(),
   ]);
-  if (!merchant || !category || isGone(offer, today)) notFound();
+  if (!categoryRead.ok) return <CatalogueUnavailablePage heading={offer.title} />;
+  const category = categoryRead.data;
+  const merchant = offer.merchant ?? (await getMerchantBySlug(offer.merchantSlug));
+  if (!merchant || !category) notFound();
 
+  // Related offers are a nicety: if they cannot be read the offer itself still renders.
+  const related = relatedRead.ok ? relatedRead.data : [];
+  const merchants = merchantsRead.ok ? merchantsRead.data : [];
   const ended = !isLive(offer, today);
 
   return (
@@ -87,7 +119,7 @@ export default async function OfferPage({ params }: OfferPageProps) {
           { name: offer.title, path: `/freebies/${offer.slug}` },
         ])}
       />
-      <Breadcrumbs category={category} offer={offer} />
+      <Breadcrumbs category={category} title={offer.title} />
       <div className="mt-6 space-y-12 sm:mt-8 sm:space-y-16">
         <OfferHero offer={offer} merchant={merchant} category={category} ended={ended} />
         <ClaimSteps steps={offer.steps} />

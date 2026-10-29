@@ -1,26 +1,29 @@
 import type { Metadata } from 'next';
-import { CategoryGrid } from '@/components/home/category-grid';
-import { FreshlyFound } from '@/components/home/freshly-found';
+import { Suspense } from 'react';
 import { HomeHero } from '@/components/home/home-hero';
+import { HomeSections, HomeSectionsSkeleton, loadHomeData } from '@/components/home/home-sections';
 import { NewsletterBand } from '@/components/home/newsletter-band';
 import { TrustStrip } from '@/components/home/trust-strip';
 import { JsonLd } from '@/components/seo/json-ld';
-import { getCategories, getFeaturedOffers, getMerchants } from '@/lib/catalogue';
+import { getCatalogueSource } from '@/lib/catalogue';
 import { isCatalogueApiBacked } from '@/lib/seo/indexing';
 import { buildOrganization, buildWebSite } from '@/lib/seo/json-ld';
-import { loadLiveOffersForSeo } from '@/lib/seo/live-offers';
 import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
-/** Re-rendered at most hourly so the featured offers and the indexing state track the catalogue. */
-export const revalidate = 3600;
+/**
+ * Rendered per request. The catalogue reads behind it are cached for a minute, so the page tracks the
+ * catalogue closely, and an outage can never be baked into a prerendered page.
+ */
+export const dynamic = 'force-dynamic';
 
 const TITLE = 'Freejoy – UK freebies, samples and offers';
 const DESCRIPTION =
   'Browse UK freebies, samples, trials and offers, with terms, postage and card requirements set out on every listing.';
 
 export async function generateMetadata(): Promise<Metadata> {
-  // Indexable only once the catalogue is API-backed; the fixture preview stays out of search.
-  const indexable = isCatalogueApiBacked(await loadLiveOffersForSeo('home metadata'));
+  const [source, home] = await Promise.all([getCatalogueSource(), loadHomeData()]);
+  // Indexable only when API-backed, and never while the page is showing its error state.
+  const indexable = isCatalogueApiBacked(source) && home.ok;
   return {
     title: TITLE,
     description: DESCRIPTION,
@@ -31,19 +34,16 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [categories, offers, merchants] = await Promise.all([
-    getCategories(),
-    getFeaturedOffers(8),
-    getMerchants(),
-  ]);
+  const demo = (await getCatalogueSource()) === 'fixture';
 
   return (
     <div className="mx-auto max-w-content px-4 py-6 sm:px-6 lg:py-8">
       <JsonLd data={[buildWebSite(), buildOrganization()]} />
-      <HomeHero />
-      <TrustStrip />
-      <CategoryGrid categories={categories} />
-      <FreshlyFound offers={offers} merchants={merchants} />
+      <HomeHero demo={demo} />
+      <TrustStrip demo={demo} />
+      <Suspense fallback={<HomeSectionsSkeleton />}>
+        <HomeSections demo={demo} />
+      </Suspense>
       <NewsletterBand />
     </div>
   );
