@@ -426,8 +426,8 @@ async def test_pruning_deletes_only_clicks_older_than_the_period(
             },
         )
 
-    async with async_sessionmaker(engine)() as session, session.begin():
-        deleted = await prune_click_events(session, days=395)
+    async with async_sessionmaker(engine)() as session:
+        deleted = await prune_click_events(session, days=395, batch_size=1)
 
     assert deleted == 2
     remaining = {row.referrer_host for row in await click_rows(engine)}

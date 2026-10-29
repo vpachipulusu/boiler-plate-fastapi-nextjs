@@ -30,6 +30,8 @@ class ClickEvent(IdMixin, Base):
     __tablename__ = "click_events"
     __table_args__ = (
         Index("ix_click_events_offer_id_occurred_at", "offer_id", "occurred_at"),
+        # Serves the retention job (`commands.prune_click_events`): old rows by time, across offers.
+        Index("ix_click_events_occurred_at", "occurred_at"),
         enum_check("user_agent_class", UserAgentClass),
     )
 
