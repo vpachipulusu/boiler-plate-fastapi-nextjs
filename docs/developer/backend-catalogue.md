@@ -38,7 +38,8 @@ Published, non-expired offers with the total before paging.
 - **200** the offer (`{"success": true, "data": <offer>}`).
 - **404** `{"success": false, "error": "Offer not found"}` for an unknown slug **and** for a `DRAFT` or `ARCHIVED`
   offer, with an identical body, so a visitor cannot probe for unpublished content.
-- **410 Gone** for an offer that has ended: published with an `end_at` in the past, or marked `EXPIRED` by an editor.
+- **410 Gone** only for an offer that provably was public and has ended: `PUBLISHED` with `end_at <= now`, or `EXPIRED`
+  with a `last_verified_at` (see the decision below). A 410 is never answered with 304.
 
 ### `GET /v1/catalogue/categories`
 
@@ -64,13 +65,22 @@ as a distinct, typed outcome (the generated client types the 410 body as `ReadOf
 an ended offer page is still useful ("this offer has ended, see similar offers in Category"), and it was public before.
 The stub carries only the slug, title, category and end date, never the offer details (eligibility, steps, terms), so
 an expired offer stops advertising its terms. `ended_at` is `null` for an offer an editor marked `EXPIRED` with no end
-date. The 410 is cacheable like the 200.
+date, and also when its `end_at` is still in the future (an editor retired it early): `ended_at` is never later than now.
+The 410 carries the same `Cache-Control` and `ETag` as the 200, but a matching `If-None-Match` still gets the 410 and its
+body, never a 304.
+
+**Which offers get a 410.** Only one that provably was public: status `PUBLISHED` with `end_at <= now`, or status
+`EXPIRED` **with** `last_verified_at` set (the database CHECK guarantees every `PUBLISHED` row has one, so a verification
+date on an `EXPIRED` row shows it once went live). Everything else (`DRAFT`, `ARCHIVED`, `EXPIRED` without
+`last_verified_at`, unknown slug) gets the identical 404 body, so the 410 cannot be used to learn that a never-published
+offer exists or what it was called. `last_verified_at` is read for this decision only; the 410 stub never contains it.
 
 ## The expiry rule
 
 `CatalogueService.is_live`: `status == PUBLISHED and (end_at is null or end_at > now)`. `now` comes from the service
 clock (UTC), is passed to the repository, and the same rule is applied in SQL by `live_conditions`; the e2e tests prove
-both agree. `start_at` is not a filter: an editor who publishes an offer with a future start date has chosen to show it.
+both agree, including the boundary: an offer whose `end_at` equals `now` is already ended (strict `>`), one second later
+is live (`test_an_offer_ending_exactly_now_is_expired_and_one_second_later_is_live`, which fixes the clock). `start_at` is not a filter: an editor who publishes an offer with a future start date has chosen to show it.
 `DRAFT`, `ARCHIVED` and (for list and counts) `EXPIRED` offers never appear in lists or counts.
 
 ## Visibility beyond status
@@ -88,7 +98,7 @@ logo_url}`, `offer_type`, `featured`, `image {tint, label, alt}`, `postage {kind
 `freshness`, `steps`. Enum values are lower-case, as in `nextjs-frontend/src/lib/catalogue/types.ts`; the database
 stores the upper-case names.
 
-Never exposed: `publisher_notes`, `status`, category and merchant ids, `source_url`, timestamps other than the ones
+Never exposed: `publisher_notes`, `status`, category and merchant ids, `source_url`, merchant `website`, timestamps other than the ones
 above, and anything from `affiliate_links` (destinations are resolved server-side by the later redirect story). The
 repository selects an explicit column list, so those columns never leave the database layer, and the response models
 are a second, independent allowlist. To expose another field, add it to `OfferRecord`, the select list, `OfferData` and
@@ -108,5 +118,15 @@ the allowlist test together.
 ## Consumers
 
 The Next.js wrappers belong to a later story. Call the generated SDK (`listOffers`, `readOffer`, `listCategories`)
-only through `src/lib/api/` and `callBackend`. The 120/min limit is keyed by the forwarded client IP, so forward the
-visitor's address in `X-Client-IP`; a server-side call without it shares one bucket.
+only through `src/lib/api/` and `callBackend`. The 120/min limit is keyed by the forwarded client IP, so the wrapper must
+forward the visitor's address in `X-Client-IP`, taken from the hosting platform's trusted header (for example the one
+Vercel sets), never from a header the client can set. Renders that forward nothing share one bucket keyed on the
+Next.js server's egress IP, which the limit can exhaust.
+
+## Operations notes
+
+- **Access logs.** `q` is a visitor's search text and travels in the query string. The uvicorn access log prints the
+  request line including `?q=`, so run the backend with `--no-access-log` or put a scrubbing formatter on `uvicorn.access`.
+- **Follow-up (later migration).** Search is `ILIKE '%term%'` on `lower(title)`, `lower(summary)` and `merchants.name`,
+  which scans the live rows. That is fine at launch volumes; when the catalogue grows, add a `pg_trgm` GIN index on
+  those three expressions in a new Alembic revision (the extension must be allowed on the managed Postgres).
