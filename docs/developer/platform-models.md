@@ -85,6 +85,10 @@ where.
 - **No enumeration.** The subscribe endpoint (a later story) returns the same response whether the row was created or
   already existed, and is rate limited.
 
+### Sample data
+
+`uv run python -m commands.seed_catalogue` fills a local or test database with the fixture catalogue as clearly marked sample data (never in production). See [getting-started.md](getting-started.md#sample-catalogue-data).
+
 ## Subscription plan catalogue
 
 `app/core/plans.py` holds the static plan catalogue (`PLANS`, `get_plan`, `is_within_limit`); it is keyed by the same

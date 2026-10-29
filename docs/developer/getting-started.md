@@ -66,6 +66,39 @@ exist only when `ENVIRONMENT` is `local` or `test` (or a Vercel preview); in pro
 `./start.sh` runs the API together with `watcher.py`, which regenerates the OpenAPI file on changes (on Windows,
 run it from Git Bash). To regenerate once: `uv run python -m commands.generate_openapi_schema`.
 
+## Sample catalogue data
+
+A local database has no categories, merchants or offers until you seed it. After `uv run alembic upgrade head`, run
+this from `fastapi_backend/`:
+
+```bash
+uv run python -m commands.seed_catalogue
+```
+
+It loads the same 6 categories, 8 merchants and 24 offers as the Phase 1 fixtures
+(`nextjs-frontend/src/lib/catalogue/fixtures.ts`) plus one affiliate link per offer, then prints how many rows are in
+place. The rules:
+
+- **Local and test only.** It runs only when `ENVIRONMENT` is exactly `local` or `test`. Any other value, an empty
+  one, an unset one (the setting then defaults to `production`) or a configuration that cannot be loaded makes it
+  print a refusal, write nothing and exit with code 1. It never prints connection strings.
+- **Obviously sample data.** Every offer has `publisher_notes = "SAMPLE DATA — not a real offer"`, merchant names end
+  in `(Sample)`, merchants have no logo, and every website, source and affiliate destination is under
+  `https://example.com/`. No real brand, logo or destination is used.
+- **Every state.** All five offer types and all four statuses are present: 21 published, 1 draft (`cat-pouch-tasting-sample`),
+  1 expired (`laundry-sheets-sample`) and 1 archived. The ended Bedtime hamper prize draw is archived here (the fixtures list it as expired) so
+  admin screens have an archived offer to work with. Links of expired and archived offers are inactive.
+- **Safe to rerun.** It upserts categories, merchants and offers by `slug` and keeps one `sample` affiliate link per
+  offer, so a second run creates no rows and a changed row is put back to the seed values. Rows with other slugs are
+  left alone. Click events and email subscribers are never seeded.
+- **Dates move with the day you run it.** Dates are offsets from today (the fixtures use 2026-10-29), so published
+  offers stay live and carry a "last checked" date that is never in the future. Running it on a later day moves them
+  forward.
+
+Run `uv run alembic upgrade head` first: on an unmigrated database it reports the failure (error type only) and exits 1.
+Tests: `tests/commands/test_seed_catalogue.py` (the guard and the data need no database; the upsert tests run with
+`TEST_DATABASE_URL`, see [testing.md](testing.md)).
+
 ## Frontend (`nextjs-frontend/`)
 
 ```bash
