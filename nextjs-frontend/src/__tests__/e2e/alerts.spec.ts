@@ -71,7 +71,7 @@ for (const viewport of VIEWPORTS) {
       });
 
       await page.getByLabel('Email address').fill('sam@example.com');
-      await page.getByText('Beauty & skincare', { exact: true }).click();
+      await page.getByText('Beauty', { exact: true }).click();
       await page.getByText('Weekly round-up', { exact: true }).click();
       await page.getByRole('checkbox', { name: /i agree to receive freebie emails/i }).check();
       await page.getByRole('button', { name: 'Send me free alerts' }).click();
@@ -86,7 +86,7 @@ for (const viewport of VIEWPORTS) {
       await page.getByRole('button', { name: 'Change my answers' }).click();
 
       await expect(page.getByLabel('Email address')).toHaveValue('sam@example.com');
-      await expect(page.getByLabel('Beauty & skincare')).toBeChecked();
+      await expect(page.getByLabel('Beauty')).toBeChecked();
       await expect(page.getByRole('button', { name: 'Send me free alerts' })).toBeVisible();
       await expect(page.getByText(DEMO_PANEL)).toHaveCount(0);
     });

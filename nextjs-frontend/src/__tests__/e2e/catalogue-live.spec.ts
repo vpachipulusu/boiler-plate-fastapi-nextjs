@@ -12,6 +12,7 @@ import { waitForPageReady } from './helpers/e2e-utils';
  *      and docs/developer/backend-catalogue.md).
  *   2. export E2E_LIVE_CATALOGUE=1 BACKEND_API_URL=http://127.0.0.1:<port> BACKEND_INTERNAL_KEY=<same key>
  *      Optional, for journey 5: E2E_ENDED_OFFER_SLUG=<slug of a seeded offer that was published and has ended>
+ *      and E2E_GONE_OFFER_SLUG=<slug of one that ended more than 30 days ago>
  *   3. npm run test:e2e:local -- src/__tests__/e2e/catalogue-live.spec.ts
  *
  * E2E_LIVE_CATALOGUE=1 makes scripts/e2e-env.cjs start the e2e server with CATALOGUE_SOURCE=api. Without
@@ -29,6 +30,7 @@ test.skip(
 
 const WIDTHS = [320, 390, 1440] as const;
 const ENDED_SLUG = process.env.E2E_ENDED_OFFER_SLUG;
+const GONE_SLUG = process.env.E2E_GONE_OFFER_SLUG;
 
 test.describe('Journey 1: browsing real published offers', () => {
   test('shows real offers on the homepage, with no demo wording', async ({ page }) => {
@@ -130,6 +132,17 @@ test.describe('Journey 5: missing and ended offers, and privacy', () => {
     await expect(page).toHaveURL(/\/category\/[a-z0-9-]+$/);
   });
 
+  test('returns 404 for an offer that ended more than 30 days ago', async ({ page }) => {
+    test.skip(
+      !GONE_SLUG,
+      'Set E2E_GONE_OFFER_SLUG to a seeded offer that was published and ended over 30 days ago'
+    );
+    const response = await page.goto(`/freebies/${GONE_SLUG}`);
+
+    expect(response?.status()).toBe(404);
+    await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
+  });
+
   test('sets no cookies on the public pages', async ({ page, context }) => {
     for (const path of ['/', '/freebies', '/freebies/no-such-offer-anywhere']) {
       await page.goto(path);
@@ -161,13 +174,14 @@ test.describe('Journey 5: missing and ended offers, and privacy', () => {
       process.env.E2E_CATALOGUE_DOWN !== '1',
       'Set E2E_CATALOGUE_DOWN=1 with the backend stopped to exercise the error state'
     );
-    await page.goto('/freebies?sort=a_z');
+    // A search with text is never cached, so a cached good answer cannot hide the outage.
+    await page.goto('/freebies?q=outage-check');
 
     const alert = page.getByRole('alert');
     await expect(alert).toBeVisible();
     await expect(alert).not.toContainText(/psycopg|traceback|internal/i);
     const retry = alert.getByRole('button', { name: 'Try again' });
-    for (let presses = 0; presses < 25; presses += 1) {
+    for (let presses = 0; presses < 60; presses += 1) {
       if (await retry.evaluate((el) => el === document.activeElement)) break;
       await page.keyboard.press('Tab');
     }

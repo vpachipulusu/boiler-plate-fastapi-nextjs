@@ -34,7 +34,7 @@ for (const viewport of VIEWPORTS) {
         page.getByRole('heading', { level: 1, name: 'Glow-boosting face cream sample' })
       ).toBeVisible();
       await expect(page.getByText('Last checked 27 October 2026')).toBeVisible();
-      await expect(page.getByText('POSTAGE: FREE')).toBeVisible();
+      await expect(page.getByText('POSTAGE: FREE', { exact: true })).toBeVisible();
       await expect(page.getByText('UK OFFER')).toBeVisible();
       await expect(
         page.getByRole('region', { name: 'How to claim this freebie' }).getByRole('listitem')

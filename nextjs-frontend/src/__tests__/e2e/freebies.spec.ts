@@ -102,6 +102,8 @@ for (const viewport of VIEWPORTS) {
       await search(page, 'pet');
       if (isDesktop) {
         await page.getByLabel('Sort by').selectOption('a_z');
+        // The select never submits on change (WCAG 3.2.2); Apply does.
+        await page.getByRole('button', { name: 'Apply' }).click();
       } else {
         await page.getByRole('button', { name: /^Filter/ }).click();
         await page
