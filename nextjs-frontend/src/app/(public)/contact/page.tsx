@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Send } from 'lucide-react';
+import { DraftBanner } from '@/components/legal/legal-page';
 
 type FieldProps = React.ComponentProps<typeof Input> & {
   id: string;
@@ -27,7 +28,8 @@ function Field({ id, label, hint, required, ...inputProps }: FieldProps) {
 
 export const metadata = {
   title: 'Contact Us',
-  description: 'Get in touch with our team',
+  description: 'Contact details for Freejoy are coming soon. Draft.',
+  robots: { index: false },
 };
 
 export default async function ContactPage({
@@ -43,8 +45,9 @@ export default async function ContactPage({
   return (
     <div className="mx-auto max-w-content px-4 py-6 sm:px-6 lg:py-8">
       <div className="mx-auto max-w-5xl">
+        <DraftBanner />
         {/* Header */}
-        <div className="mb-8 rounded-editorial bg-secondary px-6 py-10 text-center sm:px-10 sm:py-12">
+        <div className="mb-8 mt-6 rounded-editorial bg-secondary px-6 py-10 text-center sm:px-10 sm:py-12">
           <h1 className="mb-4 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
             Contact Us
           </h1>
@@ -129,7 +132,7 @@ export default async function ContactPage({
           </div>
 
           {/* Support availability */}
-          <div>
+          <div className="space-y-6">
             <Card className="rounded-card bg-good text-good-foreground">
               <CardHeader>
                 <CardTitle className="text-lg">Support Contact</CardTitle>
@@ -138,6 +141,17 @@ export default async function ContactPage({
                 <p className="text-sm text-muted-foreground">
                   A support contact is coming soon. Email, phone and sales channels are not
                   available yet.
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="rounded-card">
+              <CardHeader>
+                <CardTitle className="text-lg">Who runs Freejoy</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  The operator&apos;s name, address and contact email will be shown here before any
+                  real offer goes live. They have not been added yet.
                 </p>
               </CardContent>
             </Card>
