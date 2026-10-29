@@ -157,7 +157,7 @@ router = APIRouter(
     ],
     responses=RATE_LIMIT_FAIL_CLOSED_RESPONSES,
 )
-async def subscribe(
+async def subscribe_to_alerts(
     body: SubscribeBody, service: ServiceDep, response: Response
 ) -> SubscribeResponse:
     """Store a PENDING sign-up and email a confirmation link.
@@ -188,7 +188,7 @@ async def subscribe(
     dependencies=[Depends(limit_by_client_ip(SUBSCRIBER_TOKEN_POLICY))],
     responses={400: {"model": ErrorResponse}, **RATE_LIMIT_RESPONSES},
 )
-async def confirm(
+async def confirm_alert_subscription(
     body: TokenBody, service: ServiceDep, response: Response
 ) -> ConfirmResponse:
     """PENDING to CONFIRMED. A forged, expired, used or wrong-purpose token is the same 400."""
@@ -209,7 +209,7 @@ async def confirm(
     dependencies=[Depends(limit_by_client_ip(SUBSCRIBER_TOKEN_POLICY))],
     responses={400: {"model": ErrorResponse}, **RATE_LIMIT_RESPONSES},
 )
-async def unsubscribe(
+async def unsubscribe_from_alerts(
     body: TokenBody, service: ServiceDep, response: Response
 ) -> UnsubscribeResponse:
     """Idempotent: unsubscribing twice succeeds twice. Used by the page and by one-click POSTs."""

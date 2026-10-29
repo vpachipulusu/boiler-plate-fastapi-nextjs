@@ -9270,6 +9270,326 @@
         }
       }
     },
+    "/v1/subscribers": {
+      "post": {
+        "tags": [
+          "subscribers"
+        ],
+        "summary": "Start an alerts sign-up",
+        "description": "Store a PENDING sign-up and email a confirmation link.\n\nThe answer is identical for a new address, a pending one, a confirmed one and an unsubscribed one, and\na confirmation is re-sent at most once an hour. Nothing says whether an email went out.",
+        "operationId": "subscribe_to_alerts",
+        "parameters": [
+          {
+            "name": "X-Internal-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscribeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscribeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "503": {
+            "description": "Rate limiter unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/subscribers/confirm": {
+      "post": {
+        "tags": [
+          "subscribers"
+        ],
+        "summary": "Confirm an alerts sign-up",
+        "description": "PENDING to CONFIRMED. A forged, expired, used or wrong-purpose token is the same 400.",
+        "operationId": "confirm_alert_subscription",
+        "parameters": [
+          {
+            "name": "X-Internal-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/subscribers/unsubscribe": {
+      "post": {
+        "tags": [
+          "subscribers"
+        ],
+        "summary": "Unsubscribe from alerts",
+        "description": "Idempotent: unsubscribing twice succeeds twice. Used by the page and by one-click POSTs.",
+        "operationId": "unsubscribe_from_alerts",
+        "parameters": [
+          {
+            "name": "X-Internal-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsubscribeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/subscriptions": {
       "get": {
         "tags": [
@@ -13098,6 +13418,36 @@
         ],
         "title": "ClaimStep"
       },
+      "ConfirmResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConfirmedData",
+            "default": {
+              "status": "confirmed"
+            }
+          }
+        },
+        "type": "object",
+        "title": "ConfirmResponse"
+      },
+      "ConfirmedData": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "confirmed",
+            "title": "Status",
+            "default": "confirmed"
+          }
+        },
+        "type": "object",
+        "title": "ConfirmedData"
+      },
       "CreateCategoryRequest": {
         "properties": {
           "name": {
@@ -16751,6 +17101,95 @@
         ],
         "title": "StepIn"
       },
+      "SubscribeAccepted": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "accepted",
+            "title": "Status",
+            "default": "accepted"
+          }
+        },
+        "type": "object",
+        "title": "SubscribeAccepted"
+      },
+      "SubscribeBody": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email",
+            "title": "Email"
+          },
+          "categories": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "minLength": 1,
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Categories"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "DAILY",
+              "WEEKLY"
+            ],
+            "title": "Frequency"
+          },
+          "consent": {
+            "type": "boolean",
+            "const": true,
+            "title": "Consent",
+            "description": "The box was ticked; always true"
+          },
+          "consent_text": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Consent Text",
+            "description": "The exact wording shown"
+          },
+          "consent_source": {
+            "type": "string",
+            "const": "alerts_page",
+            "title": "Consent Source"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "email",
+          "categories",
+          "frequency",
+          "consent",
+          "consent_text",
+          "consent_source"
+        ],
+        "title": "SubscribeBody"
+      },
+      "SubscribeResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/SubscribeAccepted",
+            "default": {
+              "status": "accepted"
+            }
+          }
+        },
+        "type": "object",
+        "title": "SubscribeResponse"
+      },
       "SubscriptionDetailData": {
         "properties": {
           "organization_id": {
@@ -17206,6 +17645,22 @@
         "title": "TierPricesData",
         "description": "Minor units (cents) of the Stripe price; null when unconfigured or unreadable.\n\nCarries no currency: pair it with ``GET /v1/settings/currency``."
       },
+      "TokenBody": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "TokenBody"
+      },
       "TotpChangedResponse": {
         "properties": {
           "success": {
@@ -17217,6 +17672,36 @@
         },
         "type": "object",
         "title": "TotpChangedResponse"
+      },
+      "UnsubscribeResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/UnsubscribedData",
+            "default": {
+              "status": "unsubscribed"
+            }
+          }
+        },
+        "type": "object",
+        "title": "UnsubscribeResponse"
+      },
+      "UnsubscribedData": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "unsubscribed",
+            "title": "Status",
+            "default": "unsubscribed"
+          }
+        },
+        "type": "object",
+        "title": "UnsubscribedData"
       },
       "UpdateCategoryRequest": {
         "properties": {
