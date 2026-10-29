@@ -68,13 +68,38 @@ export interface BackendOptions {
 
 const HEADER_NAME = /^[a-z0-9-]+$/i;
 
+/**
+ * Headers that can never be the configured trusted one: they are client-settable or chained lists
+ * (x-forwarded-for, forwarded, via), or already handled with its own platform check
+ * (x-vercel-forwarded-for, which is used automatically when VERCEL=1).
+ */
+const NEVER_TRUSTED = new Set(['x-forwarded-for', 'forwarded', 'via', 'x-vercel-forwarded-for']);
+const warnedNeverTrusted = new Set<string>();
+
+/** A single plain address: no IPv6 zone ("%eth0") and no brackets, which a backend must not receive. */
+function isPlainIp(value: string): boolean {
+  return isIP(value) !== 0 && !value.includes('%') && !value.includes('[');
+}
+
+async function warnNeverTrusted(name: string): Promise<void> {
+  if (warnedNeverTrusted.has(name)) return;
+  warnedNeverTrusted.add(name);
+  const { logger } = await import('@/lib/logger');
+  logger.warn('TRUSTED_CLIENT_IP_HEADER names a header that cannot be trusted; it is ignored', {
+    header: name,
+  });
+}
+
 /** The headers whose value may be taken as the visitor's address, in order of preference. */
-function trustedClientIpHeaders(): string[] {
+async function trustedClientIpHeaders(): Promise<string[]> {
   const names: string[] = [];
   if (process.env.VERCEL === '1') names.push('x-vercel-forwarded-for');
   // One header the operator vouches for: only set it when the reverse proxy overwrites it on every request.
   const configured = process.env.TRUSTED_CLIENT_IP_HEADER?.trim().toLowerCase();
-  if (configured && HEADER_NAME.test(configured)) names.push(configured);
+  if (configured && HEADER_NAME.test(configured)) {
+    if (NEVER_TRUSTED.has(configured)) await warnNeverTrusted(configured);
+    else names.push(configured);
+  }
   return names;
 }
 
@@ -85,12 +110,12 @@ function trustedClientIpHeaders(): string[] {
  * scope; callers outside one must catch the error.
  */
 export async function readTrustedClientIp(): Promise<string | undefined> {
-  const names = trustedClientIpHeaders();
+  const names = await trustedClientIpHeaders();
   if (names.length === 0) return undefined;
   const requestHeaders = await headers();
   for (const name of names) {
     const value = requestHeaders.get(name)?.trim();
-    if (value && isIP(value)) return value;
+    if (value && isPlainIp(value)) return value;
   }
   return undefined;
 }
@@ -118,7 +143,7 @@ export async function getBackendClient({
       headers: {
         ...(sessionToken ? { [SESSION_HEADER]: sessionToken } : {}),
         ...(internalKey ? { [INTERNAL_KEY_HEADER]: internalKey } : {}),
-        ...(forwardedIp && isIP(forwardedIp) ? { 'X-Client-IP': forwardedIp } : {}),
+        ...(forwardedIp && isPlainIp(forwardedIp) ? { 'X-Client-IP': forwardedIp } : {}),
       },
     })
   );

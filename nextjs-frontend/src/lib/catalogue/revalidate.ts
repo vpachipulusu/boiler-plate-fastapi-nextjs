@@ -3,8 +3,9 @@ import 'server-only';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { CATALOGUE_CACHE_TAG } from '@/lib/api/catalogue';
 
-/** A site path: starts with "/", and has no query, fragment, whitespace or "..". */
-const SAFE_PATH = /^\/(?!.*(?:\.\.|[?#\s]))/;
+/** A site path: "/" then letters, digits and "-._~/" only. No "%" escapes, query, fragment, space or backslash. */
+const SAFE_PATH = /^\/[A-Za-z0-9\-._~/]*$/;
+const MAX_PATH_LENGTH = 256;
 
 /**
  * Drops the cached catalogue reads so the next render fetches fresh data. The admin publish, unpublish
@@ -17,7 +18,8 @@ const SAFE_PATH = /^\/(?!.*(?:\.\.|[?#\s]))/;
  */
 export function revalidateCatalogue(paths: readonly string[] = []): void {
   for (const path of paths) {
-    if (!SAFE_PATH.test(path)) throw new TypeError('revalidateCatalogue: not a plain path');
+    const safe = path.length <= MAX_PATH_LENGTH && SAFE_PATH.test(path) && !path.includes('..');
+    if (!safe) throw new TypeError('revalidateCatalogue: not a plain path');
   }
   revalidateTag(CATALOGUE_CACHE_TAG, { expire: 0 });
   for (const path of paths) revalidatePath(path);

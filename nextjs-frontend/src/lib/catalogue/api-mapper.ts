@@ -30,6 +30,13 @@ const TINTS: readonly Tint[] = [
   'sand',
 ];
 const FALLBACK_TINT: Tint = 'cream';
+const FRESHNESS_LABELS: readonly string[] = [
+  'new_today',
+  'just_added',
+  'popular',
+  'ends_soon',
+  'limited',
+];
 const MAX_LOGGED_VALUE = 60;
 
 /** Logs why a record was dropped. The value is JSON-quoted and cut short so it cannot forge log lines. */
@@ -101,9 +108,16 @@ function malformedOfferField(api: unknown): string | null {
     return 'description';
   }
   const stepsOk =
-    Array.isArray(api.steps) && api.steps.every((s) => isObj(s) && allStrings(s, ['title', 'detail']));
+    Array.isArray(api.steps) &&
+    api.steps.every((s) => isObj(s) && allStrings(s, ['title', 'detail']));
   if (!stepsOk) return 'steps';
   if (typeof api.featured !== 'boolean' || typeof api.requires_card !== 'boolean') return 'flags';
+  const terms = api.subscription_terms;
+  if (terms !== null && typeof terms !== 'string') return 'subscription_terms';
+  const label = api.freshness;
+  if (label !== null && !(typeof label === 'string' && FRESHNESS_LABELS.includes(label))) {
+    return 'freshness';
+  }
   return null;
 }
 
@@ -173,7 +187,11 @@ export function mapOffers(items: readonly ApiOffer[]): Offer[] {
 /** One API category as a `Category`, or null (logged) for an unsafe slug. */
 export function mapCategory(api: ApiCategory): Category | null {
   const fields = ['slug', 'name', 'short_name', 'description', 'intro', 'tint'];
-  if (!isObj(api) || !allStrings(api as unknown as Obj, fields) || typeof api.sort_order !== 'number') {
+  if (
+    !isObj(api) ||
+    !allStrings(api as unknown as Obj, fields) ||
+    typeof api.sort_order !== 'number'
+  ) {
     return drop('category', 'record', null);
   }
   if (!isValidSlug(api.slug)) return drop('category', 'slug', api.slug);

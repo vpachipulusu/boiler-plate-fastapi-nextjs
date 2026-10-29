@@ -15,7 +15,7 @@ import {
 } from '@/lib/catalogue';
 import { isIndexableCategory, isRefinedQuery } from '@/lib/seo/indexing';
 import { buildBreadcrumbList } from '@/lib/seo/json-ld';
-import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
+import { NOINDEX_FOLLOW_ROBOTS, listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
 type Params = Promise<{ slug: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -32,8 +32,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const loaded = await settle(getCategoryBySlug(slug));
-  // Outage: no robots of its own, so the site default applies (a short outage must not de-index the page).
-  if (!loaded.ok) return { title: 'Freebies unavailable' };
+  // Outage: the category is not known, so ask not to be indexed but let the links be followed.
+  if (!loaded.ok) return { title: 'Freebies unavailable', robots: NOINDEX_FOLLOW_ROBOTS };
   const category = loaded.data;
   // Thrown here as well as in the page. No loading.tsx sits above the public pages, so this answers 404.
   if (!category) notFound();

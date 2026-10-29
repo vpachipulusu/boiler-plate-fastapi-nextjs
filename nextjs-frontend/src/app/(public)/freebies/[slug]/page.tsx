@@ -34,8 +34,12 @@ interface OfferPageProps {
 }
 
 const NOT_FOUND_METADATA: Metadata = { title: 'Offer not found', robots: { index: false } };
-// Outage: no robots of its own, so the site default applies (a short outage must not de-index the page).
-const UNAVAILABLE_METADATA: Metadata = { title: 'Freebie unavailable' };
+// Outage: the page is not known, so it asks not to be indexed but lets its links be followed. (The listing
+// pages keep their normal robots through an outage; see docs/developer/freejoy-seo.md.)
+const UNAVAILABLE_METADATA: Metadata = {
+  title: 'Freebie unavailable',
+  robots: NOINDEX_FOLLOW_ROBOTS,
+};
 
 export async function generateMetadata({ params }: OfferPageProps): Promise<Metadata> {
   const { slug } = await params;
