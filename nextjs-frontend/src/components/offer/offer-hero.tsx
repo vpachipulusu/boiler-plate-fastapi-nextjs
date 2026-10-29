@@ -33,7 +33,12 @@ export function OfferHero({ offer, merchant, category, ended }: OfferHeroProps) 
         </h1>
         <p className="max-w-xl text-base text-muted-foreground sm:text-lg">{offer.summary}</p>
         <OfferTrustPanel offer={offer} />
-        <OfferCta offerType={offer.offerType} ended={ended} categorySlug={category.slug} />
+        <OfferCta
+          offerType={offer.offerType}
+          ended={ended}
+          categorySlug={category.slug}
+          offerId={offer.demo ? null : offer.id}
+        />
       </div>
     </section>
   );

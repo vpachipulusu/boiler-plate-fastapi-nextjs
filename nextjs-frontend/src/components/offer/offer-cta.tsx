@@ -13,11 +13,14 @@ import {
 } from '@/components/ui/dialog';
 import type { OfferType } from '@/lib/catalogue/types';
 import { CTA_LABELS, REQUEST_KIND } from './offer-format';
+import { AffiliateCta } from './outbound-link';
 
 interface OfferCtaProps {
   offerType: OfferType;
   ended: boolean;
   categorySlug: string;
+  /** Set for a real offer: the CTA links to `/go/<offerId>`. Null or absent keeps the demo dialog. */
+  offerId?: string | null;
 }
 
 /**
@@ -25,7 +28,7 @@ interface OfferCtaProps {
  * dialog instead of linking out: nothing here renders an external href. When the offer has ended
  * the button is replaced by a calm panel with two ways onward.
  */
-export function OfferCta({ offerType, ended, categorySlug }: OfferCtaProps) {
+export function OfferCta({ offerType, ended, categorySlug, offerId = null }: OfferCtaProps) {
   if (ended) {
     return (
       <section aria-labelledby="offer-ended-heading" className="rounded-card bg-warn p-5">
@@ -57,6 +60,8 @@ export function OfferCta({ offerType, ended, categorySlug }: OfferCtaProps) {
       </section>
     );
   }
+
+  if (offerId) return <AffiliateCta offerId={offerId} offerType={offerType} />;
 
   return (
     <div>
