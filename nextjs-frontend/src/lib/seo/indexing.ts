@@ -15,9 +15,16 @@ export const EXPIRED_NOINDEX_DAYS = 30;
 
 const MS_PER_DAY = 86_400_000;
 
-/** True when the catalogue holds at least one API-backed offer, i.e. it is not a fixture preview. */
-export function isCatalogueApiBacked(offers: readonly Pick<Offer, 'source'>[]): boolean {
-  return offers.some((offer) => offer.source === 'api');
+type SourceFields = Pick<Offer, 'source' | 'demo'>;
+
+/**
+ * True when the live catalogue holds at least one real API offer (`source === 'api'`, not demo),
+ * i.e. it is not a fixture preview. A demo API offer never flips listing pages to index. Note that
+ * a live list with zero API offers (launch day, or a lull) reads as "not API-backed" and the
+ * listings go noindex; see docs/developer/freejoy-seo.md for the planned `getCatalogueSource()`.
+ */
+export function isCatalogueApiBacked(offers: readonly SourceFields[]): boolean {
+  return offers.some((offer) => offer.source === 'api' && !offer.demo);
 }
 
 /** A real, published, live offer that came from the catalogue API. Demo and fixture data never is. */
@@ -30,7 +37,7 @@ export function isIndexableOffer(offer: Offer, today: string): boolean {
 /** An enabled category is indexable once the catalogue is API-backed; fixtures keep it noindex. */
 export function isIndexableCategory(
   category: Pick<Category, 'enabled'>,
-  offers: readonly Pick<Offer, 'source'>[]
+  offers: readonly SourceFields[]
 ): boolean {
   return category.enabled && isCatalogueApiBacked(offers);
 }
@@ -51,7 +58,10 @@ export type OfferIndexingState = 'live' | 'ended' | 'gone' | 'unavailable';
 
 export interface OfferIndexingPolicy {
   state: OfferIndexingState;
-  /** The status the page should answer with. `gone` is 410 by policy (see the docs for how it ships). */
+  /**
+   * The status the policy intends. Reserved for the Phase 3 410 ticket: no page reads it yet (a
+   * `gone` API offer ships as `notFound()`, see docs/developer/freejoy-seo.md).
+   */
   httpStatus: 200 | 404 | 410;
   /** True when the policy itself forces `noindex, follow` regardless of the data source. */
   noindex: boolean;

@@ -65,6 +65,11 @@ describe('isCatalogueApiBacked and isIndexableCategory', () => {
     expect(isIndexableCategory(category(), OFFERS)).toBe(false);
   });
 
+  it('does not count a demo API offer as API-backed', () => {
+    expect(isCatalogueApiBacked([apiOffer({ demo: true })])).toBe(false);
+    expect(isCatalogueApiBacked([])).toBe(false);
+  });
+
   it('treats any API offer as an API-backed catalogue', () => {
     const offers = [fixtureOffer, apiOffer()];
 
@@ -99,6 +104,13 @@ describe('daysBetween', () => {
     expect(daysBetween('2026-10-24', '2026-10-29')).toBe(5);
     expect(daysBetween('2026-09-29', '2026-10-29')).toBe(30);
     expect(daysBetween('2026-10-29', '2026-10-28')).toBe(-1);
+  });
+
+  it('counts calendar days across the BST start and end and a year boundary', () => {
+    expect(daysBetween('2026-03-28', '2026-03-30')).toBe(2);
+    expect(daysBetween('2026-10-24', '2026-10-26')).toBe(2);
+    expect(daysBetween('2026-12-31', '2027-01-30')).toBe(30);
+    expect(daysBetween('2027-12-31', '2028-03-01')).toBe(61);
   });
 
   it('is NaN for something that is not a date', () => {
@@ -149,6 +161,20 @@ describe('expiredIndexingPolicy', () => {
     expect(expiredIndexingPolicy(apiOffer({ status: 'expired', endAt: null }), TODAY).state).toBe(
       'ended'
     );
+  });
+
+  it('keeps an offer with an unreadable end date in the ended state', () => {
+    const malformed = apiOffer({ status: 'expired', endAt: 'soon' });
+
+    expect(expiredIndexingPolicy(malformed, TODAY).state).toBe('ended');
+  });
+
+  it('keeps an expired offer with a future end date ended until endAt plus 30 days', () => {
+    const early = apiOffer({ status: 'expired', endAt: '2026-11-15' });
+
+    expect(expiredIndexingPolicy(early, '2026-10-29').state).toBe('ended');
+    expect(expiredIndexingPolicy(early, '2026-12-15').state).toBe('ended');
+    expect(expiredIndexingPolicy(early, '2026-12-16').state).toBe('gone');
   });
 
   it('has no public page for draft or archived offers', () => {

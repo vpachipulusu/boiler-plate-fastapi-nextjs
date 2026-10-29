@@ -92,6 +92,16 @@ describe('buildSitemapEntries', () => {
     expect(byUrl.get(`${BASE}/`)).toBe('2026-10-25');
     expect(byUrl.get(`${BASE}/category/beauty`)).toBe('2026-10-25');
   });
+
+  it('percent-encodes a slug containing a space, ? or #', () => {
+    const entries = buildSitemapEntries({
+      offers: [apiOffer('odd slug?x#y')],
+      categories,
+      today: TODAY,
+    });
+
+    expect(urls(entries)).toContain(`${BASE}/freebies/odd%20slug%3Fx%23y`);
+  });
 });
 
 describe('sitemap route', () => {
@@ -108,9 +118,21 @@ describe('robots route', () => {
     expect(rule?.userAgent).toBe('*');
     expect(rule?.allow).toBe('/');
     expect(rule?.disallow).toEqual(
-      expect.arrayContaining(['/admin', '/dashboard', '/go/', '/api/', '/login', '/signup'])
+      expect.arrayContaining([
+        '/admin',
+        '/dashboard',
+        '/settings',
+        '/profile',
+        '/security',
+        '/go/',
+        '/api/',
+        '/login',
+        '/signup',
+        '/reset-password',
+        '/verify-email',
+      ])
     );
-    expect(DISALLOWED_PATHS).toHaveLength(6);
+    expect(DISALLOWED_PATHS).toEqual(rule?.disallow);
   });
 
   it('references the absolute sitemap url', () => {

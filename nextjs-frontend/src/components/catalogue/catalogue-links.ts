@@ -1,4 +1,5 @@
 import { toCatalogueHref, withQuery, type CatalogueQuery } from '@/lib/catalogue';
+export { isRefinedQuery as hasActiveRefinement } from '@/lib/seo/indexing';
 
 export function categoryPath(slug: string): string {
   return `/category/${slug}`;
@@ -29,18 +30,6 @@ export function catalogueHref(
 /** Adds the type if absent, removes it if present. Never mutates the input. */
 export function toggleType<T extends string>(types: readonly T[], type: T): T[] {
   return types.includes(type) ? types.filter((entry) => entry !== type) : [...types, type];
-}
-
-/** True when any filter, search text or page beyond the first is set. */
-export function hasActiveRefinement(query: CatalogueQuery): boolean {
-  return (
-    query.q !== '' ||
-    query.category !== null ||
-    query.types.length > 0 ||
-    query.postage !== null ||
-    query.sort !== 'newest' ||
-    query.page > 1
-  );
 }
 
 /** Count shown on the mobile "Filter" button: the filters that live inside the drawer. */

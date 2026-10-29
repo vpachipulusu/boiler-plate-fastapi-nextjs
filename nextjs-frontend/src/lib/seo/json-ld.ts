@@ -5,7 +5,7 @@
  * sell them, and none of those values is something the site can state truthfully.
  */
 import { siteConfig } from '@/config/site';
-import { absoluteUrl, siteOrigin } from './urls';
+import { absoluteTemplateUrl, absoluteUrl, siteOrigin } from './urls';
 
 const CONTEXT = 'https://schema.org';
 
@@ -33,7 +33,7 @@ export function buildWebSite(): JsonLdNode {
       '@type': 'SearchAction',
       target: {
         '@type': 'EntryPoint',
-        urlTemplate: absoluteUrl('/freebies?q={search_term_string}'),
+        urlTemplate: absoluteTemplateUrl('/freebies?q={search_term_string}'),
       },
       'query-input': 'required name=search_term_string',
     },
@@ -67,17 +67,17 @@ export function buildBreadcrumbList(items: readonly BreadcrumbItem[]): JsonLdNod
   };
 }
 
+// `new RegExp` with an escaped source keeps the separators out of the file as raw characters.
+const LINE_SEPARATOR = new RegExp('\\u2028', 'g');
+const PARAGRAPH_SEPARATOR = new RegExp('\\u2029', 'g');
+
 /**
  * Serialises for an inline `<script>`: `<` is escaped so a title containing `</script>` or `<!--`
  * cannot close the tag, and the two JS line separators are escaped too.
  */
-const BACKSLASH = String.fromCharCode(92);
-const LINE_SEPARATOR = new RegExp(String.fromCharCode(0x2028), 'g');
-const PARAGRAPH_SEPARATOR = new RegExp(String.fromCharCode(0x2029), 'g');
-
 export function serialiseJsonLd(data: JsonLdNode | readonly JsonLdNode[]): string {
   return JSON.stringify(data)
-    .replace(/</g, `${BACKSLASH}u003c`)
-    .replace(LINE_SEPARATOR, `${BACKSLASH}u2028`)
-    .replace(PARAGRAPH_SEPARATOR, `${BACKSLASH}u2029`);
+    .replace(/</g, '\\u003c')
+    .replace(LINE_SEPARATOR, '\\u2028')
+    .replace(PARAGRAPH_SEPARATOR, '\\u2029');
 }

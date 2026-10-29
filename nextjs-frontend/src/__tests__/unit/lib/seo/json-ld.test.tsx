@@ -8,7 +8,6 @@ import {
   serialiseJsonLd,
   type JsonLdNode,
 } from '@/lib/seo/json-ld';
-import { absoluteUrl, siteOrigin } from '@/lib/seo/urls';
 
 const FORBIDDEN_KEYS = [
   'offers',
@@ -45,14 +44,6 @@ const nodes: JsonLdNode[] = [
     { name: 'Beauty', path: '/category/beauty' },
   ]),
 ];
-
-describe('urls', () => {
-  it('builds absolute urls from the configured origin', () => {
-    expect(siteOrigin()).toBe('http://localhost:3000');
-    expect(absoluteUrl('/freebies')).toBe('http://localhost:3000/freebies');
-    expect(absoluteUrl('freebies')).toBe('http://localhost:3000/freebies');
-  });
-});
 
 describe('json-ld builders', () => {
   it('describes the site with a search action that targets /freebies?q=', () => {

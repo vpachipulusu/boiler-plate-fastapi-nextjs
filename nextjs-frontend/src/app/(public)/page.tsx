@@ -5,9 +5,10 @@ import { HomeHero } from '@/components/home/home-hero';
 import { NewsletterBand } from '@/components/home/newsletter-band';
 import { TrustStrip } from '@/components/home/trust-strip';
 import { JsonLd } from '@/components/seo/json-ld';
-import { getCategories, getFeaturedOffers, getLiveOffers, getMerchants } from '@/lib/catalogue';
+import { getCategories, getFeaturedOffers, getMerchants } from '@/lib/catalogue';
 import { isCatalogueApiBacked } from '@/lib/seo/indexing';
 import { buildOrganization, buildWebSite } from '@/lib/seo/json-ld';
+import { loadLiveOffersForSeo } from '@/lib/seo/live-offers';
 import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
 /** Re-rendered at most hourly so the featured offers and the indexing state track the catalogue. */
@@ -19,7 +20,7 @@ const DESCRIPTION =
 
 export async function generateMetadata(): Promise<Metadata> {
   // Indexable only once the catalogue is API-backed; the fixture preview stays out of search.
-  const indexable = isCatalogueApiBacked(await getLiveOffers());
+  const indexable = isCatalogueApiBacked(await loadLiveOffersForSeo('home metadata'));
   return {
     title: TITLE,
     description: DESCRIPTION,

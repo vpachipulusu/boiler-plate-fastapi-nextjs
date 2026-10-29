@@ -3,7 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import type { Offer } from '@/lib/catalogue/types';
 
-const mocks = vi.hoisted(() => ({ notFound: vi.fn(), liveOffers: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  notFound: vi.fn(),
+  liveOffers: vi.fn(),
+  logError: vi.fn(),
+}));
+
+vi.mock('@/lib/logger', () => ({ logger: { error: mocks.logError } }));
 
 vi.mock('next/navigation', () => ({
   notFound: () => {
@@ -39,6 +45,7 @@ import OfferPage, { generateMetadata as offerMetadata } from '@/app/(public)/fre
 import { generateMetadata as freebiesMetadata } from '@/app/(public)/freebies/page';
 import HomePage, { generateMetadata as homeMetadata } from '@/app/(public)/page';
 import { metadata as alertsMetadata } from '@/app/(public)/alerts/page';
+import { JsonLd } from '@/components/seo/json-ld';
 import { OFFERS } from '@/lib/catalogue/fixtures';
 
 const FIXTURE_LIVE = OFFERS.find(
@@ -65,6 +72,7 @@ const jsonLdOf = (container: HTMLElement) =>
 beforeEach(() => {
   mocks.notFound.mockClear();
   mocks.liveOffers.mockReset();
+  mocks.logError.mockClear();
 });
 
 describe('fixture-backed catalogue', () => {
@@ -202,7 +210,8 @@ describe('page JSON-LD', () => {
       params: Promise.resolve({ slug: 'beauty' }),
       searchParams: Promise.resolve({}),
     });
-    const [, , jsonLd] = (page as ReactElement<{ children: ReactElement[] }>).props.children;
+    const children = (page as ReactElement<{ children: ReactElement[] }>).props.children;
+    const jsonLd = children.find((child) => child.type === JsonLd);
     const { container } = render(jsonLd as ReactElement);
     const [breadcrumbs] = jsonLdOf(container);
 
@@ -210,5 +219,73 @@ describe('page JSON-LD', () => {
       'Home',
       'Beauty',
     ]);
+  });
+});
+
+describe('when the catalogue has no live API offers or cannot be read', () => {
+  it('goes noindex on launch day, when the live list is empty', async () => {
+    mocks.liveOffers.mockResolvedValue([]);
+
+    expect((await homeMetadata()).robots).toEqual({ index: false });
+    expect((await freebiesMetadata(search({}))).robots).toEqual({ index: false });
+    expect(
+      (await categoryMetadata({ params: Promise.resolve({ slug: 'beauty' }) })).robots
+    ).toEqual({ index: false });
+  });
+
+  it('does not let a demo API offer flip the listings to index', async () => {
+    mocks.liveOffers.mockResolvedValue([apiOffer({ demo: true })]);
+
+    expect((await homeMetadata()).robots).toEqual({ index: false });
+    expect((await freebiesMetadata(search({}))).robots).toEqual({ index: false });
+  });
+
+  it('fails secure to noindex and logs when the live offers cannot be read', async () => {
+    mocks.liveOffers.mockRejectedValue(new Error('catalogue down'));
+
+    expect((await homeMetadata()).robots).toEqual({ index: false });
+    expect((await freebiesMetadata(search({}))).robots).toEqual({ index: false });
+    expect(
+      (await categoryMetadata({ params: Promise.resolve({ slug: 'beauty' }) })).robots
+    ).toEqual({ index: false });
+    expect(mocks.logError).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify(mocks.logError.mock.calls)).toContain('catalogue down');
+  });
+});
+
+describe('refined views', () => {
+  beforeEach(() => mocks.liveOffers.mockResolvedValue([apiOffer()]));
+
+  it('treats a category page carrying another ?category= as noindex, follow', async () => {
+    const metadata = await categoryMetadata({
+      params: Promise.resolve({ slug: 'beauty' }),
+      searchParams: Promise.resolve({ category: 'pets' }),
+    });
+
+    expect(metadata.robots).toEqual({ index: false, follow: true });
+    expect(metadata.alternates?.canonical).toBe('/category/beauty');
+  });
+
+  it('uses a fixed Open Graph title on /freebies while the <title> follows the search', async () => {
+    const metadata = await freebiesMetadata(search({ q: 'pet' }));
+
+    expect(metadata.title).toBe('Search: pet');
+    expect(metadata.openGraph?.title).toBe('All freebies');
+  });
+});
+
+describe('offer page JSON-LD with hostile text', () => {
+  it('renders no raw < inside the script when the title contains a closing script tag', async () => {
+    const title = 'Tea </script><!-- deal';
+    mocks.liveOffers.mockResolvedValue([apiOffer({ title })]);
+
+    const { container } = render(
+      await OfferPage({ params: Promise.resolve({ slug: FIXTURE_LIVE.slug }) })
+    );
+    const script = container.querySelector('script[type="application/ld+json"]');
+
+    expect(script?.textContent).not.toContain('<');
+    expect(JSON.parse(script?.textContent ?? '{}').itemListElement[2].name).toBe(title);
+    expect(container.querySelectorAll('script')).toHaveLength(1);
   });
 });

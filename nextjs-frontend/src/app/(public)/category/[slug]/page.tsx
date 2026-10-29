@@ -8,12 +8,12 @@ import {
   DEFAULT_QUERY,
   getCategories,
   getCategoryBySlug,
-  getLiveOffers,
   parseCatalogueParams,
   searchOffers,
 } from '@/lib/catalogue';
 import { isIndexableCategory, isRefinedQuery } from '@/lib/seo/indexing';
 import { buildBreadcrumbList } from '@/lib/seo/json-ld';
+import { loadLiveOffersForSeo } from '@/lib/seo/live-offers';
 import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
 type Params = Promise<{ slug: string }>;
@@ -33,12 +33,14 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const category = await getCategoryBySlug(slug);
-  // Thrown here as well as in the page so the 404 status is set before streaming starts.
+  // Thrown here as well as in the page. The root loading.tsx still streams the shell first, so an
+  // unknown slug renders the 404 page with HTTP 200 (verified on the production build; see
+  // docs/developer/freejoy-seo.md, follow-up 5).
   if (!category) notFound();
 
   const title = `${category.name} freebies in the UK`;
   const query = parseCatalogueParams((await searchParams) ?? {});
-  const indexable = isIndexableCategory(category, await getLiveOffers());
+  const indexable = isIndexableCategory(category, await loadLiveOffersForSeo('category metadata'));
   return {
     title,
     description: category.description,
@@ -50,7 +52,7 @@ export async function generateMetadata({
     }),
     // Filters, search, sort and page 2+ are noindex but followable; the category itself follows
     // the data (noindex while fixture-backed).
-    robots: listingRobots({ indexable, refined: isRefinedQuery({ ...query, category: null }) }),
+    robots: listingRobots({ indexable, refined: isRefinedQuery(query) }),
   };
 }
 

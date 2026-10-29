@@ -16,7 +16,7 @@ export const INDEXABLE_ROBOTS: Robots = {
   'max-video-preview': -1,
 };
 
-/** Not indexable and nothing worth following (non-public or placeholder content). */
+/** Not indexable; `follow` is left at the crawler default. */
 export const NOINDEX_ROBOTS: Robots = { index: false };
 
 /** Not indexable, but the links on the page may be followed (refinements, ended offers). */
