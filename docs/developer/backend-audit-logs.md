@@ -38,6 +38,7 @@ The baseline builds its indexes without `CONCURRENTLY`, which blocks writes duri
 | --- | --- | --- |
 | `admin.users.update`, `.delete`, `.ban`, `.unban`, `.grant_admin`, `.revoke_admin` | `AdminUsersService` | no |
 | `admin.subscriptions.cancel`, `.refund`, `.grant` | `AdminSubscriptionsService` | yes |
+| `admin.offers.create`, `.update`, `.publish`, `.unpublish`, `.expire`, `.archive`, `.verify`; `admin.offer_links.create`, `.update`; `admin.categories.create`, `.update`, `.enable`, `.disable`; `admin.merchants.create`, `.update`, `.activate`, `.deactivate` | `AdminOfferService`, `AdminCategoryService`, `AdminMerchantService` ([backend-admin-catalogue.md](backend-admin-catalogue.md)) | no |
 | `org.create`, `org.update` | `OrganizationsService` | yes |
 | `billing.checkout`, `billing.change_plan`, `billing.cancel`, `billing.resume` | `OrgBillingService` | yes |
 | `billing.delete_payment_method`, `billing.set_default_payment_method` | `OrgBillingService` | yes |

@@ -142,6 +142,44 @@ export type AdminUserSummary = {
 };
 
 /**
+ * AffiliateLinkOut
+ */
+export type AffiliateLinkOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Offer Id
+     */
+    offer_id: string;
+    /**
+     * Provider
+     */
+    provider: string;
+    /**
+     * Destination Url
+     */
+    destination_url: string;
+    /**
+     * Tracking Id
+     */
+    tracking_id: string | null;
+    /**
+     * Active
+     */
+    active: boolean;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
  * AuditLogEntry
  */
 export type AuditLogEntry = {
@@ -344,6 +382,120 @@ export type CancelResponse = {
 };
 
 /**
+ * CatalogueErrorResponse
+ *
+ * Error body of the admin catalogue routes: the envelope plus a stable ``code``.
+ */
+export type CatalogueErrorResponse = {
+    /**
+     * Success
+     */
+    success?: false;
+    /**
+     * Error
+     */
+    error: string;
+    /**
+     * Code
+     */
+    code?: string | null;
+};
+
+/**
+ * CategoriesPage
+ */
+export type CategoriesPage = {
+    /**
+     * Categories
+     */
+    categories: Array<CategoryOut>;
+    /**
+     * Total Count
+     */
+    total_count: number;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+};
+
+/**
+ * CategoriesPageResponse
+ */
+export type CategoriesPageResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data: CategoriesPage;
+};
+
+/**
+ * CategoryOut
+ */
+export type CategoryOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Short Name
+     */
+    short_name: string;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Intro
+     */
+    intro: string;
+    /**
+     * Tint
+     */
+    tint: string;
+    /**
+     * Sort Order
+     */
+    sort_order: number;
+    /**
+     * Enabled
+     */
+    enabled: boolean;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
+ * CategoryResponse
+ */
+export type CategoryResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data: CategoryOut;
+};
+
+/**
  * ChangePlanRequest
  */
 export type ChangePlanRequest = {
@@ -377,6 +529,185 @@ export type CheckoutRequest = {
      * Cancel Url
      */
     cancel_url: string;
+};
+
+/**
+ * CreateCategoryRequest
+ */
+export type CreateCategoryRequest = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Slug
+     */
+    slug?: string | null;
+    /**
+     * Short Name
+     */
+    short_name: string;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Intro
+     */
+    intro: string;
+    /**
+     * Tint
+     */
+    tint: string;
+    /**
+     * Sort Order
+     */
+    sort_order?: number;
+    /**
+     * Enabled
+     */
+    enabled?: boolean;
+};
+
+/**
+ * CreateLinkRequest
+ */
+export type CreateLinkRequest = {
+    /**
+     * Provider
+     */
+    provider: string;
+    /**
+     * Destination Url
+     */
+    destination_url: string;
+    /**
+     * Tracking Id
+     */
+    tracking_id?: string | null;
+    /**
+     * Active
+     */
+    active?: boolean;
+};
+
+/**
+ * CreateMerchantRequest
+ */
+export type CreateMerchantRequest = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Slug
+     */
+    slug?: string | null;
+    /**
+     * Website
+     */
+    website?: string | null;
+    /**
+     * Logo Url
+     */
+    logo_url?: string | null;
+    /**
+     * Active
+     */
+    active?: boolean;
+};
+
+/**
+ * CreateOfferRequest
+ */
+export type CreateOfferRequest = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Slug
+     */
+    slug?: string | null;
+    /**
+     * Summary
+     */
+    summary: string;
+    /**
+     * Description
+     */
+    description?: Array<string>;
+    /**
+     * Category Id
+     */
+    category_id: string;
+    /**
+     * Merchant Id
+     */
+    merchant_id: string;
+    offer_type: OfferType;
+    /**
+     * Featured
+     */
+    featured?: boolean;
+    /**
+     * Image Tint
+     */
+    image_tint: string;
+    /**
+     * Image Label
+     */
+    image_label: string;
+    /**
+     * Image Alt
+     */
+    image_alt: string;
+    /**
+     * Source Url
+     */
+    source_url?: string | null;
+    postage_kind: PostageKind;
+    /**
+     * Postage Amount Minor
+     */
+    postage_amount_minor?: number | null;
+    /**
+     * Postage Currency
+     */
+    postage_currency?: string | null;
+    /**
+     * Requires Card
+     */
+    requires_card?: boolean;
+    /**
+     * Subscription Terms
+     */
+    subscription_terms?: string | null;
+    /**
+     * Eligibility
+     */
+    eligibility: string;
+    /**
+     * Availability
+     */
+    availability: string;
+    /**
+     * Steps
+     */
+    steps?: Array<StepIn>;
+    /**
+     * Start At
+     */
+    start_at?: string | null;
+    /**
+     * End At
+     */
+    end_at?: string | null;
+    freshness?: OfferFreshness | null;
+    /**
+     * Publisher Notes
+     */
+    publisher_notes?: string | null;
 };
 
 /**
@@ -966,6 +1297,17 @@ export type InvoicesResponse = {
 };
 
 /**
+ * LinkResponse
+ */
+export type LinkResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data: AffiliateLinkOut;
+};
+
+/**
  * MarkAllReadData
  */
 export type MarkAllReadData = {
@@ -990,6 +1332,88 @@ export type MarkAllReadResponse = {
  * MembershipRole
  */
 export type MembershipRole = 'OWNER' | 'ADMIN' | 'STAFF';
+
+/**
+ * MerchantOut
+ */
+export type MerchantOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Website
+     */
+    website: string | null;
+    /**
+     * Logo Url
+     */
+    logo_url: string | null;
+    /**
+     * Active
+     */
+    active: boolean;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
+ * MerchantResponse
+ */
+export type MerchantResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data: MerchantOut;
+};
+
+/**
+ * MerchantsPage
+ */
+export type MerchantsPage = {
+    /**
+     * Merchants
+     */
+    merchants: Array<MerchantOut>;
+    /**
+     * Total Count
+     */
+    total_count: number;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+};
+
+/**
+ * MerchantsPageResponse
+ */
+export type MerchantsPageResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data: MerchantsPage;
+};
 
 /**
  * MigrationsStatus
@@ -1089,6 +1513,227 @@ export type NotificationResponse = {
      */
     success?: true;
     data: NotificationItem;
+};
+
+/**
+ * OfferFreshness
+ *
+ * Editorial label set by the publisher; never computed from the clock.
+ */
+export type OfferFreshness = 'NEW_TODAY' | 'JUST_ADDED' | 'POPULAR' | 'ENDS_SOON' | 'LIMITED';
+
+/**
+ * OfferOut
+ */
+export type OfferOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Category Id
+     */
+    category_id: string;
+    /**
+     * Merchant Id
+     */
+    merchant_id: string;
+    offer_type: OfferType;
+    status: OfferStatus;
+    /**
+     * Featured
+     */
+    featured: boolean;
+    /**
+     * End At
+     */
+    end_at: string | null;
+    /**
+     * Last Verified At
+     */
+    last_verified_at: string | null;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+    /**
+     * Summary
+     */
+    summary: string;
+    /**
+     * Description
+     */
+    description: Array<string>;
+    /**
+     * Image Tint
+     */
+    image_tint: string;
+    /**
+     * Image Label
+     */
+    image_label: string;
+    /**
+     * Image Alt
+     */
+    image_alt: string;
+    /**
+     * Source Url
+     */
+    source_url: string | null;
+    postage_kind: PostageKind;
+    /**
+     * Postage Amount Minor
+     */
+    postage_amount_minor: number | null;
+    /**
+     * Postage Currency
+     */
+    postage_currency: string | null;
+    /**
+     * Requires Card
+     */
+    requires_card: boolean;
+    /**
+     * Subscription Terms
+     */
+    subscription_terms: string | null;
+    /**
+     * Eligibility
+     */
+    eligibility: string;
+    /**
+     * Availability
+     */
+    availability: string;
+    /**
+     * Steps
+     */
+    steps: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * Start At
+     */
+    start_at: string | null;
+    freshness: OfferFreshness | null;
+    /**
+     * Publisher Notes
+     */
+    publisher_notes: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Links
+     */
+    links: Array<AffiliateLinkOut>;
+};
+
+/**
+ * OfferResponse
+ */
+export type OfferResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data: OfferOut;
+};
+
+/**
+ * OfferStatus
+ */
+export type OfferStatus = 'DRAFT' | 'PUBLISHED' | 'EXPIRED' | 'ARCHIVED';
+
+/**
+ * OfferSummaryOut
+ */
+export type OfferSummaryOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Category Id
+     */
+    category_id: string;
+    /**
+     * Merchant Id
+     */
+    merchant_id: string;
+    offer_type: OfferType;
+    status: OfferStatus;
+    /**
+     * Featured
+     */
+    featured: boolean;
+    /**
+     * End At
+     */
+    end_at: string | null;
+    /**
+     * Last Verified At
+     */
+    last_verified_at: string | null;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+};
+
+/**
+ * OfferType
+ */
+export type OfferType = 'FREE_SAMPLE' | 'FREE_TRIAL' | 'CASHBACK' | 'VOUCHER' | 'COMPETITION';
+
+/**
+ * OffersPage
+ */
+export type OffersPage = {
+    /**
+     * Offers
+     */
+    offers: Array<OfferSummaryOut>;
+    /**
+     * Total Count
+     */
+    total_count: number;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+};
+
+/**
+ * OffersPageResponse
+ */
+export type OffersPageResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data: OffersPage;
 };
 
 /**
@@ -1370,6 +2015,11 @@ export type PortalRequest = {
      */
     return_url: string;
 };
+
+/**
+ * PostageKind
+ */
+export type PostageKind = 'FREE' | 'COST' | 'CHECK_TERMS';
 
 /**
  * ProfileData
@@ -1741,6 +2391,20 @@ export type SignInRequest = {
 };
 
 /**
+ * StepIn
+ */
+export type StepIn = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Detail
+     */
+    detail: string;
+};
+
+/**
  * SubscriptionDetailData
  */
 export type SubscriptionDetailData = {
@@ -2017,6 +2681,167 @@ export type TotpChangedResponse = {
 };
 
 /**
+ * UpdateCategoryRequest
+ */
+export type UpdateCategoryRequest = {
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Short Name
+     */
+    short_name?: string | null;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Intro
+     */
+    intro?: string | null;
+    /**
+     * Tint
+     */
+    tint?: string | null;
+    /**
+     * Sort Order
+     */
+    sort_order?: number | null;
+};
+
+/**
+ * UpdateLinkRequest
+ */
+export type UpdateLinkRequest = {
+    /**
+     * Provider
+     */
+    provider?: string | null;
+    /**
+     * Destination Url
+     */
+    destination_url?: string | null;
+    /**
+     * Tracking Id
+     */
+    tracking_id?: string | null;
+    /**
+     * Active
+     */
+    active?: boolean | null;
+};
+
+/**
+ * UpdateMerchantRequest
+ */
+export type UpdateMerchantRequest = {
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Website
+     */
+    website?: string | null;
+    /**
+     * Logo Url
+     */
+    logo_url?: string | null;
+};
+
+/**
+ * UpdateOfferRequest
+ *
+ * Partial update: send only the fields to change. The slug and status cannot be changed.
+ */
+export type UpdateOfferRequest = {
+    /**
+     * Title
+     */
+    title?: string | null;
+    /**
+     * Summary
+     */
+    summary?: string | null;
+    /**
+     * Description
+     */
+    description?: Array<string> | null;
+    /**
+     * Category Id
+     */
+    category_id?: string | null;
+    /**
+     * Merchant Id
+     */
+    merchant_id?: string | null;
+    offer_type?: OfferType | null;
+    /**
+     * Featured
+     */
+    featured?: boolean | null;
+    /**
+     * Image Tint
+     */
+    image_tint?: string | null;
+    /**
+     * Image Label
+     */
+    image_label?: string | null;
+    /**
+     * Image Alt
+     */
+    image_alt?: string | null;
+    /**
+     * Source Url
+     */
+    source_url?: string | null;
+    postage_kind?: PostageKind | null;
+    /**
+     * Postage Amount Minor
+     */
+    postage_amount_minor?: number | null;
+    /**
+     * Postage Currency
+     */
+    postage_currency?: string | null;
+    /**
+     * Requires Card
+     */
+    requires_card?: boolean | null;
+    /**
+     * Subscription Terms
+     */
+    subscription_terms?: string | null;
+    /**
+     * Eligibility
+     */
+    eligibility?: string | null;
+    /**
+     * Availability
+     */
+    availability?: string | null;
+    /**
+     * Steps
+     */
+    steps?: Array<StepIn> | null;
+    /**
+     * Start At
+     */
+    start_at?: string | null;
+    /**
+     * End At
+     */
+    end_at?: string | null;
+    freshness?: OfferFreshness | null;
+    /**
+     * Publisher Notes
+     */
+    publisher_notes?: string | null;
+};
+
+/**
  * UpdateRequest
  *
  * Partial update of a name and/or slug; at least one is required.
@@ -2161,6 +2986,16 @@ export type VerificationRequest = {
      * Token
      */
     token: string;
+};
+
+/**
+ * VerifyRequest
+ */
+export type VerifyRequest = {
+    /**
+     * Note
+     */
+    note?: string | null;
 };
 
 /**
@@ -4400,6 +5235,1418 @@ export type AdminSyncSubscriptionsResponses = {
 };
 
 export type AdminSyncSubscriptionsResponse = AdminSyncSubscriptionsResponses[keyof AdminSyncSubscriptionsResponses];
+
+export type AdminListCategoriesData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+        /**
+         * Search
+         */
+        search?: string | null;
+        /**
+         * Enabled
+         */
+        enabled?: boolean | null;
+    };
+    url: '/v1/admin/categories';
+};
+
+export type AdminListCategoriesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminListCategoriesError = AdminListCategoriesErrors[keyof AdminListCategoriesErrors];
+
+export type AdminListCategoriesResponses = {
+    /**
+     * Successful Response
+     */
+    200: CategoriesPageResponse;
+};
+
+export type AdminListCategoriesResponse = AdminListCategoriesResponses[keyof AdminListCategoriesResponses];
+
+export type AdminCreateCategoryData = {
+    body: CreateCategoryRequest;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/v1/admin/categories';
+};
+
+export type AdminCreateCategoryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminCreateCategoryError = AdminCreateCategoryErrors[keyof AdminCreateCategoryErrors];
+
+export type AdminCreateCategoryResponses = {
+    /**
+     * Successful Response
+     */
+    201: CategoryResponse;
+};
+
+export type AdminCreateCategoryResponse = AdminCreateCategoryResponses[keyof AdminCreateCategoryResponses];
+
+export type AdminReadCategoryData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Category Id
+         */
+        category_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/categories/{category_id}';
+};
+
+export type AdminReadCategoryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminReadCategoryError = AdminReadCategoryErrors[keyof AdminReadCategoryErrors];
+
+export type AdminReadCategoryResponses = {
+    /**
+     * Successful Response
+     */
+    200: CategoryResponse;
+};
+
+export type AdminReadCategoryResponse = AdminReadCategoryResponses[keyof AdminReadCategoryResponses];
+
+export type AdminUpdateCategoryData = {
+    body: UpdateCategoryRequest;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Category Id
+         */
+        category_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/categories/{category_id}';
+};
+
+export type AdminUpdateCategoryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminUpdateCategoryError = AdminUpdateCategoryErrors[keyof AdminUpdateCategoryErrors];
+
+export type AdminUpdateCategoryResponses = {
+    /**
+     * Successful Response
+     */
+    200: CategoryResponse;
+};
+
+export type AdminUpdateCategoryResponse = AdminUpdateCategoryResponses[keyof AdminUpdateCategoryResponses];
+
+export type AdminEnableCategoryData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Category Id
+         */
+        category_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/categories/{category_id}/enable';
+};
+
+export type AdminEnableCategoryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminEnableCategoryError = AdminEnableCategoryErrors[keyof AdminEnableCategoryErrors];
+
+export type AdminEnableCategoryResponses = {
+    /**
+     * Successful Response
+     */
+    200: CategoryResponse;
+};
+
+export type AdminEnableCategoryResponse = AdminEnableCategoryResponses[keyof AdminEnableCategoryResponses];
+
+export type AdminDisableCategoryData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Category Id
+         */
+        category_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/categories/{category_id}/disable';
+};
+
+export type AdminDisableCategoryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminDisableCategoryError = AdminDisableCategoryErrors[keyof AdminDisableCategoryErrors];
+
+export type AdminDisableCategoryResponses = {
+    /**
+     * Successful Response
+     */
+    200: CategoryResponse;
+};
+
+export type AdminDisableCategoryResponse = AdminDisableCategoryResponses[keyof AdminDisableCategoryResponses];
+
+export type AdminListMerchantsData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+        /**
+         * Search
+         */
+        search?: string | null;
+        /**
+         * Active
+         */
+        active?: boolean | null;
+    };
+    url: '/v1/admin/merchants';
+};
+
+export type AdminListMerchantsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminListMerchantsError = AdminListMerchantsErrors[keyof AdminListMerchantsErrors];
+
+export type AdminListMerchantsResponses = {
+    /**
+     * Successful Response
+     */
+    200: MerchantsPageResponse;
+};
+
+export type AdminListMerchantsResponse = AdminListMerchantsResponses[keyof AdminListMerchantsResponses];
+
+export type AdminCreateMerchantData = {
+    body: CreateMerchantRequest;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/v1/admin/merchants';
+};
+
+export type AdminCreateMerchantErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminCreateMerchantError = AdminCreateMerchantErrors[keyof AdminCreateMerchantErrors];
+
+export type AdminCreateMerchantResponses = {
+    /**
+     * Successful Response
+     */
+    201: MerchantResponse;
+};
+
+export type AdminCreateMerchantResponse = AdminCreateMerchantResponses[keyof AdminCreateMerchantResponses];
+
+export type AdminReadMerchantData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Merchant Id
+         */
+        merchant_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/merchants/{merchant_id}';
+};
+
+export type AdminReadMerchantErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminReadMerchantError = AdminReadMerchantErrors[keyof AdminReadMerchantErrors];
+
+export type AdminReadMerchantResponses = {
+    /**
+     * Successful Response
+     */
+    200: MerchantResponse;
+};
+
+export type AdminReadMerchantResponse = AdminReadMerchantResponses[keyof AdminReadMerchantResponses];
+
+export type AdminUpdateMerchantData = {
+    body: UpdateMerchantRequest;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Merchant Id
+         */
+        merchant_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/merchants/{merchant_id}';
+};
+
+export type AdminUpdateMerchantErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminUpdateMerchantError = AdminUpdateMerchantErrors[keyof AdminUpdateMerchantErrors];
+
+export type AdminUpdateMerchantResponses = {
+    /**
+     * Successful Response
+     */
+    200: MerchantResponse;
+};
+
+export type AdminUpdateMerchantResponse = AdminUpdateMerchantResponses[keyof AdminUpdateMerchantResponses];
+
+export type AdminActivateMerchantData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Merchant Id
+         */
+        merchant_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/merchants/{merchant_id}/activate';
+};
+
+export type AdminActivateMerchantErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminActivateMerchantError = AdminActivateMerchantErrors[keyof AdminActivateMerchantErrors];
+
+export type AdminActivateMerchantResponses = {
+    /**
+     * Successful Response
+     */
+    200: MerchantResponse;
+};
+
+export type AdminActivateMerchantResponse = AdminActivateMerchantResponses[keyof AdminActivateMerchantResponses];
+
+export type AdminDeactivateMerchantData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Merchant Id
+         */
+        merchant_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/merchants/{merchant_id}/deactivate';
+};
+
+export type AdminDeactivateMerchantErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminDeactivateMerchantError = AdminDeactivateMerchantErrors[keyof AdminDeactivateMerchantErrors];
+
+export type AdminDeactivateMerchantResponses = {
+    /**
+     * Successful Response
+     */
+    200: MerchantResponse;
+};
+
+export type AdminDeactivateMerchantResponse = AdminDeactivateMerchantResponses[keyof AdminDeactivateMerchantResponses];
+
+export type AdminListOffersData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+        /**
+         * Search
+         */
+        search?: string | null;
+        /**
+         * Status
+         */
+        status?: OfferStatus | null;
+        /**
+         * Category Id
+         */
+        category_id?: string | null;
+    };
+    url: '/v1/admin/offers';
+};
+
+export type AdminListOffersErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminListOffersError = AdminListOffersErrors[keyof AdminListOffersErrors];
+
+export type AdminListOffersResponses = {
+    /**
+     * Successful Response
+     */
+    200: OffersPageResponse;
+};
+
+export type AdminListOffersResponse = AdminListOffersResponses[keyof AdminListOffersResponses];
+
+export type AdminCreateOfferData = {
+    body: CreateOfferRequest;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/v1/admin/offers';
+};
+
+export type AdminCreateOfferErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminCreateOfferError = AdminCreateOfferErrors[keyof AdminCreateOfferErrors];
+
+export type AdminCreateOfferResponses = {
+    /**
+     * Successful Response
+     */
+    201: OfferResponse;
+};
+
+export type AdminCreateOfferResponse = AdminCreateOfferResponses[keyof AdminCreateOfferResponses];
+
+export type AdminReadOfferData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Offer Id
+         */
+        offer_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/offers/{offer_id}';
+};
+
+export type AdminReadOfferErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminReadOfferError = AdminReadOfferErrors[keyof AdminReadOfferErrors];
+
+export type AdminReadOfferResponses = {
+    /**
+     * Successful Response
+     */
+    200: OfferResponse;
+};
+
+export type AdminReadOfferResponse = AdminReadOfferResponses[keyof AdminReadOfferResponses];
+
+export type AdminUpdateOfferData = {
+    body: UpdateOfferRequest;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Offer Id
+         */
+        offer_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/offers/{offer_id}';
+};
+
+export type AdminUpdateOfferErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminUpdateOfferError = AdminUpdateOfferErrors[keyof AdminUpdateOfferErrors];
+
+export type AdminUpdateOfferResponses = {
+    /**
+     * Successful Response
+     */
+    200: OfferResponse;
+};
+
+export type AdminUpdateOfferResponse = AdminUpdateOfferResponses[keyof AdminUpdateOfferResponses];
+
+export type AdminPublishOfferData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Offer Id
+         */
+        offer_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/offers/{offer_id}/publish';
+};
+
+export type AdminPublishOfferErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminPublishOfferError = AdminPublishOfferErrors[keyof AdminPublishOfferErrors];
+
+export type AdminPublishOfferResponses = {
+    /**
+     * Successful Response
+     */
+    200: OfferResponse;
+};
+
+export type AdminPublishOfferResponse = AdminPublishOfferResponses[keyof AdminPublishOfferResponses];
+
+export type AdminUnpublishOfferData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Offer Id
+         */
+        offer_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/offers/{offer_id}/unpublish';
+};
+
+export type AdminUnpublishOfferErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminUnpublishOfferError = AdminUnpublishOfferErrors[keyof AdminUnpublishOfferErrors];
+
+export type AdminUnpublishOfferResponses = {
+    /**
+     * Successful Response
+     */
+    200: OfferResponse;
+};
+
+export type AdminUnpublishOfferResponse = AdminUnpublishOfferResponses[keyof AdminUnpublishOfferResponses];
+
+export type AdminExpireOfferData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Offer Id
+         */
+        offer_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/offers/{offer_id}/expire';
+};
+
+export type AdminExpireOfferErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminExpireOfferError = AdminExpireOfferErrors[keyof AdminExpireOfferErrors];
+
+export type AdminExpireOfferResponses = {
+    /**
+     * Successful Response
+     */
+    200: OfferResponse;
+};
+
+export type AdminExpireOfferResponse = AdminExpireOfferResponses[keyof AdminExpireOfferResponses];
+
+export type AdminArchiveOfferData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Offer Id
+         */
+        offer_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/offers/{offer_id}/archive';
+};
+
+export type AdminArchiveOfferErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminArchiveOfferError = AdminArchiveOfferErrors[keyof AdminArchiveOfferErrors];
+
+export type AdminArchiveOfferResponses = {
+    /**
+     * Successful Response
+     */
+    200: OfferResponse;
+};
+
+export type AdminArchiveOfferResponse = AdminArchiveOfferResponses[keyof AdminArchiveOfferResponses];
+
+export type AdminVerifyOfferData = {
+    /**
+     * Body
+     */
+    body?: VerifyRequest | null;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Offer Id
+         */
+        offer_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/offers/{offer_id}/verify';
+};
+
+export type AdminVerifyOfferErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminVerifyOfferError = AdminVerifyOfferErrors[keyof AdminVerifyOfferErrors];
+
+export type AdminVerifyOfferResponses = {
+    /**
+     * Successful Response
+     */
+    200: OfferResponse;
+};
+
+export type AdminVerifyOfferResponse = AdminVerifyOfferResponses[keyof AdminVerifyOfferResponses];
+
+export type AdminCreateOfferLinkData = {
+    body: CreateLinkRequest;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Offer Id
+         */
+        offer_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/offers/{offer_id}/links';
+};
+
+export type AdminCreateOfferLinkErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminCreateOfferLinkError = AdminCreateOfferLinkErrors[keyof AdminCreateOfferLinkErrors];
+
+export type AdminCreateOfferLinkResponses = {
+    /**
+     * Successful Response
+     */
+    201: LinkResponse;
+};
+
+export type AdminCreateOfferLinkResponse = AdminCreateOfferLinkResponses[keyof AdminCreateOfferLinkResponses];
+
+export type AdminUpdateOfferLinkData = {
+    body: UpdateLinkRequest;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+        /**
+         * X-Session-Token
+         */
+        'X-Session-Token'?: string | null;
+    };
+    path: {
+        /**
+         * Offer Id
+         */
+        offer_id: string;
+        /**
+         * Link Id
+         */
+        link_id: string;
+    };
+    query?: never;
+    url: '/v1/admin/offers/{offer_id}/links/{link_id}';
+};
+
+export type AdminUpdateOfferLinkErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: ErrorResponse;
+    /**
+     * Not Found
+     */
+    404: CatalogueErrorResponse;
+    /**
+     * Conflict
+     */
+    409: CatalogueErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: CatalogueErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type AdminUpdateOfferLinkError = AdminUpdateOfferLinkErrors[keyof AdminUpdateOfferLinkErrors];
+
+export type AdminUpdateOfferLinkResponses = {
+    /**
+     * Successful Response
+     */
+    200: LinkResponse;
+};
+
+export type AdminUpdateOfferLinkResponse = AdminUpdateOfferLinkResponses[keyof AdminUpdateOfferLinkResponses];
 
 export type ListOrganizationsData = {
     body?: never;

@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AdminCancelSubscriptionData, AdminCancelSubscriptionErrors, AdminCancelSubscriptionResponses, AdminGrantSubscriptionData, AdminGrantSubscriptionErrors, AdminGrantSubscriptionResponses, AdminListSubscriptionsData, AdminListSubscriptionsErrors, AdminListSubscriptionsResponses, AdminOverviewData, AdminOverviewErrors, AdminOverviewResponses, AdminReadSubscriptionData, AdminReadSubscriptionErrors, AdminReadSubscriptionResponses, AdminRefundPaymentData, AdminRefundPaymentErrors, AdminRefundPaymentResponses, AdminRevenueData, AdminRevenueErrors, AdminRevenueResponses, AdminRevokeGrantData, AdminRevokeGrantErrors, AdminRevokeGrantResponses, AdminSyncSubscriptionsData, AdminSyncSubscriptionsErrors, AdminSyncSubscriptionsResponses, AdminSystemStatsData, AdminSystemStatsErrors, AdminSystemStatsResponses, BanUserData, BanUserErrors, BanUserResponses, CancelSubscriptionData, CancelSubscriptionErrors, CancelSubscriptionResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangePlanData, ChangePlanErrors, ChangePlanResponses, CreateCheckoutData, CreateCheckoutErrors, CreateCheckoutResponses, CreateOrganizationData, CreateOrganizationErrors, CreateOrganizationResponses, CreatePortalData, CreatePortalErrors, CreatePortalResponses, CreateSessionData, CreateSessionErrors, CreateSessionResponses, DeleteAccountData, DeleteAccountErrors, DeleteAccountResponses, DeleteNotificationData, DeleteNotificationErrors, DeleteNotificationResponses, DeletePaymentMethodData, DeletePaymentMethodErrors, DeletePaymentMethodResponses, DeleteSessionData, DeleteSessionErrors, DeleteSessionResponses, DeleteUserData, DeleteUserErrors, DeleteUserResponses, DisableData, DisableErrors, DisableResponses, EnrollData, EnrollErrors, EnrollResponses, ExportMyDataData, ExportMyDataErrors, ExportMyDataResponses, GrantAdminData, GrantAdminErrors, GrantAdminResponses, HealthCheckData, HealthCheckErrors, HealthCheckResponses, ListAuditLogsData, ListAuditLogsErrors, ListAuditLogsResponses, ListInvoicesData, ListInvoicesErrors, ListInvoicesResponses, ListNotificationsData, ListNotificationsErrors, ListNotificationsResponses, ListOrganizationsData, ListOrganizationsErrors, ListOrganizationsResponses, ListPaymentMethodsData, ListPaymentMethodsErrors, ListPaymentMethodsResponses, ListUsersData, ListUsersErrors, ListUsersResponses, MarkAllNotificationsReadData, MarkAllNotificationsReadErrors, MarkAllNotificationsReadResponses, MarkNotificationReadData, MarkNotificationReadErrors, MarkNotificationReadResponses, ReadBillingData, ReadBillingErrors, ReadBillingResponses, ReadCurrencyData, ReadCurrencyErrors, ReadCurrencyResponses, ReadHistoryData, ReadHistoryErrors, ReadHistoryResponses, ReadinessCheckData, ReadinessCheckErrors, ReadinessCheckResponses, ReadOrganizationData, ReadOrganizationErrors, ReadOrganizationResponses, ReadPlanPricesData, ReadPlanPricesErrors, ReadPlanPricesResponses, ReadProfileData, ReadProfileErrors, ReadProfileResponses, ReadSessionData, ReadSessionErrors, ReadSessionResponses, ReadSessionStatusData, ReadSessionStatusErrors, ReadSessionStatusResponses, ReadSettingsData, ReadSettingsErrors, ReadSettingsResponses, ReadUserData, ReadUserErrors, ReadUserResponses, RefreshSessionData, RefreshSessionErrors, RefreshSessionResponses, ResumeSubscriptionData, ResumeSubscriptionErrors, ResumeSubscriptionResponses, RevokeAdminData, RevokeAdminErrors, RevokeAdminResponses, SetDefaultPaymentMethodData, SetDefaultPaymentMethodErrors, SetDefaultPaymentMethodResponses, UnbanUserData, UnbanUserErrors, UnbanUserResponses, UpdateAvatarData, UpdateAvatarErrors, UpdateAvatarResponses, UpdateOrganizationData, UpdateOrganizationErrors, UpdateOrganizationResponses, UpdateProfileData, UpdateProfileErrors, UpdateProfileResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses, UpdateUserData, UpdateUserErrors, UpdateUserResponses, VerifyData, VerifyErrors, VerifyIdTokenData, VerifyIdTokenErrors, VerifyIdTokenResponses, VerifyResponses } from './types.gen';
+import type { AdminActivateMerchantData, AdminActivateMerchantErrors, AdminActivateMerchantResponses, AdminArchiveOfferData, AdminArchiveOfferErrors, AdminArchiveOfferResponses, AdminCancelSubscriptionData, AdminCancelSubscriptionErrors, AdminCancelSubscriptionResponses, AdminCreateCategoryData, AdminCreateCategoryErrors, AdminCreateCategoryResponses, AdminCreateMerchantData, AdminCreateMerchantErrors, AdminCreateMerchantResponses, AdminCreateOfferData, AdminCreateOfferErrors, AdminCreateOfferLinkData, AdminCreateOfferLinkErrors, AdminCreateOfferLinkResponses, AdminCreateOfferResponses, AdminDeactivateMerchantData, AdminDeactivateMerchantErrors, AdminDeactivateMerchantResponses, AdminDisableCategoryData, AdminDisableCategoryErrors, AdminDisableCategoryResponses, AdminEnableCategoryData, AdminEnableCategoryErrors, AdminEnableCategoryResponses, AdminExpireOfferData, AdminExpireOfferErrors, AdminExpireOfferResponses, AdminGrantSubscriptionData, AdminGrantSubscriptionErrors, AdminGrantSubscriptionResponses, AdminListCategoriesData, AdminListCategoriesErrors, AdminListCategoriesResponses, AdminListMerchantsData, AdminListMerchantsErrors, AdminListMerchantsResponses, AdminListOffersData, AdminListOffersErrors, AdminListOffersResponses, AdminListSubscriptionsData, AdminListSubscriptionsErrors, AdminListSubscriptionsResponses, AdminOverviewData, AdminOverviewErrors, AdminOverviewResponses, AdminPublishOfferData, AdminPublishOfferErrors, AdminPublishOfferResponses, AdminReadCategoryData, AdminReadCategoryErrors, AdminReadCategoryResponses, AdminReadMerchantData, AdminReadMerchantErrors, AdminReadMerchantResponses, AdminReadOfferData, AdminReadOfferErrors, AdminReadOfferResponses, AdminReadSubscriptionData, AdminReadSubscriptionErrors, AdminReadSubscriptionResponses, AdminRefundPaymentData, AdminRefundPaymentErrors, AdminRefundPaymentResponses, AdminRevenueData, AdminRevenueErrors, AdminRevenueResponses, AdminRevokeGrantData, AdminRevokeGrantErrors, AdminRevokeGrantResponses, AdminSyncSubscriptionsData, AdminSyncSubscriptionsErrors, AdminSyncSubscriptionsResponses, AdminSystemStatsData, AdminSystemStatsErrors, AdminSystemStatsResponses, AdminUnpublishOfferData, AdminUnpublishOfferErrors, AdminUnpublishOfferResponses, AdminUpdateCategoryData, AdminUpdateCategoryErrors, AdminUpdateCategoryResponses, AdminUpdateMerchantData, AdminUpdateMerchantErrors, AdminUpdateMerchantResponses, AdminUpdateOfferData, AdminUpdateOfferErrors, AdminUpdateOfferLinkData, AdminUpdateOfferLinkErrors, AdminUpdateOfferLinkResponses, AdminUpdateOfferResponses, AdminVerifyOfferData, AdminVerifyOfferErrors, AdminVerifyOfferResponses, BanUserData, BanUserErrors, BanUserResponses, CancelSubscriptionData, CancelSubscriptionErrors, CancelSubscriptionResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangePlanData, ChangePlanErrors, ChangePlanResponses, CreateCheckoutData, CreateCheckoutErrors, CreateCheckoutResponses, CreateOrganizationData, CreateOrganizationErrors, CreateOrganizationResponses, CreatePortalData, CreatePortalErrors, CreatePortalResponses, CreateSessionData, CreateSessionErrors, CreateSessionResponses, DeleteAccountData, DeleteAccountErrors, DeleteAccountResponses, DeleteNotificationData, DeleteNotificationErrors, DeleteNotificationResponses, DeletePaymentMethodData, DeletePaymentMethodErrors, DeletePaymentMethodResponses, DeleteSessionData, DeleteSessionErrors, DeleteSessionResponses, DeleteUserData, DeleteUserErrors, DeleteUserResponses, DisableData, DisableErrors, DisableResponses, EnrollData, EnrollErrors, EnrollResponses, ExportMyDataData, ExportMyDataErrors, ExportMyDataResponses, GrantAdminData, GrantAdminErrors, GrantAdminResponses, HealthCheckData, HealthCheckErrors, HealthCheckResponses, ListAuditLogsData, ListAuditLogsErrors, ListAuditLogsResponses, ListInvoicesData, ListInvoicesErrors, ListInvoicesResponses, ListNotificationsData, ListNotificationsErrors, ListNotificationsResponses, ListOrganizationsData, ListOrganizationsErrors, ListOrganizationsResponses, ListPaymentMethodsData, ListPaymentMethodsErrors, ListPaymentMethodsResponses, ListUsersData, ListUsersErrors, ListUsersResponses, MarkAllNotificationsReadData, MarkAllNotificationsReadErrors, MarkAllNotificationsReadResponses, MarkNotificationReadData, MarkNotificationReadErrors, MarkNotificationReadResponses, ReadBillingData, ReadBillingErrors, ReadBillingResponses, ReadCurrencyData, ReadCurrencyErrors, ReadCurrencyResponses, ReadHistoryData, ReadHistoryErrors, ReadHistoryResponses, ReadinessCheckData, ReadinessCheckErrors, ReadinessCheckResponses, ReadOrganizationData, ReadOrganizationErrors, ReadOrganizationResponses, ReadPlanPricesData, ReadPlanPricesErrors, ReadPlanPricesResponses, ReadProfileData, ReadProfileErrors, ReadProfileResponses, ReadSessionData, ReadSessionErrors, ReadSessionResponses, ReadSessionStatusData, ReadSessionStatusErrors, ReadSessionStatusResponses, ReadSettingsData, ReadSettingsErrors, ReadSettingsResponses, ReadUserData, ReadUserErrors, ReadUserResponses, RefreshSessionData, RefreshSessionErrors, RefreshSessionResponses, ResumeSubscriptionData, ResumeSubscriptionErrors, ResumeSubscriptionResponses, RevokeAdminData, RevokeAdminErrors, RevokeAdminResponses, SetDefaultPaymentMethodData, SetDefaultPaymentMethodErrors, SetDefaultPaymentMethodResponses, UnbanUserData, UnbanUserErrors, UnbanUserResponses, UpdateAvatarData, UpdateAvatarErrors, UpdateAvatarResponses, UpdateOrganizationData, UpdateOrganizationErrors, UpdateOrganizationResponses, UpdateProfileData, UpdateProfileErrors, UpdateProfileResponses, UpdateSettingsData, UpdateSettingsErrors, UpdateSettingsResponses, UpdateUserData, UpdateUserErrors, UpdateUserResponses, VerifyData, VerifyErrors, VerifyIdTokenData, VerifyIdTokenErrors, VerifyIdTokenResponses, VerifyResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -343,6 +343,184 @@ export const adminSystemStats = <ThrowOnError extends boolean = false>(options?:
  * Reads every Stripe subscription and reports where it differs from the organisations' stored state. Changes no subscription; writes one audit row. Limited to 3 runs a minute.
  */
 export const adminSyncSubscriptions = <ThrowOnError extends boolean = false>(options?: Options<AdminSyncSubscriptionsData, ThrowOnError>) => (options?.client ?? client).post<AdminSyncSubscriptionsResponses, AdminSyncSubscriptionsErrors, ThrowOnError>({ url: '/v1/admin/analytics/subscription-sync', ...options });
+
+/**
+ * Admin List Categories
+ */
+export const adminListCategories = <ThrowOnError extends boolean = false>(options?: Options<AdminListCategoriesData, ThrowOnError>) => (options?.client ?? client).get<AdminListCategoriesResponses, AdminListCategoriesErrors, ThrowOnError>({ url: '/v1/admin/categories', ...options });
+
+/**
+ * Admin Create Category
+ */
+export const adminCreateCategory = <ThrowOnError extends boolean = false>(options: Options<AdminCreateCategoryData, ThrowOnError>) => (options.client ?? client).post<AdminCreateCategoryResponses, AdminCreateCategoryErrors, ThrowOnError>({
+    url: '/v1/admin/categories',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Admin Read Category
+ */
+export const adminReadCategory = <ThrowOnError extends boolean = false>(options: Options<AdminReadCategoryData, ThrowOnError>) => (options.client ?? client).get<AdminReadCategoryResponses, AdminReadCategoryErrors, ThrowOnError>({ url: '/v1/admin/categories/{category_id}', ...options });
+
+/**
+ * Admin Update Category
+ */
+export const adminUpdateCategory = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateCategoryData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateCategoryResponses, AdminUpdateCategoryErrors, ThrowOnError>({
+    url: '/v1/admin/categories/{category_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Admin Enable Category
+ */
+export const adminEnableCategory = <ThrowOnError extends boolean = false>(options: Options<AdminEnableCategoryData, ThrowOnError>) => (options.client ?? client).post<AdminEnableCategoryResponses, AdminEnableCategoryErrors, ThrowOnError>({ url: '/v1/admin/categories/{category_id}/enable', ...options });
+
+/**
+ * Admin Disable Category
+ */
+export const adminDisableCategory = <ThrowOnError extends boolean = false>(options: Options<AdminDisableCategoryData, ThrowOnError>) => (options.client ?? client).post<AdminDisableCategoryResponses, AdminDisableCategoryErrors, ThrowOnError>({ url: '/v1/admin/categories/{category_id}/disable', ...options });
+
+/**
+ * Admin List Merchants
+ */
+export const adminListMerchants = <ThrowOnError extends boolean = false>(options?: Options<AdminListMerchantsData, ThrowOnError>) => (options?.client ?? client).get<AdminListMerchantsResponses, AdminListMerchantsErrors, ThrowOnError>({ url: '/v1/admin/merchants', ...options });
+
+/**
+ * Admin Create Merchant
+ */
+export const adminCreateMerchant = <ThrowOnError extends boolean = false>(options: Options<AdminCreateMerchantData, ThrowOnError>) => (options.client ?? client).post<AdminCreateMerchantResponses, AdminCreateMerchantErrors, ThrowOnError>({
+    url: '/v1/admin/merchants',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Admin Read Merchant
+ */
+export const adminReadMerchant = <ThrowOnError extends boolean = false>(options: Options<AdminReadMerchantData, ThrowOnError>) => (options.client ?? client).get<AdminReadMerchantResponses, AdminReadMerchantErrors, ThrowOnError>({ url: '/v1/admin/merchants/{merchant_id}', ...options });
+
+/**
+ * Admin Update Merchant
+ */
+export const adminUpdateMerchant = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateMerchantData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateMerchantResponses, AdminUpdateMerchantErrors, ThrowOnError>({
+    url: '/v1/admin/merchants/{merchant_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Admin Activate Merchant
+ */
+export const adminActivateMerchant = <ThrowOnError extends boolean = false>(options: Options<AdminActivateMerchantData, ThrowOnError>) => (options.client ?? client).post<AdminActivateMerchantResponses, AdminActivateMerchantErrors, ThrowOnError>({ url: '/v1/admin/merchants/{merchant_id}/activate', ...options });
+
+/**
+ * Admin Deactivate Merchant
+ */
+export const adminDeactivateMerchant = <ThrowOnError extends boolean = false>(options: Options<AdminDeactivateMerchantData, ThrowOnError>) => (options.client ?? client).post<AdminDeactivateMerchantResponses, AdminDeactivateMerchantErrors, ThrowOnError>({ url: '/v1/admin/merchants/{merchant_id}/deactivate', ...options });
+
+/**
+ * Admin List Offers
+ */
+export const adminListOffers = <ThrowOnError extends boolean = false>(options?: Options<AdminListOffersData, ThrowOnError>) => (options?.client ?? client).get<AdminListOffersResponses, AdminListOffersErrors, ThrowOnError>({ url: '/v1/admin/offers', ...options });
+
+/**
+ * Admin Create Offer
+ */
+export const adminCreateOffer = <ThrowOnError extends boolean = false>(options: Options<AdminCreateOfferData, ThrowOnError>) => (options.client ?? client).post<AdminCreateOfferResponses, AdminCreateOfferErrors, ThrowOnError>({
+    url: '/v1/admin/offers',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Admin Read Offer
+ */
+export const adminReadOffer = <ThrowOnError extends boolean = false>(options: Options<AdminReadOfferData, ThrowOnError>) => (options.client ?? client).get<AdminReadOfferResponses, AdminReadOfferErrors, ThrowOnError>({ url: '/v1/admin/offers/{offer_id}', ...options });
+
+/**
+ * Admin Update Offer
+ */
+export const adminUpdateOffer = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateOfferData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateOfferResponses, AdminUpdateOfferErrors, ThrowOnError>({
+    url: '/v1/admin/offers/{offer_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Admin Publish Offer
+ */
+export const adminPublishOffer = <ThrowOnError extends boolean = false>(options: Options<AdminPublishOfferData, ThrowOnError>) => (options.client ?? client).post<AdminPublishOfferResponses, AdminPublishOfferErrors, ThrowOnError>({ url: '/v1/admin/offers/{offer_id}/publish', ...options });
+
+/**
+ * Admin Unpublish Offer
+ */
+export const adminUnpublishOffer = <ThrowOnError extends boolean = false>(options: Options<AdminUnpublishOfferData, ThrowOnError>) => (options.client ?? client).post<AdminUnpublishOfferResponses, AdminUnpublishOfferErrors, ThrowOnError>({ url: '/v1/admin/offers/{offer_id}/unpublish', ...options });
+
+/**
+ * Admin Expire Offer
+ */
+export const adminExpireOffer = <ThrowOnError extends boolean = false>(options: Options<AdminExpireOfferData, ThrowOnError>) => (options.client ?? client).post<AdminExpireOfferResponses, AdminExpireOfferErrors, ThrowOnError>({ url: '/v1/admin/offers/{offer_id}/expire', ...options });
+
+/**
+ * Admin Archive Offer
+ */
+export const adminArchiveOffer = <ThrowOnError extends boolean = false>(options: Options<AdminArchiveOfferData, ThrowOnError>) => (options.client ?? client).post<AdminArchiveOfferResponses, AdminArchiveOfferErrors, ThrowOnError>({ url: '/v1/admin/offers/{offer_id}/archive', ...options });
+
+/**
+ * Admin Verify Offer
+ */
+export const adminVerifyOffer = <ThrowOnError extends boolean = false>(options: Options<AdminVerifyOfferData, ThrowOnError>) => (options.client ?? client).post<AdminVerifyOfferResponses, AdminVerifyOfferErrors, ThrowOnError>({
+    url: '/v1/admin/offers/{offer_id}/verify',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Admin Create Offer Link
+ */
+export const adminCreateOfferLink = <ThrowOnError extends boolean = false>(options: Options<AdminCreateOfferLinkData, ThrowOnError>) => (options.client ?? client).post<AdminCreateOfferLinkResponses, AdminCreateOfferLinkErrors, ThrowOnError>({
+    url: '/v1/admin/offers/{offer_id}/links',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Admin Update Offer Link
+ */
+export const adminUpdateOfferLink = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateOfferLinkData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateOfferLinkResponses, AdminUpdateOfferLinkErrors, ThrowOnError>({
+    url: '/v1/admin/offers/{offer_id}/links/{link_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * List Organizations

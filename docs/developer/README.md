@@ -33,6 +33,7 @@ Start here, then follow the links. Root-level overview: [`../../README.md`](../.
 | [backend-frontend-seams.md](backend-frontend-seams.md) | Endpoints that keep `stripe` and `firebase-admin` out of the frontend |
 | [backend-audit-logs.md](backend-audit-logs.md) | Audit log model and admin API |
 | [backend-admin-users.md](backend-admin-users.md) | Admin user management |
+| [backend-admin-catalogue.md](backend-admin-catalogue.md) | Admin offers, categories, merchants and affiliate links: permissions, publish rules, status table |
 | [admin-settings.md](admin-settings.md) | The admin settings area (general, theme, feature flags) |
 
 ## Stripe Billing module
