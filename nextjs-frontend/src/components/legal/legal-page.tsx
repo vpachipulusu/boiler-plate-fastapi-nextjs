@@ -1,4 +1,8 @@
 import { TriangleAlert } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+/** The exact banner wording; pages and tests share it so no page can drift. */
+export const DRAFT_BANNER_TEXT = 'Draft — placeholder text pending legal review';
 
 interface LegalPageProps {
   title: string;
@@ -8,18 +12,28 @@ interface LegalPageProps {
   children: React.ReactNode;
 }
 
+/** Visible while a page is placeholder text; removed only after a qualified reviewer signs it off. */
+export function DraftBanner({ className }: { className?: string }) {
+  return (
+    <div
+      role="note"
+      className={cn(
+        'flex items-start gap-3 rounded-card bg-warn px-4 py-3 text-sm font-bold text-warn-foreground',
+        className
+      )}
+    >
+      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+      {DRAFT_BANNER_TEXT}
+    </div>
+  );
+}
+
 /** Shared shell for editorial and legal pages: draft banner, h1, summary, readable prose. */
 export function LegalPage({ title, summary, lastReviewed, children }: LegalPageProps) {
   return (
     <div className="mx-auto max-w-content px-4 py-8 sm:px-6 lg:py-12">
       <div className="mx-auto max-w-3xl">
-        <div
-          role="note"
-          className="flex items-start gap-3 rounded-card bg-warn px-4 py-3 text-sm font-bold text-warn-foreground"
-        >
-          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          Draft — placeholder text pending legal review
-        </div>
+        <DraftBanner />
         <h1 className="mt-8 font-display text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
           {title}
         </h1>

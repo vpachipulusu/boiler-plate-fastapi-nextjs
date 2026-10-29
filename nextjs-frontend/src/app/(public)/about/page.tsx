@@ -34,9 +34,15 @@ export default function AboutPage() {
     >
       <h2>What Freejoy is</h2>
       <p>
-        Freejoy collects free samples, trials, cashback, vouchers and competitions from brands
-        people in the UK might enjoy, and puts the terms in plain words next to each one. We do not
-        run the offers; the brand does.
+        Freejoy is planned to list free samples, free trials, cashback, vouchers and competitions
+        from brands people in the UK might enjoy, with the terms in plain words next to each one. We
+        do not run the offers; the brand does.
+      </p>
+      <h2>Not everything is free</h2>
+      <p>
+        Each listing says which kind of offer it is. A free sample may have postage to pay. A free
+        trial may ask for a card and start charging when it ends. Cashback and vouchers are not
+        free: you spend money first or get a discount. A competition is an entry, not a prize.
       </p>
       <h2>How we intend to check offers</h2>
       <p>
@@ -53,10 +59,17 @@ export default function AboutPage() {
           </li>
         ))}
       </ol>
+      <h2>How Freejoy plans to pay for itself</h2>
+      <p>
+        Some links to brands are expected to earn Freejoy a commission once real offers go live.
+        Read the <Link href="/affiliate-disclosure">affiliate disclosure</Link> for how that is
+        planned to work.
+      </p>
       <h2>Keeping in touch</h2>
       <p>
-        Want the next find in your inbox? <Link href="/alerts">Join the free alerts</Link> or use
-        the <Link href="/contact">contact page</Link> to tell us about a problem with a listing.
+        Alerts are a preview for now: you can try the <Link href="/alerts">alerts form</Link>, but
+        it does not save anything yet. The <Link href="/contact">contact page</Link> will explain
+        how to tell us about a problem with a listing once it is live.
       </p>
     </LegalPage>
   );

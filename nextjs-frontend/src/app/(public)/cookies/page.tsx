@@ -16,20 +16,30 @@ export default function CookiesPage() {
     >
       <h2>Cookies in this release</h2>
       <p>
-        This release is intended to set no non-essential cookies and run no analytics, so no cookie
-        banner is shown. The final list of what the framework and error reporting store in the
-        browser is still to be confirmed in review.
+        This release is intended to set no non-essential cookies and run no analytics or advertising
+        scripts. If error monitoring is switched on, the privacy notice describes it. Browsing the
+        public pages is not meant to store anything on your device, so no cookie banner is shown at
+        present. That is our current reading and it is still to be confirmed in review.
+      </p>
+      <h2>If you sign in</h2>
+      <p>
+        If you sign in to an account, a sign-in cookie called `session` keeps you signed in for up
+        to five days. It is needed for the sign-in you asked for and is not used for anything else.
+        Opening the sign-in or sign-up page prepares sign-in storage in your browser even if you do
+        not sign in; it is used only for signing in. The final list will name each item.
       </p>
       <h2>If that changes</h2>
       <p>
         If analytics or other optional cookies are added later, this page will list each one, what
-        it is for and how long it lasts, and we will ask for your consent before setting it.
+        it is for and how long it lasts, and we will ask for your consent before setting it unless a
+        legal exception clearly applies and we say so.
       </p>
       <ReviewerChecklist
         items={[
-          'Final cookie and local-storage list, including strictly necessary items from the framework',
-          'Whether any essential item needs to be named and explained',
-          'Consent mechanism and wording before any optional cookie is added',
+          'Final cookie and local-storage list, including strictly necessary items from the framework and sign-in',
+          'Whether the conclusion that no banner is needed on the public pages holds',
+          'Whether error monitoring needs any wording here or only in the privacy notice',
+          'Consent mechanism and wording before any optional cookie, analytics or affiliate pixel is added',
           'Expiry period stated for each item',
         ]}
       />
