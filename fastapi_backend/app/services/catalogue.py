@@ -46,6 +46,13 @@ def is_live(status: OfferStatus, end_at: datetime | None, now: datetime) -> bool
     return status is OfferStatus.PUBLISHED and (end_at is None or end_at > now)
 
 
+def _was_public(offer: OfferRecord) -> bool:
+    """Not live now, but it was: ended while published, or retired after being verified."""
+    if offer.status is OfferStatus.PUBLISHED:
+        return True
+    return offer.status is OfferStatus.EXPIRED and offer.last_verified_at is not None
+
+
 def _utcnow() -> datetime:
     return datetime.now(UTC)
 
@@ -71,24 +78,28 @@ class CatalogueService:
     async def get_offer(self, slug: str) -> OfferRecord | ExpiredOffer | None:
         """The live offer, an ``ExpiredOffer`` once it has ended, or None.
 
-        Drafts and archived offers answer None, exactly like a slug that does not exist, so
-        a visitor cannot probe for unpublished content. An offer an editor marked EXPIRED, or
-        a published one whose end date has passed, answers ``ExpiredOffer``.
+        Only an offer that provably was public can be reported as ended: published with an
+        end date that has passed, or marked EXPIRED with a verification date (a published
+        offer always has one, so its absence means the offer never went live). Drafts,
+        archived offers, EXPIRED rows that never went live and unknown slugs all answer
+        None, so a visitor cannot probe for unpublished content.
         """
+        now = self._clock()
         offer = await self._repository.find_visible_offer(slug)
         if offer is None:
             return None
-        if is_live(offer.status, offer.end_at, self._clock()):
+        if is_live(offer.status, offer.end_at, now):
             return offer
-        if offer.status in (OfferStatus.PUBLISHED, OfferStatus.EXPIRED):
-            return ExpiredOffer(
-                slug=offer.slug,
-                title=offer.title,
-                category_slug=offer.category_slug,
-                category_name=offer.category_name,
-                ended_at=offer.end_at,
-            )
-        return None
+        if not _was_public(offer):
+            return None
+        ended_at = offer.end_at
+        return ExpiredOffer(
+            slug=offer.slug,
+            title=offer.title,
+            category_slug=offer.category_slug,
+            category_name=offer.category_name,
+            ended_at=ended_at if ended_at is not None and ended_at <= now else None,
+        )
 
     async def list_categories(self) -> Sequence[CategoryRecord]:
         """Enabled categories, each with its count of live offers."""

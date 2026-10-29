@@ -75,7 +75,8 @@ def cached_response(
     content = body.model_dump_json()
     etag = etag_for(content.encode())
     headers = {"Cache-Control": CACHE_CONTROL, "ETag": etag}
-    if matches(if_none_match, etag):
+    # Only a 200 can be "not modified"; a 410 must keep telling the caller the offer is gone.
+    if status_code == 200 and matches(if_none_match, etag):
         return Response(status_code=304, headers=headers)
     return Response(
         content,
