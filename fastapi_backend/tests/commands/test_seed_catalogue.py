@@ -206,6 +206,11 @@ REMOTE_URLS = [
     ),
     ("", ()),
     ("not a url", ("not a url",)),
+    (
+        "postgresql+asyncpg://u:s3cret@localhost:5432,db.remote.invalid:5432/x",
+        ("s3cret", "remote.invalid", "5432,"),
+    ),
+    ("postgresql+asyncpg://u:s3cret@localhost:abc/x", ("s3cret", "abc")),
 ]
 
 
@@ -215,6 +220,7 @@ def test_refuses_a_database_that_is_not_on_this_machine(
 ) -> None:
     output = refuse(capsys, environment="local", database_url=url)
 
+    assert "refusing to run" in output
     assert "DATABASE_URL must point at localhost, 127.0.0.1 or ::1" in output
     assert "Nothing was written" in output
     assert "postgresql" not in output

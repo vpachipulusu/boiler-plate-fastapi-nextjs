@@ -121,12 +121,29 @@ async def test_a_real_offer_with_a_seed_slug_raises_a_conflict() -> None:
     assert real.title == "Mine"
 
 
+async def test_an_offer_with_the_sample_note_but_a_real_source_raises_a_conflict() -> (
+    None
+):
+    real = Offer(
+        slug="coffee-discovery-pack",
+        publisher_notes=SAMPLE_NOTE,
+        source_url="https://real.invalid/x",
+    )
+
+    with pytest.raises(SeedConflict) as conflict:
+        await seed(FakeSession([real]))
+
+    assert conflict.value.table == "offers"
+
+
 @pytest.mark.parametrize(
     ("name", "website"),
     [
         ("Tea Time", "https://example.com/merchants/tea-time"),
         ("Tea Time (Sample)", "https://tea-time.example.org"),
         ("Tea Time (Sample)", None),
+        ("Tea Time (Sample)", "https://example.com.evil.invalid/merchants/tea-time"),
+        ("Tea Time (Sample)", "https://example.community/merchants/tea-time"),
     ],
 )
 async def test_a_merchant_that_is_not_marked_as_sample_raises_a_conflict(
