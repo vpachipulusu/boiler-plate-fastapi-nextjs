@@ -8,7 +8,6 @@ The body is identical for every caller, so it is cacheable: ``Cache-Control: pri
 content-hash ``ETag`` answered with 304 on ``If-None-Match``.
 """
 
-import hashlib
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, Response
@@ -16,6 +15,7 @@ from pydantic import BaseModel
 
 from app.api.auth import require_internal_key
 from app.api.deps import SessionDep
+from app.api.http_cache import etag_for, matches
 from app.api.rate_limit import RATE_LIMIT_RESPONSES, limit_by_client_ip
 from app.core.config import settings
 from app.core.errors import ErrorResponse
@@ -58,18 +58,6 @@ def get_settings_service(session: SessionDep) -> PublicSettingsService:
 ServiceDep = Annotated[PublicSettingsService, Depends(get_settings_service)]
 
 
-def _etag_for(body: bytes) -> str:
-    return f'"{hashlib.sha256(body).hexdigest()[:32]}"'
-
-
-def _matches(if_none_match: str | None, etag: str) -> bool:
-    """RFC 9110 weak comparison of an ``If-None-Match`` list against ``etag``."""
-    if if_none_match is None:
-        return False
-    candidates = [part.strip() for part in if_none_match.split(",")]
-    return "*" in candidates or any(c.removeprefix("W/") == etag for c in candidates)
-
-
 @router.get(
     "/currency",
     response_model=CurrencyResponse,
@@ -88,9 +76,9 @@ async def read_currency(
     ``Cache-Control: private, max-age=60`` and an ``ETag``.
     """
     currency = await service.currency()
-    etag = _etag_for(currency.encode())
+    etag = etag_for(currency.encode())
     headers = {"Cache-Control": SUCCESS_CACHE_CONTROL, "ETag": etag}
-    if _matches(if_none_match, etag):
+    if matches(if_none_match, etag):
         return Response(status_code=304, headers=headers)
     content = CurrencyResponse(data=CurrencyData(currency=currency)).model_dump_json()
     return Response(content, media_type="application/json", headers=headers)

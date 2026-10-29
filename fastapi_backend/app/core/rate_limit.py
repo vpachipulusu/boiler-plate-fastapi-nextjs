@@ -68,6 +68,10 @@ WEBHOOK_POLICY = RateLimitPolicy(
 PUBLIC_SETTINGS_POLICY = RateLimitPolicy(
     "public_settings", limit=120, window_seconds=60, fail_closed=False
 )
+# Public catalogue reads (offers and categories): keyed by client IP, no user is attached.
+PUBLIC_CATALOGUE_POLICY = RateLimitPolicy(
+    "public_catalogue", limit=120, window_seconds=60, fail_closed=False
+)
 # Bulk Stripe subscription reconciliation: up to 20 Stripe calls per run, so a
 # few runs a minute per admin are plenty. Fail closed: an outage must not lift the limit.
 ADMIN_SYNC_POLICY = RateLimitPolicy(
