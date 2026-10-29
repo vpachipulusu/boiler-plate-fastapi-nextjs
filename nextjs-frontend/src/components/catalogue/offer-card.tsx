@@ -34,7 +34,8 @@ export function OfferCard({ offer, merchant, className }: OfferCardProps) {
       <div className="relative">
         <OfferArt image={offer.image} />
         <OfferTypeBadge type={offer.offerType} className="absolute left-3 top-3" />
-        {offer.demo && <DemoBadge className="absolute right-3 top-3" />}
+        {/* Below the type badge on narrow two-column cards so the two pills never overlap. */}
+        {offer.demo && <DemoBadge className="absolute bottom-3 right-3 sm:bottom-auto sm:top-3" />}
       </div>
       <p className="mt-4 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
         {merchant.name}
@@ -44,9 +45,10 @@ export function OfferCard({ offer, merchant, className }: OfferCardProps) {
           {offer.title}
         </Link>
       </h3>
-      <div className="mt-auto flex items-center justify-between border-t border-border pt-3 text-xs">
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-3 text-xs">
+        {/* The mobile design (screens 05/06) keeps only the link on narrow cards. */}
         {freshness ? (
-          <span className="inline-flex items-center gap-1 text-muted-foreground">
+          <span className="hidden items-center gap-1 whitespace-nowrap text-muted-foreground sm:inline-flex">
             <Clock className="h-3.5 w-3.5" aria-hidden="true" />
             {freshness}
           </span>

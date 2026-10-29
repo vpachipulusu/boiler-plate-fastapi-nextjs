@@ -22,7 +22,8 @@ export async function generateStaticParams(): Promise<{ slug: string }[]> {
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { slug } = await params;
   const category = await getCategoryBySlug(slug);
-  if (!category) return { title: 'Category not found', robots: { index: false } };
+  // Thrown here as well as in the page so the 404 status is set before streaming starts.
+  if (!category) notFound();
 
   const title = `${category.name} freebies in the UK`;
   return {

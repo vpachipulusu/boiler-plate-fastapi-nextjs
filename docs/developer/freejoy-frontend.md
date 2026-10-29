@@ -92,6 +92,10 @@ site header are client components.
 - The mobile filter drawer and the sort auto-submit need JavaScript; search, category chips and
   pagination work without it.
 - `/freebies` is served statically from fixtures; caching and revalidation arrive with Phase 2.
+- An unknown `/category/[slug]` renders the 404 page but answers HTTP 200. The template's root
+  `src/app/loading.tsx` wraps every page in a Suspense boundary, so dynamic routes stream the shell
+  before `notFound()` runs (`/freebies/[slug]` is static and does answer 404). Fix with the Phase 3
+  SEO work by scoping or removing the root loading boundary.
 
 ## Next phases
 
