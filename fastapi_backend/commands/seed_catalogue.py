@@ -53,6 +53,8 @@ LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 # A query parameter can override the host in the URL, so a URL that sets one is refused.
 HOST_QUERY_KEYS = frozenset({"host", "hostaddr"})
 SAMPLE_MERCHANT_SUFFIX = " (Sample)"
+# With the slash, so https://example.community and https://example.com.evil.invalid do not match.
+SAMPLE_PREFIX = f"{SAMPLE_ORIGIN}/"
 # Ended and archived sample offers keep their link, but it is switched off.
 INACTIVE_LINK_STATUSES = frozenset({OfferStatus.EXPIRED, OfferStatus.ARCHIVED})
 
@@ -78,7 +80,7 @@ def is_local_database(url: str | None) -> bool:
         return False
     try:
         parsed = make_url(url)
-    except ArgumentError:
+    except (ArgumentError, ValueError):  # ValueError: a non-numeric port
         return False
     if not parsed.host or HOST_QUERY_KEYS & set(parsed.query):
         return False
@@ -97,11 +99,13 @@ class SeedConflict(Exception):
 def _is_sample(row: Category | Merchant | Offer) -> bool:
     """Categories carry no marker, so they are never treated as sample rows."""
     if isinstance(row, Offer):
-        return row.publisher_notes == SAMPLE_NOTE
+        return row.publisher_notes == SAMPLE_NOTE and (row.source_url or "").startswith(
+            SAMPLE_PREFIX
+        )
     if isinstance(row, Merchant):
         return row.name.endswith(SAMPLE_MERCHANT_SUFFIX) and (
             row.website or ""
-        ).startswith(SAMPLE_ORIGIN)
+        ).startswith(SAMPLE_PREFIX)
     return False
 
 
@@ -187,7 +191,7 @@ def _availability_text(template: str, end_at: datetime | None) -> str:
     """Fill ``{end}`` from the real end date so the text never goes stale on a later run."""
     if end_at is None:
         return template
-    return template.format(end=f"{end_at.day} {end_at:%B %Y}")
+    return template.replace("{end}", f"{end_at.day} {end_at:%B %Y}")
 
 
 def _offer_values(
@@ -319,9 +323,9 @@ def main(
             "ENVIRONMENT must be 'local' or 'test' (unset means production)."
         )
     url = _configured_database_url() if database_url is None else database_url
-    if not is_local_database(url):
-        return _refuse("DATABASE_URL must point at localhost, 127.0.0.1 or ::1.")
     try:
+        if not is_local_database(url):
+            return _refuse("DATABASE_URL must point at localhost, 127.0.0.1 or ::1.")
         engine: AsyncEngine | None = None
         if maker is None:
             from app.core.database import async_session_maker, engine
