@@ -15,9 +15,10 @@ Write a new ADR when you change a decision below, instead of editing the old one
 | [007](0007-rate-limit-keys.md) | Rate limits keyed by user or organisation | Accepted |
 | [008](0008-api-client-generation.md) | Typed API client generated from OpenAPI | Accepted |
 | [011](0011-single-vercel-project-with-services.md) | One Vercel project with services | Accepted |
+| [012](0012-email-provider.md) | Email provider for alerts (Brevo) | Proposed |
 
 Numbers 002, 005, 009 and 010 belonged to the product this template was extracted from and are not part of
-the template. Start your own records at 012 (or renumber; nothing depends on the numbers).
+the template. Start your own records at 013 (or renumber; nothing depends on the numbers).
 
 ## Statuses
 
