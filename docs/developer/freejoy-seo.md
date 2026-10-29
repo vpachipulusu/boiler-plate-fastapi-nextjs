@@ -34,7 +34,7 @@ change that makes the form live.
 | `/category/[slug]` with a filter, search, sort or page above 1 | `noindex, follow` | `noindex, follow` |
 | `/freebies/[slug]`, live | `noindex` | `index, follow` |
 | `/freebies/[slug]`, ended | `noindex, follow` | `noindex, follow` |
-| any of the above, **when the page is showing its error state** | `noindex` | `noindex` |
+| any of the above, **while the page shows its outage state** | unchanged (`noindex`) | unchanged: the normal robots for that URL |
 | `/alerts` | `noindex` | `noindex` until the form is live |
 | Legal pages | not part of this story | not part of this story |
 
@@ -60,10 +60,17 @@ outage cannot freeze a page, because a failed read is thrown and never cached. S
 
 ### When the catalogue cannot be read
 
-- The page shows its error state (`InlineError`, a retry button, curated copy) and answers HTTP 200 with
-  `noindex`: `generateMetadata` makes the same (memoised) reads as the page and returns `noindex` when
-  they fail. Dynamic responses are `Cache-Control: private, no-cache, no-store`, so nothing stores the
-  error page. The next request after the backend recovers renders normally.
+- The page shows its outage state (`InlineError`, a retry button, curated copy) and answers **HTTP 200 for
+  as long as the outage lasts**. It does **not** add `noindex`: `generateMetadata` does not read the
+  catalogue for its robots, so the page keeps the robots it would have had (indexable in API mode, a refined
+  view still `noindex, follow`, fixtures always `noindex`). A short outage therefore cannot de-index pages.
+  For a page whose own record could not be read (an offer or category title) the metadata is only a
+  generic title and the site default robots apply. Dynamic responses are
+  `Cache-Control: private, no-cache, no-store`, so nothing stores the error page, and the next request
+  after the backend recovers renders normally.
+- **Follow-up: answer 5xx during an outage.** A 200 with an error body is a soft error to crawlers; a 503
+  would be more honest. A Next.js page cannot set its own status once it streams, so this needs a
+  route handler or the proxy; it is not part of FREEJ-21.
 - `generateMetadata` never throws for an outage. Only a `CatalogueUnavailableError` is folded into the
   error state; any other error is a bug and propagates.
 - The sitemap logs the failure and falls back to the static pages only (`lib/seo/live-offers.ts`), so
@@ -110,8 +117,8 @@ from, so it stays `ended`.
 
 **What actually ships for `gone`: a 404, not a 410.** A Next.js page cannot set its own status code;
 `notFound()` always answers 404. A 410 needs a route handler or the proxy, and the proxy runs without
-catalogue access. So For an API-sourced offer more than 30 days past its end date the page calls
-`notFound()` (404; the page itself streams with HTTP 200 and a noindex tag, see follow-up 4). Search engines treat a 404 and a 410 almost the same way; a 410 only drops the URL
+catalogue access. So for an API-sourced offer more than 30 days past its end date the page calls
+`notFound()` (a real 404). Search engines treat a 404 and a 410 almost the same way; a 410 only drops the URL
 a little faster. Making it a real 410 is a **Phase 3 follow-up** (for example a catalogue-aware route
 handler or a rewrite for offers the API reports as gone). Fixture offers are never "gone" so the design
 preview keeps rendering.
@@ -200,12 +207,10 @@ These need a human, a public URL or a decision, and were not done in FREEJ-25:
    which exist in `public/` (the first three 404 in Lighthouse). Add real brand assets, then pass the
    logo path to `buildOrganization` and an image to `openGraphFor`.
 3. **Real 410 for gone offers** (Phase 3): replace the 404 described under "Expired offers".
-4. **Unknown `/category/[slug]` and `/freebies/[slug]` answer HTTP 200** with the 404 page and a Next.js
-   `noindex` tag (the root `loading.tsx` streams the shell first). Before FREEJ-21 `/freebies/[slug]` was
-   static and did answer 404; being dynamic it now behaves like the category page. Confirmed with `curl`
-   on the production build; with the root `loading.tsx` removed and no segment `loading.tsx`,
-   `/category/nope` answers 404. Fix by scoping the root boundary to the admin, auth, dashboard and pricing
-   groups and dropping `freebies/[slug]/loading.tsx`; see `freejoy-frontend.md`.
+4. **Unknown `/category/[slug]` and `/freebies/[slug]` answer a real 404.** No `loading.tsx` may sit above the
+   public pages: a loading boundary streams the shell before `notFound()` runs and turns every 404 into a
+   200 soft 404. The root `loading.tsx` was moved into the admin, auth, dashboard and pricing segments
+   (`RouteSkeleton`), and `src/__tests__/unit/config/loading-boundary.test.ts` fails if one returns.
 5. **Re-run Lighthouse** now that the catalogue can be API-backed; the SEO score is capped by the deliberate
    noindex today. Numbers so far: `docs/evidence/phase3/lighthouse.md`.
 6. Decide whether thin categories (no live offers) should stay indexable.

@@ -100,27 +100,35 @@ else). Contract: [backend-catalogue.md](backend-catalogue.md).
   `not_found` and a 410 becomes `gone` with the stub (title, category, end date); those are real answers
   and may be cached.
 - **Visitor IP.** The backend rate limit is 120 requests a minute per `X-Client-IP`. `readTrustedClientIp()`
-  in `server.ts` reads **only** Vercel's `x-vercel-forwarded-for` (and only when `VERCEL=1`), never
-  `X-Forwarded-For`, `X-Real-IP` or any other header a client can set, and only if the value is an IP
-  address. The wrapper reads it before the cache boundary and carries it to the request in an
+  in `server.ts` reads Vercel's `x-vercel-forwarded-for` (only when `VERCEL=1`) and **one** header named by the
+  server-only `TRUSTED_CLIENT_IP_HEADER` (no default; the name must match `/^[a-z0-9-]+$/i`), never
+  `X-Forwarded-For` or any other header a client can set, and only if the value is a single IP address.
+  Set `TRUSTED_CLIENT_IP_HEADER` only when your reverse proxy overwrites that header on every request;
+  otherwise clients can spoof rate-limit keys. The wrapper reads it before the cache boundary and carries it to the request in an
   `AsyncLocalStorage`, so it is **not** part of the cache key (one entry per read, not per visitor) and is
   used only when the read actually reaches the backend. `shared: true` still reads no request headers
   itself; the address arrives through the new `clientIp` option. With no trusted header the header is
   omitted. Checked by hand against a local stub backend with `VERCEL=1` and pinned by `catalogue-headers.test.ts`.
+- **Rate-limit caveats.** Without a trusted header (non-Vercel hosting with `TRUSTED_CLIENT_IP_HEADER`
+  unset) every read shares **one** backend bucket (`public_catalogue`, 120 a minute, keyed on the
+  server's egress IP). The cache absorbs normal traffic, but a flood of distinct searches (which skip the
+  cache) can exhaust that bucket and put the whole site into its error state. `VERCEL=1` must never be
+  set on a non-Vercel host (a test keeps it out of the env templates). A CDN in front of Vercel makes
+  every visitor share the CDN's address unless the header you trust carries the real one.
 - **No backend text in the browser.** Pages show the curated `CATALOGUE_UNAVAILABLE_MESSAGE`.
 
 `revalidateCatalogue(paths?)` (`src/lib/catalogue/revalidate.ts`, server-only) expires the `catalogue`
-tag immediately (`revalidateTag('catalogue', { expire: 0 })`) and optionally revalidates paths. It is for
+tag immediately (`revalidateTag('catalogue', { expire: 0 })`) and optionally revalidates paths (a no-op for the force-dynamic public pages, kept for the FREEJ-22 contract; paths must be plain site paths). It is for
 the admin publish, unpublish and expire actions (FREEJ-22); nothing calls it yet.
 
 ## States
 
 | State | What the visitor gets |
 |---|---|
-| Loading | `loading.tsx` skeletons (root, and an offer-shaped one for `/freebies/[slug]`); Suspense skeletons for the home sections and the catalogue results, `role="status" aria-busy="true"` with an accessible name, blocks `aria-hidden` |
+| Loading | `RouteSkeleton` `loading.tsx` for the admin, auth, dashboard and pricing segments only (none above the public pages, see Not found); in-page Suspense skeletons for the home sections and the catalogue results, `role="status" aria-busy="true"` with an accessible name, blocks `aria-hidden` |
 | Empty | "No freebies match that yet" with a Clear filters link; "no featured freebies right now" on the home page |
-| Error | `InlineError` (`role="alert"`, curated copy) with a "Try again" button (`RetryButton`, a real `button` that calls `router.refresh()`, `aria-disabled` while it runs so focus stays). The page answers **HTTP 200 with `noindex`** (metadata reads the same memoised data and sees the failure) and is never cached: dynamic responses carry `Cache-Control: private, no-cache, no-store`. |
-| Not found | `notFound()` for an unknown, unpublished or non-slug offer or category. Streams as HTTP 200 with the 404 page and a `noindex` tag; see [freejoy-seo.md](freejoy-seo.md#owner-follow-ups) follow-up 4. |
+| Error | `InlineError` (`role="alert"`, curated copy) with a "Try again" button (`RetryButton`, a real `button` that calls `router.refresh()`, `aria-disabled` while it runs so focus stays). The page answers **HTTP 200** for the duration of the outage and keeps its normal robots (a 5xx is a follow-up, see [freejoy-seo.md](freejoy-seo.md#when-the-catalogue-cannot-be-read)); it is never cached: dynamic responses carry `Cache-Control: private, no-cache, no-store`. |
+| Not found | `notFound()` for an unknown, unpublished or non-slug offer or category answers a real **HTTP 404**. This holds only because no `loading.tsx` sits above the public pages; `loading-boundary.test.ts` guards it. |
 | Ended | The API's 410 renders "This offer has ended" with the title, the end date and two ways onward (no call to action, claim steps or terms). `noindex, follow` for 30 days after the end date, then not found. |
 
 ## Trust rules the UI follows
@@ -187,13 +195,10 @@ it. The filter drawer and sort control render outside the keyed Suspense boundar
   the URL. Phase 3 replaces this with a POST server action.
 - The mobile filter drawer needs JavaScript; search, sort (Apply button), category chips and
   pagination work without it.
-- An unknown `/category/[slug]` or `/freebies/[slug]` renders the 404 page but answers HTTP 200 (with a
-  `noindex` tag). The template's root `src/app/loading.tsx` wraps every page in a Suspense boundary, so
-  dynamic routes stream the shell before `notFound()` runs. Measured on the production build: with the
-  root `loading.tsx` removed (and no segment `loading.tsx`) `/category/nope` answers 404; the offer page's
-  own `loading.tsx` has the same effect as the root one. Fixing it means scoping the root boundary to the
-  admin, auth, dashboard and pricing groups (a template change outside FREEJ-21) and dropping the offer
-  skeleton.
+- An outage answers HTTP 200 (error state, normal robots) for as long as it lasts; a 5xx is a follow-up.
+- The offer page has no route-level loading skeleton: a `loading.tsx` there would turn every unknown offer into
+  a 200 soft 404. The root skeleton lives in `components/site/route-skeleton.tsx` and is re-exported by the
+  admin, auth, dashboard and pricing segments.
 - Offers have no claim link yet (Phase 3), so the CTA button opens the "coming soon" dialog.
 
 ## Next phases
