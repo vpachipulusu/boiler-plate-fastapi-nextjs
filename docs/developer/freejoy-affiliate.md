@@ -60,8 +60,9 @@ Applied twice, in the backend and again in the route, so a bug in one layer is n
 4. **The route repeats the https check** (`parseHttpsDestination`): a clean absolute `https:` URL with a host, no
    user info, default port, none of the forbidden characters. The `Location` is built from the resulting `URL`
    object, never by string concatenation. It also mirrors the backend host rule: ASCII only (an IDN must be
-   punycode, so a Cyrillic lookalike is refused), at least one dot, no trailing dot, no IPv6 literal, and a last
-   label that is not a number. The ended-offer redirect uses a slug checked against the slug pattern and a
+   punycode, so a Cyrillic lookalike is refused), no `%` in the written host, at most 253 characters made of valid
+   1 to 63 character labels, at least one dot, no trailing dot, no IPv6 literal, and a last label that is not a
+   number. The ended-offer redirect uses a slug checked against the slug pattern and a
    **relative** `Location` (`/freebies/<slug>?ended=1`), so neither `Host` nor `X-Forwarded-Host` can put another
    origin into it.
 
@@ -125,7 +126,9 @@ per publisher (for example Impact) are deliberately not listed: add the exact do
 **`direct` trusts the merchant website.** The merchant's `website` is written by an admin through the admin API, so a
 `direct` link is only as trustworthy as that field and the admin accounts that can edit it. Every create and update
 of a merchant is audited (`admin.merchants.create` / `admin.merchants.update`) and the audit row holds the old and
-new `website`, so a change can be traced. Treat `merchants.write` as a sensitive permission.
+new `website`, so a change can be traced. When a website changes while the merchant has active `direct` links, the
+backend logs a warning with the merchant id and the link ids (never URLs). Treat `merchants.write` as a sensitive
+permission.
 
 **Add a provider:**
 
@@ -138,8 +141,9 @@ new `website`, so a change can be traced. Treat `merchants.write` as a sensitive
 4. Create the affiliate link in the admin with `provider` set to the new key. The admin API checks the URL shape
    **and** the provider/host pair when a link is created or when its provider or destination changes: an unknown
    provider is a `422` (`unknown_provider`) and a host the provider may not use is a `422` (`destination_not_allowed`,
-   "Destination host is not allowed for this provider"). Switching a link on or off does not re-check, so a link
-   that predates a rule can still be deactivated.
+   "Destination host is not allowed for this provider"). Switching a link **off** does not re-check, so a link
+   that predates a rule can still be deactivated; switching one **on** does, so a legacy link with a bad host
+   cannot be revived (`422 destination_not_allowed`).
 
 The redirect repeats the check every time a link is followed, because rows can change outside the admin API and a
 merchant's website can change after a `direct` link was saved. A link that fails there is skipped (the offer's
@@ -154,10 +158,18 @@ merchant's website can change after a `direct` link was saved. A link that fails
 - The client key is `x-vercel-forwarded-for` on Vercel. **Off Vercel there is no trusted proxy header, so every
   client shares one `unknown` bucket per scope** (all `/go/` traffic together counts against 200 per minute). That
   is fine for local runs and previews behind a single caller; do not rely on this limiter alone behind another host.
-- The backend limits `POST .../click` twice: `OUTBOUND_CLICK_POLICY` (60 per minute per forwarded client IP) and
-  `OUTBOUND_OFFER_POLICY` (600 per minute per offer id, in `app/core/rate_limit.py`, so a crowd of distinct clients
-  cannot inflate one offer's count faster than that). Both fail open like the other public catalogue routes, and
-  both answer `429` with `Retry-After`.
+- The backend limits `POST .../click` twice:
+  - `OUTBOUND_CLICK_POLICY`, 60 per minute per forwarded client IP. Over it the answer is `429` with `Retry-After`.
+  - `OUTBOUND_OFFER_POLICY`, 600 per minute per offer id (`app/core/rate_limit.py`). Over it the visitor is **still
+    redirected** (the click endpoint answers `200` with the destination) but **no click row is written**.
+    **Trade-off:** click counts are capped at 600 per offer per minute, so a crowd of distinct clients cannot inflate
+    one offer's count faster than that, and a genuine surge is undercounted rather than turned into refused visitors.
+    The redirect itself is never refused because of this cap. A cap-spent request still goes through every other
+    check (public offer, usable link, allowed host).
+  - Both fail open like the other public catalogue routes (a limiter outage records the click as usual).
+- The proxy keys IPv6 clients by their full address, while the backend groups them by /64. This pre-existing gap
+  is not specific to `/go/`: one IPv6 subscriber can spread requests over many addresses to get more proxy
+  buckets, though the backend limits above still apply.
 
 ## Retention
 
@@ -168,8 +180,11 @@ uv run python -m commands.prune_click_events            # default --days 395
 uv run python -m commands.prune_click_events --days 90  # a shorter period; 0 or less is refused
 ```
 
-It deletes rows whose `occurred_at` is older than the period and prints how many went. Run it on a schedule (for
-example monthly, from a cron job or a scheduled workflow with `DATABASE_URL` set); it is safe to repeat. The period is
+It deletes rows whose `occurred_at` is older than the period, in committed batches of `--batch-size` rows (default
+10000; the ids come from a limited subquery served by `ix_click_events_occurred_at`, migration `0003`), and prints
+the total. If a batch fails it prints the error type and **how many rows were already deleted** to stderr and exits
+1; the earlier batches stay deleted and a rerun carries on. Run it on a schedule (for example monthly, from a cron
+job or a scheduled workflow with `DATABASE_URL` set); it is safe to repeat. The period is
 stated on the privacy page ("If you use an offer button"): change both together. Nothing schedules it yet.
 
 ## Referrer policy

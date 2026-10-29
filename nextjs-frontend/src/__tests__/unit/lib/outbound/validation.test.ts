@@ -61,6 +61,19 @@ describe('parseHttpsDestination', () => {
     expect(parseHttpsDestination('https://a.co.uk/x')?.hostname).toBe('a.co.uk');
   });
 
+  it('accepts a 253 character host and a 63 character label', () => {
+    const label63 = 'a'.repeat(63);
+    const host253 = `${label63}.${label63}.${label63}.${'b'.repeat(57)}.com`;
+    expect(host253.length).toBe(253);
+    expect(parseHttpsDestination(`https://${host253}/x`)?.hostname).toBe(host253);
+  });
+
+  it('accepts hyphens inside a label', () => {
+    expect(parseHttpsDestination('https://my-shop.co-op.example/x')?.hostname).toBe(
+      'my-shop.co-op.example'
+    );
+  });
+
   it('accepts the default port written out', () => {
     expect(parseHttpsDestination('https://shop.example:443/x')?.host).toBe('shop.example');
   });
@@ -85,6 +98,17 @@ describe('parseHttpsDestination', () => {
     ['NUL', 'https://good.example/\u0000'],
     ['C1 control', 'https://good.example/\u0085'],
     ['custom port', 'https://good.example:8443/'],
+    ['percent-encoded host', 'https://%77ww.example.com/x'],
+    ['percent-encoded dot', 'https://www%2eexample.com/x'],
+    [
+      '254 character host',
+      `https://${'a'.repeat(63)}.${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(58)}.com/`,
+    ],
+    ['64 character label', `https://${'a'.repeat(64)}.example/`],
+    ['leading hyphen label', 'https://-bad.example.com/'],
+    ['trailing hyphen label', 'https://bad-.example.com/'],
+    ['underscore label', 'https://bad_name.example.com/'],
+    ['empty label', 'https://bad..example.com/'],
     ['IPv6 literal', 'https://[::1]/x'],
     ['IPv4', 'https://127.0.0.1/x'],
     ['decimal IPv4', 'https://2130706433/'],

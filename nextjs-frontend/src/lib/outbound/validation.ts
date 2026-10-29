@@ -44,14 +44,29 @@ function hasForbiddenCharacter(value: string): boolean {
 /** The WHATWG "ends in a number" rule: decimal digits, or 0x and hex digits (IPv4 in any spelling). */
 const NUMERIC_LABEL = /^(?:\d+|0x[0-9a-f]*)$/i;
 
+/** One DNS label as the backend accepts it: letters, digits and inner hyphens, 1 to 63 characters. */
+const DNS_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
 /**
- * Same host rule as the backend (`validate_https_url`): a DNS name with at least two labels, no
- * trailing dot, no IP literal and a last label that is not a number.
+ * Same host rule as the backend (`validate_https_url`): a DNS name of at most 253 characters made of at
+ * least two valid labels, no trailing dot, no IP literal and a last label that is not a number.
  */
 function isPlainDnsHost(hostname: string): boolean {
-  if (hostname.startsWith('[') || hostname.endsWith('.') || !hostname.includes('.')) return false;
-  const lastLabel = hostname.slice(hostname.lastIndexOf('.') + 1);
-  return !NUMERIC_LABEL.test(lastLabel);
+  if (hostname.length > MAX_HOST_LENGTH || hostname.startsWith('[')) return false;
+  const labels = hostname.split('.');
+  if (labels.length < 2 || !labels.every((label) => DNS_LABEL.test(label))) return false;
+  return !NUMERIC_LABEL.test(labels[labels.length - 1]);
+}
+
+/**
+ * The authority part of an `https://` URL as written, before any parsing. `URL` percent-decodes a host
+ * (`%77ww.example.com` becomes `www.example.com`), which would hide an encoded host from the checks that
+ * run on the parsed value, so a `%` anywhere in the written authority is refused.
+ */
+function writtenAuthority(raw: string): string {
+  const afterScheme = raw.slice('https://'.length);
+  const end = afterScheme.search(/[/?#]/);
+  return end === -1 ? afterScheme : afterScheme.slice(0, end);
 }
 
 /**
@@ -63,6 +78,7 @@ function isPlainDnsHost(hostname: string): boolean {
 export function parseHttpsDestination(raw: unknown): URL | null {
   if (typeof raw !== 'string' || raw === '' || raw.length > MAX_DESTINATION_LENGTH) return null;
   if (!HTTPS_WITH_AUTHORITY.test(raw) || hasForbiddenCharacter(raw)) return null;
+  if (writtenAuthority(raw).includes('%')) return null;
   let url: URL;
   try {
     url = new URL(raw);
