@@ -5,10 +5,10 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.platform.category import Category
 from app.repositories.base import BaseRepository
+from app.repositories.catalogue import escape_like
 
 
 @dataclass(frozen=True)
@@ -32,10 +32,6 @@ class CategoryPage:
     total_count: int
 
 
-def escape_like(term: str) -> str:
-    return term.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
-
-
 def _record(row: Category) -> CategoryRecord:
     return CategoryRecord(
         id=row.id,
@@ -53,9 +49,6 @@ def _record(row: Category) -> CategoryRecord:
 
 
 class AdminCategoryRepository(BaseRepository):
-    def __init__(self, session: AsyncSession) -> None:
-        super().__init__(session)
-
     async def list_categories(
         self, search: str | None, enabled: bool | None, limit: int, offset: int
     ) -> CategoryPage:

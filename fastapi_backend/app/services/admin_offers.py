@@ -174,7 +174,9 @@ class AdminOfferService:
         check_window(merged.start_at, merged.end_at)
         await self._require_references(merged.category_id, merged.merchant_id)
         if merged.status is OfferStatus.PUBLISHED:
-            await self._require_publishable(merged)
+            # An offer already past its end date stays editable; the date is only judged
+            # when this request changes it.
+            await self._require_publishable(merged, check_end="end_at" in values)
         updated = await self.store.update(offer_id, values)
         before, after = changed_values(current, values, AUDITED_FIELDS)
         await self.auditor.record(
@@ -270,6 +272,11 @@ class AdminOfferService:
             await self._require_destination_remains(offer)
         updated = await self.store.update_link(link_id, values)
         before, after = changed_values(link, values, LINK_AUDITED)
+        if (
+            "destination_url" in values
+        ):  # the host only: paths and queries carry tracking ids
+            before["destination_host"] = _host(link.destination_url)
+            after["destination_host"] = _host(updated.destination_url)
         await self.auditor.record(
             actor,
             action="admin.offer_links.update",
@@ -294,13 +301,15 @@ class AdminOfferService:
         if await self.store.merchant_active(merchant_id) is None:
             raise InvalidInput("unknown_merchant")
 
-    async def _require_publishable(self, offer: OfferRecord) -> None:
+    async def _require_publishable(
+        self, offer: OfferRecord, *, check_end: bool = True
+    ) -> None:
         facts = PublishFacts(
             category_enabled=bool(await self.store.category_enabled(offer.category_id)),
             merchant_active=bool(await self.store.merchant_active(offer.merchant_id)),
             active_links=await self.store.count_active_links(offer.id),
             has_source_url=bool(offer.source_url),
-            end_at=offer.end_at,
+            end_at=offer.end_at if check_end else None,
             last_verified_at=offer.last_verified_at,
         )
         blockers = publish_blockers(facts, self.clock())

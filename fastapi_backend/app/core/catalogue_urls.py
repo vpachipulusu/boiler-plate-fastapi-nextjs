@@ -12,8 +12,15 @@ script injection, so the rules are strict and deliberately simple. A URL is acce
 * the authority has no user info (``https://trusted.example@evil.example`` fails), no IPv6
   literal and no port other than 443;
 * the host is a DNS name with at least two labels of letters, digits and inner hyphens, and the
-  last label is not all digits, which refuses IPv4 in every spelling (``127.0.0.1``,
-  ``2130706433``) and single-label names such as ``localhost``.
+  last label is not a number (decimal digits, or ``0x`` followed by hex digits, the WHATWG
+  "ends in a number" rule). That refuses IPv4 in every spelling browsers and glibc accept
+  (``127.0.0.1``, ``2130706433``, ``0x7f.0.0.0x1``, ``1.0x``) and single-label names such as
+  ``localhost``.
+
+The validator looks at the text only. It cannot stop a name that resolves to a private address
+(``localhost.localdomain``, ``127.0.0.1.nip.io``). Any future server-side fetcher of these URLs
+must resolve the host and refuse private, loopback and link-local addresses at connect time,
+and must refuse redirects to anything but https.
 
 Non-ASCII hosts must be given in punycode. The scheme and host are returned lower-cased; the
 path, query and fragment are kept byte for byte.
@@ -26,6 +33,7 @@ from urllib.parse import urlsplit, urlunsplit
 MAX_URL_LENGTH = 2048
 HTTPS_PORT = 443
 _LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
+_NUMERIC_LABEL = re.compile(r"\d+|0x[0-9a-f]*", re.IGNORECASE)
 _ENCODED_CONTROL = re.compile(r"%(?:[01][0-9a-f]|7f)", re.IGNORECASE)
 _BAD_CATEGORIES = frozenset({"Cc", "Cf", "Zs", "Zl", "Zp"})
 
@@ -44,7 +52,7 @@ def _is_clean(raw: str) -> bool:
 
 def _is_valid_host(host: str) -> bool:
     labels = host.split(".")
-    if len(labels) < 2 or len(host) > 253 or labels[-1].isdigit():
+    if len(labels) < 2 or len(host) > 253 or _NUMERIC_LABEL.fullmatch(labels[-1]):
         return False
     return all(_LABEL.fullmatch(label) for label in labels)
 

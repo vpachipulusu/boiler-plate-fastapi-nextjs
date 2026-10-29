@@ -5,10 +5,10 @@ admin UI branches on ``code``, never on the message. Messages are fixed strings;
 value, id or provider text is echoed back.
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Response
-from pydantic import BaseModel, StringConstraints
+from pydantic import StringConstraints
 
 from app.api.auth import require_internal_key
 from app.api.rate_limit import limit_by_subject
@@ -67,11 +67,7 @@ class CatalogueErrorResponse(ErrorResponse):
     code: str | None = None
 
 
-class OkResponse(BaseModel):
-    success: Literal[True] = True
-
-
-ERROR_DOCS = {
+ERROR_DOCS: dict[int | str, dict[str, Any]] = {
     401: {"model": ErrorResponse},
     403: {"model": ErrorResponse},
     404: {"model": CatalogueErrorResponse},
@@ -138,5 +134,5 @@ def admin_router(prefix: str, tag: str) -> APIRouter:
             Depends(require_internal_key),
             Depends(limit_by_subject(API_POLICY, current_subject)),
         ],
-        responses=ERROR_DOCS,  # type: ignore[arg-type]
+        responses=ERROR_DOCS,
     )

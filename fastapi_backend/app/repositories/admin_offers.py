@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.platform.affiliate_link import AffiliateLink
 from app.models.platform.category import Category
@@ -17,8 +16,8 @@ from app.models.platform.offer import (
     OfferType,
     PostageKind,
 )
-from app.repositories.admin_categories import escape_like
 from app.repositories.base import BaseRepository
+from app.repositories.catalogue import escape_like
 
 
 @dataclass(frozen=True)
@@ -108,9 +107,6 @@ def _conditions(filters: OfferFilters) -> list[Any]:
 
 
 class AdminOfferRepository(BaseRepository):
-    def __init__(self, session: AsyncSession) -> None:
-        super().__init__(session)
-
     async def list_offers(
         self, filters: OfferFilters, limit: int, offset: int
     ) -> OfferPage:
@@ -155,15 +151,23 @@ class AdminOfferRepository(BaseRepository):
         return _offer(row)
 
     async def category_enabled(self, category_id: str) -> bool | None:
-        """Whether the category is enabled; None when it does not exist."""
+        """Whether the category is enabled (None: it does not exist), under a share lock.
+
+        FOR SHARE makes a concurrent disable wait until this transaction commits, and a
+        publish that starts after a disable wait for it, so the two cannot interleave.
+        """
         return await self._session.scalar(
-            select(Category.enabled).where(Category.id == category_id)
+            select(Category.enabled)
+            .where(Category.id == category_id)
+            .with_for_update(read=True)
         )
 
     async def merchant_active(self, merchant_id: str) -> bool | None:
-        """Whether the merchant is active; None when it does not exist."""
+        """Whether the merchant is active (None: it does not exist), under a share lock."""
         return await self._session.scalar(
-            select(Merchant.active).where(Merchant.id == merchant_id)
+            select(Merchant.active)
+            .where(Merchant.id == merchant_id)
+            .with_for_update(read=True)
         )
 
     async def list_links(self, offer_id: str) -> list[AffiliateLinkRecord]:

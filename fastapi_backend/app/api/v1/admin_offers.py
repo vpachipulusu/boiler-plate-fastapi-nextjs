@@ -46,7 +46,6 @@ router = admin_router("/v1/admin/offers", "admin-offers")
 ReadAdmin = Annotated[AdminContext, Depends(require_admin("offers.read"))]
 WriteAdmin = Annotated[AdminContext, Depends(require_admin("offers.write"))]
 PublishAdmin = Annotated[AdminContext, Depends(require_admin("offers.publish"))]
-LinkId = ResourceId
 
 
 def get_offer_service(session: SessionDep, auditor: AuditorDep) -> AdminOfferService:
@@ -204,7 +203,7 @@ async def admin_create_offer_link(
 @router.patch("/{offer_id}/links/{link_id}", response_model=LinkResponse)
 async def admin_update_offer_link(
     offer_id: ResourceId,
-    link_id: LinkId,
+    link_id: ResourceId,
     body: UpdateLinkRequest,
     response: Response,
     admin: WriteAdmin,

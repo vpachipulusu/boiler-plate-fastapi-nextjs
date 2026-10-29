@@ -5,11 +5,10 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.platform.merchant import Merchant
-from app.repositories.admin_categories import escape_like
 from app.repositories.base import BaseRepository
+from app.repositories.catalogue import escape_like
 
 
 @dataclass(frozen=True)
@@ -44,9 +43,6 @@ def _record(row: Merchant) -> MerchantRecord:
 
 
 class AdminMerchantRepository(BaseRepository):
-    def __init__(self, session: AsyncSession) -> None:
-        super().__init__(session)
-
     async def list_merchants(
         self, search: str | None, active: bool | None, limit: int, offset: int
     ) -> MerchantPage:
