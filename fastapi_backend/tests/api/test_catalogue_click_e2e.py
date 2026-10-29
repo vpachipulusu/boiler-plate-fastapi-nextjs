@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from app.api.deps import get_session_provider
 from app.core.database import DefaultSessionProvider, build_engine
 from app.main import create_app
+from app.repositories.admin_merchants import AdminMerchantRepository
 from commands.prune_click_events import prune_click_events
 from tests.api.test_catalogue_e2e import add_category, add_merchant, add_offer, insert
 
@@ -432,3 +433,24 @@ async def test_pruning_deletes_only_clicks_older_than_the_period(
     assert deleted == 2
     remaining = {row.referrer_host for row in await click_rows(engine)}
     assert remaining == {"kept", "new"}
+
+
+async def test_the_merchant_repository_lists_only_active_direct_link_ids(
+    engine: AsyncEngine, shop: dict[str, str]
+) -> None:
+    one = await add_offer(engine, shop["category"], shop["merchant"], "one")
+    two = await add_offer(engine, shop["category"], shop["merchant"], "two")
+    direct = await add_link(
+        engine, one, "https://www.acme.example/x", provider="direct"
+    )
+    await add_link(engine, one, provider="awin")
+    await add_link(
+        engine, two, "https://www.acme.example/y", provider="direct", active=False
+    )
+
+    async with async_sessionmaker(engine)() as session:
+        ids = await AdminMerchantRepository(session).active_direct_link_ids(
+            shop["merchant"]
+        )
+
+    assert ids == [direct]

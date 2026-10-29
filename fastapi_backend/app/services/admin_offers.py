@@ -274,7 +274,9 @@ class AdminOfferService:
         if link is None:
             raise CatalogueNotFound("link")
         values = clean_urls(changes, ("destination_url",))
-        if "provider" in values or "destination_url" in values:
+        # Also when a switched-off link is switched on: it may predate the allowlist.
+        reactivating = values.get("active") is True and not link.active
+        if "provider" in values or "destination_url" in values or reactivating:
             await self._require_allowed_destination(
                 offer,
                 values.get("provider", link.provider),

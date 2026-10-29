@@ -220,6 +220,10 @@ class FakeCategoryStore:
 class FakeMerchantStore:
     def __init__(self, *items: MerchantRecord) -> None:
         self.items = {item.id: item for item in items}
+        self.direct_links: dict[str, list[str]] = {}
+
+    async def active_direct_link_ids(self, merchant_id: str) -> list[str]:
+        return self.direct_links.get(merchant_id, [])
 
     async def list_merchants(
         self, search: str | None, active: bool | None, limit: int, offset: int

@@ -211,3 +211,43 @@ async def test_creating_a_merchant_audits_its_website():
     )
 
     assert auditor.rows[0]["after"]["website"] == "https://acme.example.com"
+
+
+async def test_changing_the_website_warns_about_active_direct_links_by_id_only(caplog):
+    service, store, *_ = merchants(merchant("m1"))
+    store.direct_links["m1"] = ["lnk_a", "lnk_b"]
+
+    with caplog.at_level("WARNING", logger="yourapp.admin_catalogue"):
+        await service.update_merchant(
+            ACTOR, "m1", {"website": "https://new.example.com/x"}
+        )
+
+    assert "m1" in caplog.text and "lnk_a" in caplog.text and "lnk_b" in caplog.text
+    assert "new.example.com" not in caplog.text and "https://" not in caplog.text
+
+
+async def test_no_warning_when_the_website_is_unchanged_or_there_are_no_direct_links(
+    caplog,
+):
+    service, store, *_ = merchants(merchant("m1"), merchant("m2"))
+    store.direct_links["m1"] = ["lnk_a"]
+
+    with caplog.at_level("WARNING", logger="yourapp.admin_catalogue"):
+        await service.update_merchant(ACTOR, "m1", {"name": "Renamed"})
+        await service.update_merchant(
+            ACTOR, "m2", {"website": "https://m2.example.com"}
+        )
+
+    assert caplog.text == ""
+
+
+async def test_clearing_the_website_also_warns(caplog):
+    service, store, *_ = merchants(merchant("m1"))
+    store.direct_links["m1"] = ["lnk_a"]
+    await service.update_merchant(ACTOR, "m1", {"website": "https://old.example.com"})
+    caplog.clear()
+
+    with caplog.at_level("WARNING", logger="yourapp.admin_catalogue"):
+        await service.update_merchant(ACTOR, "m1", {"website": None})
+
+    assert "lnk_a" in caplog.text

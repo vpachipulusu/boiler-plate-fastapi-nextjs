@@ -1,5 +1,6 @@
 """AdminOfferService rules with in-memory fakes: no database, no network."""
 
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
@@ -661,3 +662,35 @@ async def test_update_link_can_still_switch_off_a_link_that_predates_the_allowli
 
     assert updated.active is False
     assert store.links["l1"].destination_url == "https://shop.example.com/go"
+
+
+async def test_reactivating_a_link_runs_the_host_check_again():
+    legacy = link(
+        "l1", active=False
+    )  # awin on shop.example.com: predates the allowlist
+    service, store, auditor, _ = build(offer("off1"), links=[legacy])
+
+    with pytest.raises(InvalidInput) as raised:
+        await service.update_link(ACTOR, "off1", "l1", {"active": True})
+
+    assert raised.value.code == "destination_not_allowed"
+    assert store.links["l1"].active is False and auditor.rows == []
+
+
+async def test_reactivating_a_link_with_an_allowed_host_works():
+    good = replace(
+        link("l1", active=False), destination_url="https://www.awin1.com/c?id=1"
+    )
+    service, store, *_ = build(offer("off1"), links=[good])
+
+    updated = await service.update_link(ACTOR, "off1", "l1", {"active": True})
+
+    assert updated.active is True and store.links["l1"].active is True
+
+
+async def test_a_patch_that_keeps_an_active_link_active_is_not_rechecked():
+    service, *_ = build(offer("off1"), links=[link("l1")])
+
+    updated = await service.update_link(ACTOR, "off1", "l1", {"tracking_id": "t-2"})
+
+    assert updated.tracking_id == "t-2"
