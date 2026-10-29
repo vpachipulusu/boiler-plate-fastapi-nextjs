@@ -4,7 +4,10 @@ import { Spark } from '@/components/site/brand-mark';
 import { getCategories } from '@/lib/catalogue';
 import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
-/** Flip to true when the alerts form really subscribes people; until then the page stays noindex. */
+/**
+ * Flip to true once alerts are live in production (a real email provider configured, ADR-012); until then
+ * the page stays noindex and the backend refuses sign-ups, so nobody is told to check an inbox for nothing.
+ */
 const ALERTS_FORM_LIVE = false;
 
 const ALERTS_TITLE = 'Free alerts';
@@ -23,21 +26,9 @@ export const metadata: Metadata = {
   robots: listingRobots({ indexable: ALERTS_FORM_LIVE }),
 };
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_EMAIL_LENGTH = 254;
-
-/** Only a plausible address is prefilled; anything else (or a repeated param) is ignored. */
-function prefillEmail(value: string | string[] | undefined): string {
-  if (typeof value !== 'string') return '';
-  return value.length <= MAX_EMAIL_LENGTH && EMAIL_PATTERN.test(value) ? value : '';
-}
-
-export default async function AlertsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ email?: string | string[] }>;
-}) {
-  const [params, categories] = await Promise.all([searchParams, getCategories()]);
+/** No query string is read: an address must never travel in a page address, so nothing is prefilled. */
+export default async function AlertsPage() {
+  const categories = await getCategories();
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-14">
@@ -70,10 +61,7 @@ export default async function AlertsPage({
           </div>
         </section>
         <section className="px-6 py-10 sm:px-10 sm:py-12">
-          <AlertsForm
-            categories={categories.map(({ slug, name }) => ({ slug, name }))}
-            defaultEmail={prefillEmail(params.email)}
-          />
+          <AlertsForm categories={categories.map(({ slug, name }) => ({ slug, name }))} />
         </section>
       </div>
     </div>

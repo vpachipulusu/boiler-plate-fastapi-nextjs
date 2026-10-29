@@ -319,3 +319,23 @@ async def test_without_a_token_secret_the_routes_answer_503(
         response = await http.post("/v1/subscribers", json=VALID)
 
     assert response.status_code == 503
+
+
+async def test_production_without_a_provider_refuses_signups_but_not_unsubscribes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    http, harness, _ = build()
+    async with http:
+        await http.post("/v1/subscribers", json=VALID)
+        token = link_tokens(harness.provider.sent[0].text)["unsubscribe"]
+        monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+        monkeypatch.setattr(settings, "VERCEL_ENV", None)
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "")
+
+        signup = await http.post("/v1/subscribers", json=VALID)
+        unsubscribe = await http.post(
+            "/v1/subscribers/unsubscribe", json={"token": token}
+        )
+
+    assert signup.status_code == 503
+    assert unsubscribe.status_code == 200

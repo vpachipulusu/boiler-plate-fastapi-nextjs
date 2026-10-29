@@ -139,6 +139,14 @@ def _unavailable() -> HTTPException:
     return HTTPException(503, UNAVAILABLE_MESSAGE, {"Retry-After": RETRY_AFTER_SECONDS})
 
 
+def require_email_delivery() -> None:
+    """Refuse sign-ups in production while no provider is set: nobody should be told to check an inbox
+    for a message that will never come. Local and test runs accept them (nothing is sent).
+    """
+    if not settings.EMAIL_PROVIDER and not settings.relaxed_environment:
+        raise _unavailable()
+
+
 router = APIRouter(
     prefix="/v1/subscribers",
     tags=["subscribers"],
@@ -153,7 +161,8 @@ router = APIRouter(
     response_model=SubscribeResponse,
     summary="Start an alerts sign-up",
     dependencies=[
-        Depends(limit_by_client_ip_and_email(SUBSCRIBE_POLICY, subscribe_email))
+        Depends(require_email_delivery),
+        Depends(limit_by_client_ip_and_email(SUBSCRIBE_POLICY, subscribe_email)),
     ],
     responses=RATE_LIMIT_FAIL_CLOSED_RESPONSES,
 )

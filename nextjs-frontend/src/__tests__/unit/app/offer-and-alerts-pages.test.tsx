@@ -122,8 +122,8 @@ describe('offer detail page', () => {
 });
 
 describe('alerts page', () => {
-  async function renderAlerts(email?: string | string[]) {
-    render(await AlertsPage({ searchParams: Promise.resolve({ email }) }));
+  async function renderAlerts() {
+    render(await AlertsPage());
   }
 
   it('shows the promise heading, the form and one checkbox per category', async () => {
@@ -137,18 +137,9 @@ describe('alerts page', () => {
     expect(within(group).getAllByRole('checkbox')).toHaveLength(6);
   });
 
-  it('prefills a valid email from the query string', async () => {
-    await renderAlerts('sam@example.com');
+  it('starts with an empty address: nothing is prefilled from the page address', async () => {
+    await renderAlerts();
 
-    expect(screen.getByLabelText(/email address/i)).toHaveValue('sam@example.com');
+    expect(screen.getByLabelText(/email address/i)).toHaveValue('');
   });
-
-  it.each(['not an email', ['a@b.co', 'c@d.co'], undefined])(
-    'ignores an unusable email parameter: %j',
-    async (value) => {
-      await renderAlerts(value as string | string[] | undefined);
-
-      expect(screen.getByLabelText(/email address/i)).toHaveValue('');
-    }
-  );
 });

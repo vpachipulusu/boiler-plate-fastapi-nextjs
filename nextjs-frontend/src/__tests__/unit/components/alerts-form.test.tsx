@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+
+const mocks = vi.hoisted(() => ({ subscribe: vi.fn() }));
+vi.mock('@/app/actions/alerts-actions', () => ({ subscribeToAlertsAction: mocks.subscribe }));
+
 import { AlertsForm } from '@/components/alerts/alerts-form';
+import { ALERTS_CONSENT_TEXT } from '@/lib/alerts/consent';
+import { ALERTS_FAILURE_MESSAGES } from '@/lib/alerts/outcomes';
 
 const CATEGORIES = [
   { slug: 'beauty', name: 'Beauty & skincare' },
@@ -9,21 +15,38 @@ const CATEGORIES = [
   { slug: 'pets', name: 'Pets' },
 ];
 
-const DEMO_PANEL = /alerts aren.t live yet/i;
+const INBOX_PANEL = /check your inbox/i;
+const UNAVAILABLE = {
+  success: false,
+  code: 'unavailable',
+  error: ALERTS_FAILURE_MESSAGES.unavailable,
+} as const;
 
 function setup() {
   const user = userEvent.setup();
   render(<AlertsForm categories={CATEGORIES} />);
-  return {
+  const form = {
     user,
     email: () => screen.getByLabelText(/email address/i),
     consent: () => screen.getByRole('checkbox', { name: /i agree to receive freebie emails/i }),
-    submit: () => screen.getByRole('button', { name: /send me free alerts/i }),
+    submit: () => screen.getByRole('button', { name: /send me free alerts|sending/i }),
+    async fillValid() {
+      await user.type(form.email(), 'sam@example.com');
+      await user.click(screen.getByLabelText('Food & drink'));
+      await user.click(screen.getByLabelText('Weekly round-up'));
+      await user.click(form.consent());
+    },
   };
+  return form;
 }
 
-describe('AlertsForm', () => {
-  it('shows an error and no demo panel for an invalid email', async () => {
+beforeEach(() => {
+  mocks.subscribe.mockReset();
+  mocks.subscribe.mockResolvedValue({ success: true });
+});
+
+describe('AlertsForm validation', () => {
+  it('shows an error and sends nothing for an invalid email', async () => {
     const form = setup();
     await form.user.type(form.email(), 'not-an-email');
     await form.user.click(screen.getByLabelText('Beauty & skincare'));
@@ -34,10 +57,10 @@ describe('AlertsForm', () => {
     expect(await screen.findByText('Enter a valid email address.')).toBeInTheDocument();
     expect(form.email()).toHaveAttribute('aria-invalid', 'true');
     expect(form.email()).toHaveAccessibleDescription('Enter a valid email address.');
-    expect(screen.queryByText(DEMO_PANEL)).toBeNull();
+    expect(mocks.subscribe).not.toHaveBeenCalled();
   });
 
-  it('asks for at least one category before accepting the form', async () => {
+  it('asks for at least one category before sending', async () => {
     const form = setup();
     await form.user.type(form.email(), 'sam@example.com');
     await form.user.click(form.consent());
@@ -45,10 +68,10 @@ describe('AlertsForm', () => {
     await form.user.click(form.submit());
 
     expect(await screen.findByText('Choose at least one category.')).toBeInTheDocument();
-    expect(screen.queryByText(DEMO_PANEL)).toBeNull();
+    expect(mocks.subscribe).not.toHaveBeenCalled();
   });
 
-  it('requires consent before accepting the form', async () => {
+  it('requires consent before sending', async () => {
     const form = setup();
     await form.user.type(form.email(), 'sam@example.com');
     await form.user.click(screen.getByLabelText('Pets'));
@@ -57,19 +80,47 @@ describe('AlertsForm', () => {
 
     expect(await screen.findByText(/please agree to receive emails/i)).toBeInTheDocument();
     expect(form.consent()).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.queryByText(DEMO_PANEL)).toBeNull();
+    expect(mocks.subscribe).not.toHaveBeenCalled();
+  });
+});
+
+describe('AlertsForm before submitting', () => {
+  it('has no demo notice, defaults to daily and starts with an empty address', () => {
+    setup();
+
+    expect(screen.queryByText(/design preview|not live yet/i)).toBeNull();
+    expect(screen.getByLabelText('Daily highlights')).toBeChecked();
+    expect(screen.getByLabelText('Weekly round-up')).not.toBeChecked();
+    expect(screen.getByLabelText(/email address/i)).toHaveValue('');
   });
 
-  it('shows the demo panel, with a way onward, after a valid submission', async () => {
+  it('shows exactly the consent wording that the server stores', () => {
     const form = setup();
-    await form.user.type(form.email(), 'sam@example.com');
-    await form.user.click(screen.getByLabelText('Food & drink'));
-    await form.user.click(screen.getByLabelText('Weekly round-up'));
-    await form.user.click(form.consent());
+
+    expect(form.consent().closest('label')?.textContent?.trim()).toBe(ALERTS_CONSENT_TEXT);
+    expect(screen.getByRole('link', { name: 'privacy policy' })).toHaveAttribute(
+      'href',
+      '/privacy'
+    );
+  });
+});
+
+describe('AlertsForm submitting', () => {
+  it('sends the answers to the server action and asks the visitor to check their inbox', async () => {
+    const form = setup();
+    await form.fillValid();
 
     await form.user.click(form.submit());
 
-    expect(await screen.findByText(DEMO_PANEL)).toBeInTheDocument();
+    expect(mocks.subscribe).toHaveBeenCalledWith({
+      email: 'sam@example.com',
+      categories: ['food-drink'],
+      frequency: 'weekly',
+      consent: true,
+    });
+    expect(await screen.findByText(INBOX_PANEL)).toBeInTheDocument();
+    expect(screen.getByText(/sam@example\.com is new to our alerts/i)).toBeInTheDocument();
+    expect(screen.getByText(/nothing starts until you do/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Browse freebies' })).toHaveAttribute(
       'href',
       '/freebies'
@@ -77,28 +128,73 @@ describe('AlertsForm', () => {
     expect(screen.queryByRole('button', { name: /send me free alerts/i })).toBeNull();
   });
 
-  it('restores the form with the typed email after "Change my answers"', async () => {
+  it('does not say whether the address was already subscribed', async () => {
     const form = setup();
-    await form.user.type(form.email(), 'sam@example.com');
-    await form.user.click(screen.getByLabelText('Beauty & skincare'));
-    await form.user.click(form.consent());
-    await form.user.click(form.submit());
-    await screen.findByText(DEMO_PANEL);
+    await form.fillValid();
 
-    await form.user.click(screen.getByRole('button', { name: 'Change my answers' }));
+    await form.user.click(form.submit());
+
+    const panel = await screen.findByText(INBOX_PANEL);
+    expect(panel.parentElement?.textContent).not.toMatch(/already (subscribed|on)|welcome back/i);
+  });
+
+  it('disables the button and says it is sending while the request runs', async () => {
+    let finish: (value: { success: true }) => void = () => {};
+    mocks.subscribe.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const form = setup();
+    await form.fillValid();
+
+    await form.user.click(form.submit());
+
+    expect(screen.getByRole('button', { name: 'Sending…' })).toBeDisabled();
+    finish({ success: true });
+    expect(await screen.findByText(INBOX_PANEL)).toBeInTheDocument();
+  });
+
+  it('shows a curated error, keeps the answers and succeeds on retry', async () => {
+    mocks.subscribe.mockResolvedValueOnce(UNAVAILABLE);
+    const form = setup();
+    await form.fillValid();
+
+    await form.user.click(form.submit());
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(ALERTS_FAILURE_MESSAGES.unavailable);
+    expect(form.email()).toHaveValue('sam@example.com');
+    expect(form.email()).toBeEnabled();
+    expect(screen.getByLabelText('Food & drink')).toBeChecked();
+
+    await form.user.click(form.submit());
+
+    expect(await screen.findByText(INBOX_PANEL)).toBeInTheDocument();
+    expect(mocks.subscribe).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shows the curated message when the request itself throws', async () => {
+    mocks.subscribe.mockRejectedValueOnce(new Error('network down: secret detail'));
+    const form = setup();
+    await form.fillValid();
+
+    await form.user.click(form.submit());
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(ALERTS_FAILURE_MESSAGES.unavailable);
+    expect(alert.textContent).not.toMatch(/secret detail/);
+  });
+
+  it('restores the form with the typed email after "Use a different address"', async () => {
+    const form = setup();
+    await form.fillValid();
+    await form.user.click(form.submit());
+    await screen.findByText(INBOX_PANEL);
+
+    await form.user.click(screen.getByRole('button', { name: 'Use a different address' }));
 
     expect(form.email()).toHaveValue('sam@example.com');
     expect(form.email()).toBeEnabled();
-    expect(screen.getByLabelText('Beauty & skincare')).toBeChecked();
+    expect(screen.getByLabelText('Food & drink')).toBeChecked();
     expect(form.submit()).toBeInTheDocument();
-    expect(screen.queryByText(DEMO_PANEL)).toBeNull();
-  });
-
-  it('defaults to daily highlights and prefills a provided email', () => {
-    render(<AlertsForm categories={CATEGORIES} defaultEmail="pre@example.com" />);
-
-    expect(screen.getByLabelText('Daily highlights')).toBeChecked();
-    expect(screen.getByLabelText('Weekly round-up')).not.toBeChecked();
-    expect(screen.getByLabelText(/email address/i)).toHaveValue('pre@example.com');
+    expect(screen.queryByText(INBOX_PANEL)).toBeNull();
   });
 });

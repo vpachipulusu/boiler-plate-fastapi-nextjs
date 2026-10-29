@@ -137,6 +137,10 @@ export async function proxy(request: NextRequest) {
   // Add security headers
   const response = NextResponse.next();
   applySecurityHeaders(response);
+  // Alerts confirm and unsubscribe links carry a token in the query string: never send it as a Referer.
+  if (pathname === '/alerts/confirm' || pathname.startsWith('/alerts/unsubscribe')) {
+    response.headers.set('Referrer-Policy', 'no-referrer');
+  }
 
   // CORS headers for API routes
   if (pathname.startsWith('/api/')) {

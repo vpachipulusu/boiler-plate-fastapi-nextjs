@@ -80,16 +80,15 @@ describe('homepage', () => {
     expect(strip.textContent).not.toMatch(/\d/);
   });
 
-  it('submits the alerts form with GET to /alerts and a labelled email field', async () => {
+  it('links the sign-up band to /alerts without collecting an email address', async () => {
     const { container } = await renderHome();
 
-    const form = container.querySelector('form') as HTMLFormElement;
-    expect(form).toHaveAttribute('action', '/alerts');
-    expect(form.method).toBe('get');
-    const email = screen.getByLabelText('Your email address');
-    expect(email).toHaveAttribute('name', 'email');
-    expect(email).toHaveAttribute('type', 'email');
-    expect(within(form).getByRole('button', { name: 'Get free alerts' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Get free alerts' })).toHaveAttribute(
+      'href',
+      '/alerts'
+    );
+    expect(container.querySelector('form')).toBeNull();
+    expect(container.querySelector('input[type="email"]')).toBeNull();
     expect(screen.getByRole('link', { name: 'privacy details' })).toHaveAttribute(
       'href',
       '/privacy'
@@ -226,14 +225,19 @@ describe('draft status on every legal and editorial page', () => {
 });
 
 describe('privacy notice', () => {
-  it('discloses logs and the email-in-URL behaviour, and marks collection plans as plans', () => {
+  it('describes the alerts data, the double opt-in and the proposed retention, flagged for review', () => {
     const { container } = render(<PrivacyPage />);
 
     expect(container.textContent).toMatch(/IP address/);
-    expect(container.textContent).toMatch(/page address/);
     expect(container.textContent).toMatch(/error-monitoring provider/);
-    expect(container.textContent).toMatch(/If alerts go live/);
+    expect(container.textContent).toMatch(/double opt-in/);
+    expect(container.textContent).toMatch(/exact wording you saw/);
+    expect(container.textContent).toMatch(/deleted after 30 days/);
+    expect(container.textContent).toMatch(/12 months/);
+    expect(container.textContent).toMatch(/for legal review/);
     expect(container.textContent).toMatch(/not .* running today/i);
+    expect(container.textContent).not.toMatch(/carried to the alerts page/);
+    expect(screen.getByRole('heading', { name: 'Email alerts' })).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/does not save any information|saves nothing/i);
   });
 
