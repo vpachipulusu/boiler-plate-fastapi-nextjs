@@ -1,4 +1,5 @@
 from typing import Annotated
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -7,6 +8,7 @@ from app.core.totp import TotpCodec, TotpUnavailable
 
 LOCAL_ENVIRONMENTS = frozenset({"local", "test"})
 VERCEL_NON_PRODUCTION = frozenset({"preview", "development"})
+EMAIL_PROVIDERS = frozenset({"", "brevo", "fake"})
 
 
 class Settings(BaseSettings):
@@ -64,6 +66,20 @@ class Settings(BaseSettings):
     # portal may return to. Unset means every return URL is rejected.
     BILLING_RETURN_URL_ORIGINS: str = ""
 
+    # Alerts email (ADR-012). Backend only. EMAIL_PROVIDER unset means nothing is ever sent.
+    # "brevo" is the real provider; "fake" records messages and is refused outside local/test.
+    EMAIL_PROVIDER: str = ""
+    EMAIL_PROVIDER_API_KEY: SecretStr | None = None
+    EMAIL_PROVIDER_LIST_ID: str = ""
+    EMAIL_FROM: str = ""
+    EMAIL_FROM_NAME: str = "Freejoy"
+    # Where the "fake" provider appends each message as a JSON line (local/test only).
+    EMAIL_FAKE_OUTBOX: str = ""
+    # Public origin of the website, used for the links in emails (no path).
+    PUBLIC_SITE_URL: str = "http://localhost:3000"
+    # HMAC secret for confirm and unsubscribe tokens. Required outside local/test.
+    SUBSCRIBER_TOKEN_SECRET: SecretStr | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
@@ -93,6 +109,43 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "TOTP_ENCRYPTION_KEY must be a valid Fernet key"
                 ) from None
+        return self
+
+    @model_validator(mode="after")
+    def validate_email_config(self) -> "Settings":
+        """Alerts email (ADR-012): a half-configured provider stops startup, not the first signup."""
+        provider = self.EMAIL_PROVIDER
+        if provider not in EMAIL_PROVIDERS:
+            raise ValueError("EMAIL_PROVIDER must be unset, 'brevo' or 'fake'")
+        relaxed = self.relaxed_environment
+        site = urlsplit(self.PUBLIC_SITE_URL)
+        if (
+            site.scheme not in ("http", "https")
+            or not site.netloc
+            or site.path not in ("", "/")
+            or site.query
+            or site.fragment
+        ):
+            raise ValueError("PUBLIC_SITE_URL must be an origin such as https://host")
+        secret = self.SUBSCRIBER_TOKEN_SECRET
+        if secret is not None and len(secret.get_secret_value()) < 32:
+            raise ValueError("SUBSCRIBER_TOKEN_SECRET must have at least 32 characters")
+        if secret is None and not relaxed:
+            raise ValueError("SUBSCRIBER_TOKEN_SECRET must be set in production")
+        if provider == "fake" and not relaxed:
+            raise ValueError("EMAIL_PROVIDER=fake is only allowed in local and test")
+        if provider == "brevo":
+            if not (
+                self.EMAIL_PROVIDER_API_KEY
+                and self.EMAIL_FROM
+                and self.EMAIL_PROVIDER_LIST_ID.isdigit()
+            ):
+                raise ValueError(
+                    "EMAIL_PROVIDER=brevo requires EMAIL_PROVIDER_API_KEY, EMAIL_FROM "
+                    "and a numeric EMAIL_PROVIDER_LIST_ID"
+                )
+            if site.scheme != "https" and not relaxed:
+                raise ValueError("PUBLIC_SITE_URL must use https in production")
         return self
 
     @property
