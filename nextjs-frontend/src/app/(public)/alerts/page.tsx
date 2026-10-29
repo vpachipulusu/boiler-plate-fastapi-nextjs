@@ -2,13 +2,25 @@ import type { Metadata } from 'next';
 import { AlertsForm } from '@/components/alerts/alerts-form';
 import { Spark } from '@/components/site/brand-mark';
 import { getCategories } from '@/lib/catalogue';
+import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
+
+/** Flip to true when the alerts form really subscribes people; until then the page stays noindex. */
+const ALERTS_FORM_LIVE = false;
+
+const ALERTS_TITLE = 'Free alerts';
+const ALERTS_DESCRIPTION =
+  'Choose the freebie categories you care about and how often you want to hear about them.';
 
 export const metadata: Metadata = {
-  title: 'Free alerts',
-  description:
-    'Choose the freebie categories you care about and how often you want to hear about them.',
+  title: ALERTS_TITLE,
+  description: ALERTS_DESCRIPTION,
   alternates: { canonical: '/alerts' },
-  robots: { index: false },
+  openGraph: openGraphFor({
+    title: ALERTS_TITLE,
+    description: ALERTS_DESCRIPTION,
+    path: '/alerts',
+  }),
+  robots: listingRobots({ indexable: ALERTS_FORM_LIVE }),
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

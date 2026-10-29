@@ -117,13 +117,13 @@ describe('freebies page', () => {
 
     expect(metadata.title).toBe('Search: pet');
     expect(metadata.alternates?.canonical).toBe('/freebies');
-    expect(metadata.robots).toEqual({ index: false });
+    expect(metadata.robots).toEqual({ index: false, follow: true });
   });
 
   it('does not index page 2', async () => {
     const metadata = await freebiesMetadata({ searchParams: Promise.resolve({ page: '2' }) });
 
-    expect(metadata.robots).toEqual({ index: false });
+    expect(metadata.robots).toEqual({ index: false, follow: true });
   });
 
   it('renders the header with the search prefilled from the URL', async () => {

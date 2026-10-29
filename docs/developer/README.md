@@ -23,6 +23,7 @@ Start here, then follow the links. Root-level overview: [`../../README.md`](../.
 | [architecture.md](architecture.md) | The two apps, the auth flow, the backend layering, data, logging |
 | [freejoy-frontend.md](freejoy-frontend.md) | Freejoy Phase 1: public routes, fixture catalogue, trust rules, theme, tests |
 | [../compliance/uk-affiliate-checklist.md](../compliance/uk-affiliate-checklist.md) | UK affiliate and consumer-trust checklist (PECR/ICO, CAP/ASA/CMA): status per rule, Phase 3 acceptance criteria, Phase 1 copy audit, owner actions |
+| [freejoy-seo.md](freejoy-seo.md) | Freejoy SEO: indexing policy, sitemap, robots, JSON-LD, expired offers, owner follow-ups |
 | [platform-models.md](platform-models.md) | SQLAlchemy models and the Alembic baseline |
 | [backend-auth.md](backend-auth.md) | Session endpoints, Firebase verification, internal key |
 | [backend-totp.md](backend-totp.md) | Two-factor authentication |
@@ -30,6 +31,7 @@ Start here, then follow the links. Root-level overview: [`../../README.md`](../.
 | [backend-organizations.md](backend-organizations.md) | Organisations and memberships |
 | [backend-plan-limits.md](backend-plan-limits.md) | Plan definitions and limit checks |
 | [backend-public-settings.md](backend-public-settings.md) | Public settings read by the frontend |
+| [backend-catalogue.md](backend-catalogue.md) | Public catalogue API: offers, offer detail, categories |
 | [backend-frontend-seams.md](backend-frontend-seams.md) | Endpoints that keep `stripe` and `firebase-admin` out of the frontend |
 | [backend-audit-logs.md](backend-audit-logs.md) | Audit log model and admin API |
 | [backend-admin-users.md](backend-admin-users.md) | Admin user management |

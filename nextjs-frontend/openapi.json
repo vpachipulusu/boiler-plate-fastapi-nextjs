@@ -6743,7 +6743,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OfferResponse"
+                  "$ref": "#/components/schemas/app__api__v1__admin_offers_schemas__OfferResponse"
                 }
               }
             }
@@ -6870,7 +6870,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OfferResponse"
+                  "$ref": "#/components/schemas/app__api__v1__admin_offers_schemas__OfferResponse"
                 }
               }
             }
@@ -7005,7 +7005,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OfferResponse"
+                  "$ref": "#/components/schemas/app__api__v1__admin_offers_schemas__OfferResponse"
                 }
               }
             }
@@ -7132,7 +7132,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OfferResponse"
+                  "$ref": "#/components/schemas/app__api__v1__admin_offers_schemas__OfferResponse"
                 }
               }
             }
@@ -7259,7 +7259,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OfferResponse"
+                  "$ref": "#/components/schemas/app__api__v1__admin_offers_schemas__OfferResponse"
                 }
               }
             }
@@ -7386,7 +7386,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OfferResponse"
+                  "$ref": "#/components/schemas/app__api__v1__admin_offers_schemas__OfferResponse"
                 }
               }
             }
@@ -7513,7 +7513,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OfferResponse"
+                  "$ref": "#/components/schemas/app__api__v1__admin_offers_schemas__OfferResponse"
                 }
               }
             }
@@ -7657,7 +7657,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OfferResponse"
+                  "$ref": "#/components/schemas/app__api__v1__admin_offers_schemas__OfferResponse"
                 }
               }
             }
@@ -8795,6 +8795,477 @@
               }
             },
             "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/catalogue/offers": {
+      "get": {
+        "tags": [
+          "catalogue"
+        ],
+        "summary": "List published offers",
+        "description": "Published offers that have not ended, with the total before paging.\n\n``type`` may repeat. Without ``sort`` the newest come first.",
+        "operationId": "list_offers",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Matches title, summary or merchant",
+              "title": "Q"
+            },
+            "description": "Matches title, summary or merchant"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Category slug; unknown gives none",
+              "title": "Category"
+            },
+            "description": "Category slug; unknown gives none"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "free_sample",
+                      "free_trial",
+                      "cashback",
+                      "voucher",
+                      "competition"
+                    ],
+                    "type": "string"
+                  },
+                  "maxItems": 5
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "postage",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "free",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Postage"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "newest",
+                "ending_soon",
+                "a_z"
+              ],
+              "type": "string",
+              "default": "newest",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "featured",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Featured"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 12,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "if-none-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ETag from an earlier response",
+              "title": "If-None-Match"
+            },
+            "description": "ETag from an earlier response"
+          },
+          {
+            "name": "X-Internal-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "304": {
+            "description": "Not modified (If-None-Match matched)"
+          }
+        }
+      }
+    },
+    "/v1/catalogue/offers/{slug}": {
+      "get": {
+        "tags": [
+          "catalogue"
+        ],
+        "summary": "Read one published offer",
+        "description": "A live offer. An ended offer answers 410 with ``expired: true`` and its title.",
+        "operationId": "read_offer",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "if-none-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ETag from an earlier response",
+              "title": "If-None-Match"
+            },
+            "description": "ETag from an earlier response"
+          },
+          {
+            "name": "X-Internal-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__api__v1__catalogue_schemas__OfferResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "304": {
+            "description": "Not modified (If-None-Match matched)"
+          },
+          "404": {
+            "description": "Not published or unknown",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The offer has ended",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiredOfferResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/catalogue/categories": {
+      "get": {
+        "tags": [
+          "catalogue"
+        ],
+        "summary": "List enabled categories",
+        "description": "Enabled categories in display order, each with its count of published offers.",
+        "operationId": "list_categories",
+        "parameters": [
+          {
+            "name": "if-none-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ETag from an earlier response",
+              "title": "If-None-Match"
+            },
+            "description": "ETag from an earlier response"
+          },
+          {
+            "name": "X-Internal-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "304": {
+            "description": "Not modified (If-None-Match matched)"
           }
         }
       }
@@ -12369,6 +12840,77 @@
         ],
         "title": "CategoriesPageResponse"
       },
+      "CategoryData": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "short_name": {
+            "type": "string",
+            "title": "Short Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "intro": {
+            "type": "string",
+            "title": "Intro"
+          },
+          "tint": {
+            "type": "string",
+            "title": "Tint"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order"
+          },
+          "offer_count": {
+            "type": "integer",
+            "title": "Offer Count",
+            "description": "Live offers in this category"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "short_name",
+          "description",
+          "intro",
+          "tint",
+          "sort_order",
+          "offer_count"
+        ],
+        "title": "CategoryData"
+      },
+      "CategoryListResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryData"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "CategoryListResponse"
+      },
       "CategoryOut": {
         "properties": {
           "id": {
@@ -12433,6 +12975,24 @@
           "updated_at"
         ],
         "title": "CategoryOut"
+      },
+      "CategoryRef": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name"
+        ],
+        "title": "CategoryRef"
       },
       "CategoryResponse": {
         "properties": {
@@ -12519,6 +13079,24 @@
           "cancel_url"
         ],
         "title": "CheckoutRequest"
+      },
+      "ClaimStep": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "detail"
+        ],
+        "title": "ClaimStep"
       },
       "CreateCategoryRequest": {
         "properties": {
@@ -13181,6 +13759,71 @@
         "title": "ErrorResponse",
         "description": "Body of every error response (documents the runtime envelope in OpenAPI)."
       },
+      "ExpiredOfferData": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "category": {
+            "$ref": "#/components/schemas/CategoryRef"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "title",
+          "category",
+          "ended_at"
+        ],
+        "title": "ExpiredOfferData"
+      },
+      "ExpiredOfferResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": false,
+            "title": "Success",
+            "default": false
+          },
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "default": "This offer has ended"
+          },
+          "expired": {
+            "type": "boolean",
+            "const": true,
+            "title": "Expired",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ExpiredOfferData"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ExpiredOfferResponse",
+        "description": "The 410 body: the error envelope plus ``expired`` and just enough to render the page."
+      },
       "ExportData": {
         "properties": {
           "exported_at": {
@@ -13839,6 +14482,29 @@
         ],
         "title": "IdentityResponse"
       },
+      "ImageData": {
+        "properties": {
+          "tint": {
+            "type": "string",
+            "title": "Tint"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "alt": {
+            "type": "string",
+            "title": "Alt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tint",
+          "label",
+          "alt"
+        ],
+        "title": "ImageData"
+      },
       "InvoiceData": {
         "properties": {
           "id": {
@@ -13999,6 +14665,36 @@
           "STAFF"
         ],
         "title": "MembershipRole"
+      },
+      "MerchantData": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "logo_url"
+        ],
+        "title": "MerchantData"
       },
       "MerchantOut": {
         "properties": {
@@ -14288,6 +14984,161 @@
         ],
         "title": "NotificationResponse"
       },
+      "OfferData": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "description": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Description"
+          },
+          "category": {
+            "$ref": "#/components/schemas/CategoryRef"
+          },
+          "merchant": {
+            "$ref": "#/components/schemas/MerchantData"
+          },
+          "offer_type": {
+            "type": "string",
+            "enum": [
+              "free_sample",
+              "free_trial",
+              "cashback",
+              "voucher",
+              "competition"
+            ],
+            "title": "Offer Type"
+          },
+          "featured": {
+            "type": "boolean",
+            "title": "Featured"
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageData"
+          },
+          "postage": {
+            "$ref": "#/components/schemas/PostageData"
+          },
+          "requires_card": {
+            "type": "boolean",
+            "title": "Requires Card"
+          },
+          "subscription_terms": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subscription Terms"
+          },
+          "eligibility": {
+            "type": "string",
+            "title": "Eligibility"
+          },
+          "availability": {
+            "type": "string",
+            "title": "Availability"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "last_verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Verified At"
+          },
+          "freshness": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "new_today",
+                  "just_added",
+                  "popular",
+                  "ends_soon",
+                  "limited"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freshness"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "summary",
+          "description",
+          "category",
+          "merchant",
+          "offer_type",
+          "featured",
+          "image",
+          "postage",
+          "requires_card",
+          "subscription_terms",
+          "eligibility",
+          "availability",
+          "start_at",
+          "end_at",
+          "last_verified_at",
+          "freshness",
+          "steps"
+        ],
+        "title": "OfferData"
+      },
       "OfferFreshness": {
         "type": "string",
         "enum": [
@@ -14299,6 +15150,55 @@
         ],
         "title": "OfferFreshness",
         "description": "Editorial label set by the publisher; never computed from the clock."
+      },
+      "OfferListData": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OfferData"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "OfferListData"
+      },
+      "OfferListResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OfferListData"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "OfferListResponse"
       },
       "OfferOut": {
         "properties": {
@@ -14531,24 +15431,6 @@
           "links"
         ],
         "title": "OfferOut"
-      },
-      "OfferResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "const": true,
-            "title": "Success",
-            "default": true
-          },
-          "data": {
-            "$ref": "#/components/schemas/OfferOut"
-          }
-        },
-        "type": "object",
-        "required": [
-          "data"
-        ],
-        "title": "OfferResponse"
       },
       "OfferStatus": {
         "type": "string",
@@ -15155,6 +16037,48 @@
           "return_url"
         ],
         "title": "PortalRequest"
+      },
+      "PostageData": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "free",
+              "cost",
+              "check_terms"
+            ],
+            "title": "Kind"
+          },
+          "amount_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Minor"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "amount_minor",
+          "currency"
+        ],
+        "title": "PostageData"
       },
       "PostageKind": {
         "type": "string",
@@ -17078,6 +18002,42 @@
         "additionalProperties": false,
         "type": "object",
         "title": "VerifyRequest"
+      },
+      "app__api__v1__admin_offers_schemas__OfferResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OfferOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "OfferResponse"
+      },
+      "app__api__v1__catalogue_schemas__OfferResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OfferData"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "OfferResponse"
       }
     }
   }
