@@ -72,16 +72,19 @@ class FakeCatalogueRepository:
         offers: list[OfferRecord] | None = None,
         total: int | None = None,
         by_slug: OfferRecord | None = None,
+        by_id: OfferRecord | None = None,
         categories: list[CategoryRecord] | None = None,
         error: Exception | None = None,
     ) -> None:
         self.offers = offers or []
         self.total = len(self.offers) if total is None else total
         self.by_slug = by_slug
+        self.by_id = by_id
         self.categories = categories or []
         self.error = error
         self.list_calls: list[tuple[OfferFilters, datetime, int, int]] = []
         self.slugs: list[str] = []
+        self.ids: list[str] = []
         self.category_now: list[datetime] = []
 
     async def list_live_offers(
@@ -97,6 +100,12 @@ class FakeCatalogueRepository:
             raise self.error
         self.slugs.append(slug)
         return self.by_slug
+
+    async def find_visible_offer_by_id(self, offer_id: str) -> OfferRecord | None:
+        if self.error:
+            raise self.error
+        self.ids.append(offer_id)
+        return self.by_id
 
     async def list_enabled_categories(self, now: datetime) -> list[CategoryRecord]:
         if self.error:

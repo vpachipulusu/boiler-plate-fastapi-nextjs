@@ -72,6 +72,11 @@ PUBLIC_SETTINGS_POLICY = RateLimitPolicy(
 PUBLIC_CATALOGUE_POLICY = RateLimitPolicy(
     "public_catalogue", limit=120, window_seconds=60, fail_closed=False
 )
+# Outbound redirect clicks (/go/[id]): keyed by client IP. A click writes a row, so the limit is
+# tighter than the read-only catalogue. Fails open: an outage must not stop a visitor reaching the offer.
+OUTBOUND_CLICK_POLICY = RateLimitPolicy(
+    "outbound_click", limit=60, window_seconds=60, fail_closed=False
+)
 # Bulk Stripe subscription reconciliation: up to 20 Stripe calls per run, so a
 # few runs a minute per admin are plenty. Fail closed: an outage must not lift the limit.
 ADMIN_SYNC_POLICY = RateLimitPolicy(
