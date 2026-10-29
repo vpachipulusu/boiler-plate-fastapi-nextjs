@@ -1,0 +1,82 @@
+{
+  "project": "Freejoy \u2014 final UI direction",
+  "version": "1.0",
+  "status": "Design refined; illustrative offers",
+  "brand": {
+    "name": "Freejoy (working name)",
+    "personality": [
+      "friendly",
+      "trustworthy",
+      "joyful",
+      "calm"
+    ],
+    "palette": {
+      "ink": "#1F3630",
+      "muted": "#5F746C",
+      "green": "#0F7556",
+      "coral": "#F66A54",
+      "mint": "#DDF4E8",
+      "cream": "#FFEDD8",
+      "paper": "#FBFAF7",
+      "white": "#FFFFFF",
+      "line": "#E4EAE5"
+    }
+  },
+  "typography": {
+    "suggested_font": "Inter or Geist Sans",
+    "display": "56px / 64px, 800",
+    "heading_lg": "40px / 48px, 800",
+    "heading_md": "28px / 36px, 800",
+    "body": "16px / 24px, 400",
+    "caption": "12px / 18px, 500"
+  },
+  "radii": {
+    "card": 16,
+    "large_card": 24,
+    "input": 12,
+    "button": "999px"
+  },
+  "grid": {
+    "desktop_canvas": 1440,
+    "desktop_content_width": 1314,
+    "desktop_columns": 12,
+    "desktop_gutter": 24,
+    "mobile_canvas": 390,
+    "mobile_margin": 19,
+    "mobile_card_gap": 10
+  },
+  "screens": [
+    "01 Home desktop",
+    "02 Catalogue desktop",
+    "03 Offer detail desktop",
+    "04 Email preferences desktop",
+    "05 Home mobile",
+    "06 Catalogue mobile",
+    "07 Offer detail mobile",
+    "08 Admin offers desktop",
+    "09 Design system"
+  ],
+  "content_guidelines": [
+    "Do not describe a trial or cashback as a free sample",
+    "Show any postage, fees, subscriptions or card requirements clearly",
+    "Offer status and last verified date visible before outbound clicks",
+    "Label affiliate links and show a plain-language disclosure",
+    "Use honest popularity and expiry labels; avoid unverified urgency",
+    "Illustrative products in mockups must be replaced with genuine licensed imagery and approved offers"
+  ],
+  "implementation_alignment": {
+    "nextjs": [
+      "Next.js App Router server-rendered public pages",
+      "Metadata and canonical tags per offer",
+      "Server-only API wrapper",
+      "Public pages without Firebase login"
+    ],
+    "fastapi": [
+      "Offer catalogue and admin CRUD",
+      "Merchant records and affiliate URL redirect",
+      "Click tracking with privacy controls",
+      "Expiry verification"
+    ],
+    "database": "Existing PostgreSQL + SQLAlchemy/Alembic"
+  }
+}
