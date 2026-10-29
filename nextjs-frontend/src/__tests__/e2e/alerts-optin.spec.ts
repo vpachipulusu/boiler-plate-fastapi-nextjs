@@ -48,7 +48,11 @@ test.describe('Alerts double opt-in', () => {
     await page.goto('/alerts');
     await waitForPageReady(page);
     await page.getByLabel('Email address').fill(email);
-    await page.getByText('Beauty & skincare', { exact: true }).click();
+    await page
+      .getByRole('group', { name: /interested in/i })
+      .locator('label')
+      .first()
+      .click();
     await page.getByText('Weekly round-up', { exact: true }).click();
     await page.getByRole('checkbox', { name: /i agree to receive freebie emails/i }).check();
     await page.getByRole('button', { name: 'Send me free alerts' }).click();
@@ -76,7 +80,7 @@ test.describe('Alerts double opt-in', () => {
     await page.goto(confirmLink);
     await waitForPageReady(page);
     await page.getByRole('button', { name: 'Confirm my alerts' }).click();
-    await expect(page.getByRole('alert')).toContainText(/not valid any more/i);
+    await expect(page.getByText(/not valid any more/i)).toBeVisible();
 
     await page.goto(unsubscribeLink);
     await waitForPageReady(page);
