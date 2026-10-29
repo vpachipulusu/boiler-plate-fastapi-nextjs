@@ -81,23 +81,27 @@ place. The rules:
 
 - **Local and test only.** It runs only when `ENVIRONMENT` is exactly `local` or `test`. Any other value, an empty
   one, an unset one (the setting then defaults to `production`) or a configuration that cannot be loaded makes it
-  print a refusal, write nothing and exit with code 1. It never prints connection strings.
+  print a refusal, write nothing and exit with code 1. The `DATABASE_URL` host must also be `localhost`, `127.0.0.1` or
+  `::1`: a remote host (even a `*_test` database), a unix socket, a `host=` query parameter, an empty or unparsable
+  URL all refuse the same way. It never prints the URL, the host or the environment value.
 - **Obviously sample data.** Every offer has `publisher_notes = "SAMPLE DATA — not a real offer"`, merchant names end
   in `(Sample)`, merchants have no logo, and every website, source and affiliate destination is under
   `https://example.com/`. No real brand, logo or destination is used.
 - **Every state.** All five offer types and all four statuses are present: 21 published, 1 draft (`cat-pouch-tasting-sample`),
   1 expired (`laundry-sheets-sample`) and 1 archived. The ended Bedtime hamper prize draw is archived here (the fixtures list it as expired) so
   admin screens have an archived offer to work with. Links of expired and archived offers are inactive.
-- **Safe to rerun.** It upserts categories, merchants and offers by `slug` and keeps one `sample` affiliate link per
+- **Safe to rerun.** It upserts merchants and offers by `slug` (categories are insert-only) and keeps one `sample` affiliate link per
   offer, so a second run creates no rows and a changed row is put back to the seed values. Rows with other slugs are
-  left alone. Click events and email subscribers are never seeded.
+  left alone; a merchant or offer with a seed slug that is not sample data makes the run refuse and write nothing;
+  existing categories are never modified. Click events and email subscribers are never seeded.
 - **Dates move with the day you run it.** Dates are offsets from today (the fixtures use 2026-10-29), so published
-  offers stay live and carry a "last checked" date that is never in the future. Running it on a later day moves them
-  forward.
+  offers stay live and carry a "last checked" date that is never in the future. The closing dates in the
+  availability text are filled in from the same offsets, so they match `end_at`. Running it on a later day moves
+  everything forward.
 
 Run `uv run alembic upgrade head` first: on an unmigrated database it reports the failure (error type only) and exits 1.
-Tests: `tests/commands/test_seed_catalogue.py` (the guard and the data need no database; the upsert tests run with
-`TEST_DATABASE_URL`, see [testing.md](testing.md)).
+Tests: `tests/commands/test_seed_catalogue.py` (the guards and the data need no database; the upsert tests run with
+`TEST_DATABASE_URL`, see [testing.md](testing.md)) and `test_seed_catalogue_upsert.py` (upsert rules on a fake session).
 
 ## Frontend (`nextjs-frontend/`)
 

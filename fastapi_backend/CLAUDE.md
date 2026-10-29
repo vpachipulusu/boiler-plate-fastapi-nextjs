@@ -98,7 +98,8 @@ session makers: those live behind `app.core.database` (`SessionProvider`), and r
 - Tests live in `tests/` mirroring `app/` (`api`, `core`, `services`, `repositories`, `commands`). Unit tests use
   no network, real database, Redis or Sentry: `tests/conftest.py` sets placeholder settings. Tests named
   `*_e2e.py` run against a throwaway Postgres when `TEST_DATABASE_URL` points at a `*_test` database and are
-  skipped otherwise.
+  skipped otherwise. `tests/commands/test_seed_catalogue.py` also uses `TEST_DATABASE_URL`: it truncates the
+  catalogue tables and refuses a database that is not a local `*_test` one.
 - **Fakes via Protocol, not mocks of internals.** Depend on a small `Protocol` (`SessionProvider`,
   `RateLimiter`) and inject a fake from `tests/fakes.py` (`FakeSessionProvider`, `FakeRateLimiter`,
   `RaisingRateLimiter`). In API tests replace the dependency with `app.dependency_overrides`, or build a small
