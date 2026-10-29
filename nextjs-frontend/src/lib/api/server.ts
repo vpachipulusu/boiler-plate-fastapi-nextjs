@@ -66,15 +66,33 @@ export interface BackendOptions {
   clientIp?: string;
 }
 
+const HEADER_NAME = /^[a-z0-9-]+$/i;
+
+/** The headers whose value may be taken as the visitor's address, in order of preference. */
+function trustedClientIpHeaders(): string[] {
+  const names: string[] = [];
+  if (process.env.VERCEL === '1') names.push('x-vercel-forwarded-for');
+  // One header the operator vouches for: only set it when the reverse proxy overwrites it on every request.
+  const configured = process.env.TRUSTED_CLIENT_IP_HEADER?.trim().toLowerCase();
+  if (configured && HEADER_NAME.test(configured)) names.push(configured);
+  return names;
+}
+
 /**
- * The visitor's address from the hosting platform's trusted header, or undefined (not on Vercel, header
- * absent or not an IP). Only Vercel's `x-vercel-forwarded-for` is trusted: it cannot be set by the client,
- * unlike X-Forwarded-For. Needs a request scope; callers outside one must catch the error.
+ * The visitor's address from a trusted header, or undefined (none configured, header absent or not an IP).
+ * Trusted: Vercel's `x-vercel-forwarded-for` (when VERCEL=1) and the single header named by the server-only
+ * TRUSTED_CLIENT_IP_HEADER. Never X-Forwarded-For or any other header a client can set. Needs a request
+ * scope; callers outside one must catch the error.
  */
 export async function readTrustedClientIp(): Promise<string | undefined> {
-  if (process.env.VERCEL !== '1') return undefined;
-  const value = (await headers()).get('x-vercel-forwarded-for')?.trim();
-  return value && isIP(value) ? value : undefined;
+  const names = trustedClientIpHeaders();
+  if (names.length === 0) return undefined;
+  const requestHeaders = await headers();
+  for (const name of names) {
+    const value = requestHeaders.get(name)?.trim();
+    if (value && isIP(value)) return value;
+  }
+  return undefined;
 }
 
 /** A fresh client per call, so one request's session can never leak into another. */
