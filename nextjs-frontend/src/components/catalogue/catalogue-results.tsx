@@ -27,10 +27,15 @@ function countLabel(total: number): string {
  * filter and sort controls next to it stay mounted (and keep focus) while results stream in.
  */
 export async function CatalogueHeading({ query }: Pick<CatalogueResultsProps, 'query'>) {
-  const loaded = await settle(Promise.all([searchOffers(query), getCategories()]));
-  // On an outage the heading stays and the count is left out; the results column explains why.
-  const [page, categories] = loaded.ok ? loaded.data : [null, []];
-  const category = categories.find((entry) => entry.slug === query.category);
+  // Read separately: a search outage must not cost the heading its category name, nor the reverse.
+  const [searched, categoriesRead] = await Promise.all([
+    settle(searchOffers(query)),
+    settle(getCategories()),
+  ]);
+  const page = searched.ok ? searched.data : null;
+  const category = categoriesRead.ok
+    ? categoriesRead.data.find((entry) => entry.slug === query.category)
+    : undefined;
 
   return (
     <div className="min-w-0">

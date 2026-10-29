@@ -3,6 +3,7 @@ import { OfferArt } from '@/components/catalogue/offer-art';
 import { OfferTypeBadge } from '@/components/catalogue/offer-type-badge';
 import type { Category, Merchant, Offer } from '@/lib/catalogue/types';
 import { OfferCta } from './offer-cta';
+import { OfferEndedPanel } from './offer-ended-panel';
 import { OfferTrustPanel } from './offer-trust-panel';
 
 interface OfferHeroProps {
@@ -33,12 +34,11 @@ export function OfferHero({ offer, merchant, category, ended }: OfferHeroProps) 
         </h1>
         <p className="max-w-xl text-base text-muted-foreground sm:text-lg">{offer.summary}</p>
         <OfferTrustPanel offer={offer} />
-        <OfferCta
-          offerType={offer.offerType}
-          ended={ended}
-          categorySlug={category.slug}
-          demo={offer.demo}
-        />
+        {ended ? (
+          <OfferEndedPanel categorySlug={category.slug} />
+        ) : (
+          <OfferCta offerType={offer.offerType} demo={offer.demo} />
+        )}
       </div>
     </section>
   );

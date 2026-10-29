@@ -53,9 +53,9 @@ export function HomeSectionsSkeleton() {
     <div role="status" aria-busy="true" aria-label="Loading freebies" className="pt-10">
       <span className="sr-only">Loading freebies</span>
       <Skeleton className="h-8 w-64" />
-      <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-5 lg:grid-cols-6">
+      <div className="mt-5 grid grid-cols-3 gap-2.5 sm:gap-4 lg:grid-cols-6">
         {Array.from({ length: 6 }, (_, index) => (
-          <Skeleton key={index} className="h-24 rounded-card" />
+          <Skeleton key={index} className="h-[4.5rem] rounded-card" />
         ))}
       </div>
       <Skeleton className="mt-12 h-8 w-48" />

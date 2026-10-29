@@ -31,7 +31,6 @@ import {
   getLiveOffers,
   getMerchantBySlug,
   getMerchants,
-  getOfferBySlug,
   getRelatedOffers,
   getToday,
   lookupOffer,
@@ -76,22 +75,12 @@ describe('with CATALOGUE_SOURCE=api', () => {
     expect(await getMerchants()).toEqual([]);
     expect(await getMerchantBySlug('x')).toBeNull();
     expect(await lookupOffer('a')).toEqual({ kind: 'found', offer });
-    expect(await getOfferBySlug('a')).toBe(offer);
     expect(await getLiveOffers()).toEqual([offer]);
     expect(await getFeaturedOffers()).toEqual([offer]);
     expect(await searchOffers(DEFAULT_QUERY)).toEqual({ total: 1 });
     expect(await getRelatedOffers(offer)).toEqual([offer]);
     expect(mocks.api.getFeaturedOffers).toHaveBeenCalledWith(8);
     expect(mocks.api.getRelatedOffers).toHaveBeenCalledWith(offer, 4);
-  });
-
-  it('returns null from getOfferBySlug for an ended or missing offer', async () => {
-    vi.stubEnv('CATALOGUE_SOURCE', 'api');
-    mocks.api.lookupOffer.mockResolvedValueOnce({ kind: 'not_found' });
-    mocks.api.lookupOffer.mockResolvedValueOnce({ kind: 'ended', ended: {} });
-
-    expect(await getOfferBySlug('a')).toBeNull();
-    expect(await getOfferBySlug('b')).toBeNull();
   });
 
   it('does not touch the fixtures', async () => {

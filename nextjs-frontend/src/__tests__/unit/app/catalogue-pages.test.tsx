@@ -18,7 +18,7 @@ import {
   CATALOGUE_PAGE_SIZE,
   DEFAULT_QUERY,
   getCategories,
-  getOfferBySlug,
+  lookupOffer,
   parseCatalogueParams,
   searchOffers,
   type CatalogueQuery,
@@ -28,6 +28,13 @@ import { FIXTURE_TODAY } from '@/lib/catalogue/fixtures';
 const categoryMetadata = categoryRoute.generateMetadata;
 const freebiesMetadata = freebiesRoute.generateMetadata;
 const noParams = Promise.resolve({});
+
+/** A found offer, or null: the page-level lookup without the ended state. */
+async function getOfferBySlug(slug: string) {
+  const lookup = await lookupOffer(slug);
+  return lookup.kind === 'found' ? lookup.offer : null;
+}
+
 
 function cardSlugs(): string[] {
   return screen

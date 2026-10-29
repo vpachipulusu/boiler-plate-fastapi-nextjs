@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogClose,
@@ -13,12 +14,9 @@ import {
 } from '@/components/ui/dialog';
 import type { OfferType } from '@/lib/catalogue/types';
 import { CTA_LABELS, REQUEST_KIND } from './offer-format';
-import { OfferEndedPanel } from './offer-ended-panel';
 
 interface OfferCtaProps {
   offerType: OfferType;
-  ended: boolean;
-  categorySlug: string;
   /** True for fixture offers (design preview); false for real catalogue offers. */
   demo: boolean;
 }
@@ -52,12 +50,11 @@ function ctaCopy(demo: boolean, offerType: OfferType) {
 
 /**
  * Primary call to action. No offer has a destination yet (the `/go/[id]` redirect is Phase 3), so
- * the button opens a dialog instead of linking out: nothing here renders an external href. When the
- * offer has ended the button is replaced by a calm panel with two ways onward.
+ * the button opens a dialog instead of linking out: nothing here renders an external href. A real
+ * offer's button says "Coming soon" on its face so it never promises a claim it cannot make. The
+ * ended state is rendered by the (server) hero instead of this client component.
  */
-export function OfferCta({ offerType, ended, categorySlug, demo }: OfferCtaProps) {
-  if (ended) return <OfferEndedPanel categorySlug={categorySlug} />;
-
+export function OfferCta({ offerType, demo }: OfferCtaProps) {
   const copy = ctaCopy(demo, offerType);
   return (
     <div>
@@ -66,9 +63,20 @@ export function OfferCta({ offerType, ended, categorySlug, demo }: OfferCtaProps
           <Button
             type="button"
             variant="accent"
-            className="h-14 w-full justify-between rounded-pill px-7 text-base font-bold shadow-sm"
+            aria-label={demo ? undefined : `${CTA_LABELS[offerType]}, coming soon`}
+            className={cn(
+              'w-full justify-between rounded-pill px-7 text-base font-bold shadow-sm',
+              demo ? 'h-14' : 'h-auto min-h-14 whitespace-normal py-2.5 text-start'
+            )}
           >
-            {CTA_LABELS[offerType]}
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {CTA_LABELS[offerType]}
+              {!demo && (
+                <span className="rounded-pill border border-current px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+                  Coming soon
+                </span>
+              )}
+            </span>
             <ArrowRight aria-hidden="true" />
           </Button>
         </DialogTrigger>
