@@ -8,9 +8,10 @@ the pages under `src/app/(public)/`.
 ## Indexing policy
 
 Indexability is decided by the catalogue data, not by a flag in the code. The one exception is
-`ALERTS_FORM_LIVE = false` in `src/app/(public)/alerts/page.tsx`: a deliberate pre-launch hold that
-keeps `/alerts` noindex until alerts are live in production (the form now subscribes for real; flip the flag once a provider is configured), because the page has no catalogue
-data to decide from. Flip it in the same change that makes the form live.
+`ALERTS_FORM_LIVE` (an environment variable read in `src/app/(public)/alerts/page.tsx`, unset by default): a
+deliberate pre-launch hold that keeps `/alerts` noindex, and shows a "not open yet" notice instead of the form,
+until `ALERTS_FORM_LIVE=true` is set at build time once a provider is configured. The page has no catalogue
+data to decide from.
 
 | Helper (`lib/seo/indexing.ts`) | Rule |
 |---|---|

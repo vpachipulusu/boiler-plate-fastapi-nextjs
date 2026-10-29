@@ -27,7 +27,7 @@ All routes need `X-Internal-Key`. Bodies and errors use the usual envelope.
 
 | Route | Answers | Notes |
 | --- | --- | --- |
-| `POST /v1/subscribers` | 202 `{"success":true,"data":{"status":"accepted"}}` | Same answer for a new, pending, confirmed or unsubscribed address. Limited per client IP **and** per keyed hash of the address (`SUBSCRIBE_POLICY`: 5 per hour each, fail closed). 503 when the provider is down, or in production with `EMAIL_PROVIDER` unset. |
+| `POST /v1/subscribers` | 202 `{"success":true,"data":{"status":"accepted"}}` | Same answer for a new, pending, confirmed or unsubscribed address. Limited per client IP (`SUBSCRIBE_IP_POLICY`: 20 per hour, since a shared network can hold several visitors) **and** per keyed hash of the address (`SUBSCRIBE_EMAIL_POLICY`: 5 per hour); both fail closed. 503 when the provider is down, or when `EMAIL_PROVIDER` is unset and `ENVIRONMENT` is not `local`/`test` (a Vercel preview counts as deployed). |
 | `POST /v1/subscribers/confirm` `{token}` | 200 `confirmed`, or 400 `Invalid or expired link` | Forged, expired, used, wrong-purpose and unknown tokens all give the same 400. 503 when the provider list cannot be updated; the link stays usable. |
 | `POST /v1/subscribers/unsubscribe` `{token}` | 200 `unsubscribed`, or 400 | Idempotent. The local change is committed first (status, `unsubscribed_at`; `categories` emptied and `provider_subscriber_id` cleared, as [platform-models.md](platform-models.md) requires); a provider failure gives 503 and the next try repeats the provider call. |
 
@@ -61,19 +61,28 @@ thin route that redirects to the landing page; do not make it change state.
   form (`alerts_page`). The wording lives in one place, `src/lib/alerts/consent.ts`, and the server action sets it,
   so the stored text cannot differ from what the page showed and the browser cannot forge it. The text itself
   is the version; there is no separate version number.
-- **Re-subscribing.** An UNSUBSCRIBED address that signs up again becomes PENDING with the new consent; an older
-  unsubscribe link still works (fails safe). The checklist's "re-subscribing revokes earlier unsubscribe tokens"
-  (D5.5) is not implemented.
+- **Re-subscribing is an operator action.** An UNSUBSCRIBED row is never re-opened by an anonymous submission
+  (anyone can type an address, and that would let a stranger restart mail to someone who opted out): the form
+  answers the usual 202 and sends nothing, exactly as for a confirmed address. Bringing an unsubscribed address
+  back means an operator deleting its row (or waiting for the 12 month purge) so the person can sign up afresh.
+  Until then an old unsubscribe link still works (fails safe). The checklist's "re-subscribing revokes earlier
+  unsubscribe tokens" (D5.5) is therefore moot.
+- **Retention ages from the first request.** Re-sending a confirmation for a PENDING row updates the chosen
+  categories and frequency and `confirmation_sent_at`, but not the consent record, so the 30 day clock of an
+  unconfirmed sign-up cannot be extended by resubmitting.
 
 ## The email provider
 
-`app/core/email_provider.py` defines the `EmailProvider` protocol (`send`, `upsert_contact`, `delete_contact`) and four implementations, chosen by `EMAIL_PROVIDER`:
+`app/core/email_provider.py` defines the `EmailProvider` protocol (`send`, `upsert_contact`, `delete_contact`) and three implementations, chosen by `EMAIL_PROVIDER`:
 
 | Value | Behaviour |
 | --- | --- |
 | unset | `DisabledEmailProvider`: nothing is sent; one log line per dropped message, never the address. Local dev and tests. In production the subscribe route answers 503 instead, so nobody is told to check an inbox for mail that will never come. |
 | `brevo` | `BrevoEmailProvider` over `httpx` (no new dependency). Needs `EMAIL_PROVIDER_API_KEY`, `EMAIL_PROVIDER_LIST_ID`, `EMAIL_FROM`. **Not yet run against a live account.** |
-| `fake` | `FakeEmailProvider`: records calls; if `EMAIL_FAKE_OUTBOX` is set, appends each message as a JSON line to that file. Refused at startup unless `ENVIRONMENT` is `local` or `test`. |
+| `fake` | `FakeEmailProvider`: records calls; if `EMAIL_FAKE_OUTBOX` is set, appends each message as a JSON line to that file. Refused at startup unless `ENVIRONMENT` is `local` or `test` (a Vercel preview with `ENVIRONMENT=production` is refused too). |
+
+The confirmation email's subject and body use `EMAIL_FROM_NAME` (default `Freejoy`) as the brand. That is separate
+from `APP_NAME` (the API's title) and from `NEXT_PUBLIC_APP_NAME` (the website's name); keep the three in step.
 
 Settings are validated at startup (`app/core/config.py`): a half-configured Brevo, an unknown provider, a bad
 `PUBLIC_SITE_URL`, a short `SUBSCRIBER_TOKEN_SECRET`, or a production start without that secret all stop the
@@ -120,10 +129,28 @@ brings it back.
 - **Home band.** `NewsletterBand` is now a link to `/alerts`. `/alerts` ignores `?email=`. Nothing puts an address
   in a URL any more (finding N-07 of the checklist; the Sentry scrubber, FREEJ-31, is still worth having for old
   links).
-- **Known leak.** The confirm and unsubscribe links must carry a token in the query string (a mail app POSTs to
-  the one-click URL directly). Hosting request logs, and Sentry page URLs when a DSN is set, can therefore hold a
-  token for the page load. A confirm token stops working once used or after 24 hours; an unsubscribe token can
-  only unsubscribe that one address. FREEJ-31 should scrub `token` as well as `email`.
+- **Alerts switch.** `/alerts` shows the form only when `ALERTS_FORM_LIVE=true` is set (server-only, read when
+  the page is built); otherwise it shows a plain "Alerts aren't open yet" notice, no form, and stays noindex. The
+  backend refuses sign-ups in production without a provider as a last line. Set it when a provider is live.
+- **Sentry.** The links must carry a token in the query string (a mail app POSTs to the one-click URL directly),
+  so `src/lib/sentry/scrub-token.ts` replaces `token=...` with `[Filtered]` in every URL, query string and
+  breadcrumb of an event (`beforeSend` and `beforeSendTransaction` in the client, server and edge configs).
+- **Known leaks.** Hosting platform request logs still record the full URL of the landing page load, token
+  included, for as long as the platform keeps them (retention is the platform's setting: check it and shorten it
+  before launch). A confirm token stops working once used or after 24 hours; an unsubscribe token can only
+  unsubscribe that one address.
+
+## Known residual risks (pre-launch follow-ups)
+
+- **Timing side channel on `POST /v1/subscribers`.** A new or re-sendable address takes one provider round trip
+  longer than a confirmed, unsubscribed or recently-sent one, which returns at once. The bodies and statuses are
+  identical and the per-IP and per-address limits bound probing, but response time can still hint at state.
+  Recommended fix: send the email after the commit with `BackgroundTasks` (checking the platform keeps the task
+  alive after the response), or pad every answer to a fixed minimum duration. To be filed as its own story.
+- **Client IP off Vercel.** `callBackend` forwards `X-Client-IP` only when `VERCEL=1` (it trusts
+  `x-vercel-forwarded-for`, never a raw `X-Forwarded-For`). Anywhere else (local runs, another host) every visitor
+  reaches the backend as one address and shares one per-IP bucket, so the 20 per hour IP limit is shared by all.
+  Fine for development; a non-Vercel production would need its own trusted forwarding header.
 
 ## Local run and tests
 
@@ -145,5 +172,4 @@ uv run uvicorn app.main:app --port 8000
 
 Create the Brevo account and set the variables; verify the sending domain; set a postal address and legal
 operator name for the email footer and the consent label; have the consent wording, the 30-day and 12-month
-retention periods, the named processor and the minimum age reviewed; then set `ALERTS_FORM_LIVE = true` in
-`src/app/(public)/alerts/page.tsx`.
+retention periods, the named processor and the minimum age reviewed; then build the frontend with `ALERTS_FORM_LIVE=true`.
