@@ -3,8 +3,14 @@ import { waitForPageReady } from './helpers/e2e-utils';
 
 /**
  * Alerts preferences (`/alerts`) journey. The form validates in the browser and ends in a
- * "not live yet" demo panel: no request is made and nothing is saved.
+ * "not live yet" demo panel: no request is made and nothing is saved. The category checkboxes come from
+ * the fixture catalogue (the e2e server runs with CATALOGUE_SOURCE=fixture unless E2E_LIVE_CATALOGUE=1).
  */
+
+test.skip(
+  process.env.E2E_LIVE_CATALOGUE === '1',
+  'Fixture specs: the server is on the live catalogue'
+);
 
 const VIEWPORTS = [
   { name: 'desktop 1440', width: 1440, height: 900 },
@@ -65,7 +71,7 @@ for (const viewport of VIEWPORTS) {
       });
 
       await page.getByLabel('Email address').fill('sam@example.com');
-      await page.getByText('Beauty & skincare', { exact: true }).click();
+      await page.getByText('Beauty', { exact: true }).click();
       await page.getByText('Weekly round-up', { exact: true }).click();
       await page.getByRole('checkbox', { name: /i agree to receive freebie emails/i }).check();
       await page.getByRole('button', { name: 'Send me free alerts' }).click();
@@ -80,7 +86,7 @@ for (const viewport of VIEWPORTS) {
       await page.getByRole('button', { name: 'Change my answers' }).click();
 
       await expect(page.getByLabel('Email address')).toHaveValue('sam@example.com');
-      await expect(page.getByLabel('Beauty & skincare')).toBeChecked();
+      await expect(page.getByLabel('Beauty')).toBeChecked();
       await expect(page.getByRole('button', { name: 'Send me free alerts' })).toBeVisible();
       await expect(page.getByText(DEMO_PANEL)).toHaveCount(0);
     });

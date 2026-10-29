@@ -21,7 +21,7 @@ Start here, then follow the links. Root-level overview: [`../../README.md`](../.
 | Doc | What it covers |
 | --- | --- |
 | [architecture.md](architecture.md) | The two apps, the auth flow, the backend layering, data, logging |
-| [freejoy-frontend.md](freejoy-frontend.md) | Freejoy Phase 1: public routes, fixture catalogue, trust rules, theme, tests |
+| [freejoy-frontend.md](freejoy-frontend.md) | Freejoy public pages: routes, catalogue source (API or fixtures), the API wrapper and its cache, states, trust rules, theme, tests |
 | [../compliance/uk-affiliate-checklist.md](../compliance/uk-affiliate-checklist.md) | UK affiliate and consumer-trust checklist (PECR/ICO, CAP/ASA/CMA): status per rule, Phase 3 acceptance criteria, Phase 1 copy audit, owner actions |
 | [freejoy-seo.md](freejoy-seo.md) | Freejoy SEO: indexing policy, sitemap, robots, JSON-LD, expired offers, owner follow-ups |
 | [platform-models.md](platform-models.md) | SQLAlchemy models and the Alembic baseline |

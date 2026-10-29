@@ -6,9 +6,11 @@ import type { Merchant, Offer } from '@/lib/catalogue';
 interface FreshlyFoundProps {
   offers: Offer[];
   merchants: Merchant[];
+  /** True when the offers are fixtures: the section says so. */
+  demo: boolean;
 }
 
-export function FreshlyFound({ offers, merchants }: FreshlyFoundProps) {
+export function FreshlyFound({ offers, merchants, demo }: FreshlyFoundProps) {
   return (
     <section aria-labelledby="freshly-found-heading" className="pt-10">
       <div className="flex items-end justify-between gap-4">
@@ -20,7 +22,9 @@ export function FreshlyFound({ offers, merchants }: FreshlyFoundProps) {
             Freshly found
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Featured picks from the sample catalogue.
+            {demo
+              ? 'Featured picks from the sample catalogue.'
+              : 'Featured picks from our latest finds.'}
           </p>
         </div>
         <Link
@@ -31,10 +35,18 @@ export function FreshlyFound({ offers, merchants }: FreshlyFoundProps) {
           <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Link>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">
-        Sample listings for the design preview, not real offers.
-      </p>
-      <OfferGrid offers={offers} merchants={merchants} className="mt-5" />
+      {demo && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Sample listings for the design preview, not real offers.
+        </p>
+      )}
+      {offers.length === 0 ? (
+        <p className="mt-5 rounded-card border border-border bg-card p-6 text-sm text-muted-foreground">
+          There are no featured freebies right now. Browse all freebies to see what is available.
+        </p>
+      ) : (
+        <OfferGrid offers={offers} merchants={merchants} className="mt-5" />
+      )}
     </section>
   );
 }

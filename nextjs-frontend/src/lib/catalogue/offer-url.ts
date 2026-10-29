@@ -2,8 +2,8 @@
  * Catalogue filter state <-> URL. The URL is the source of truth, so every helper here is pure
  * and unknown or malformed values fall back to the defaults instead of throwing.
  */
-import { CATEGORIES } from './fixtures';
 import { normaliseQuery } from './query';
+import { isValidSlug } from './slug';
 import { OFFER_TYPES, SORT_KEYS, type CatalogueQuery, type OfferType, type SortKey } from './types';
 
 export const DEFAULT_QUERY: CatalogueQuery = {
@@ -45,7 +45,8 @@ export function parseCatalogueParams(params: RawParams): CatalogueQuery {
 
   return {
     q: normaliseQuery(firstValue(params.q)),
-    category: CATEGORIES.some((entry) => entry.slug === category) ? category : null,
+    // Any well-formed slug: whether it names a real category is the data source's call.
+    category: isValidSlug(category) ? category : null,
     types: parseTypes(params.type),
     postage: firstValue(params.postage).trim() === 'free' ? 'free' : null,
     sort: parseSort(firstValue(params.sort).trim()),

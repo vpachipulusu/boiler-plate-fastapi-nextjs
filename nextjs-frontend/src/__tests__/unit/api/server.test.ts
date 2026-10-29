@@ -64,6 +64,37 @@ describe('callBackend', () => {
       expect(headerGet).not.toHaveBeenCalled();
     });
 
+    it('forwards an address the caller passes in, still reading no request headers', async () => {
+      vi.stubEnv('BACKEND_INTERNAL_KEY', 'server-key');
+      fetchMock.mockResolvedValue(jsonResponse({ status: 'ok' }));
+
+      await callBackend((client) => healthCheck({ client }), {
+        shared: true,
+        clientIp: '203.0.113.7',
+      });
+
+      expect(fetchMock.mock.calls[0][0].headers.get('X-Client-IP')).toBe('203.0.113.7');
+      expect(headerGet).not.toHaveBeenCalled();
+      expect(cookieGet).not.toHaveBeenCalled();
+    });
+
+    it('drops a passed-in address that is not an IP, or that comes without the internal key', async () => {
+      vi.stubEnv('BACKEND_INTERNAL_KEY', 'server-key');
+      fetchMock.mockResolvedValue(jsonResponse({ status: 'ok' }));
+      await callBackend((client) => healthCheck({ client }), {
+        shared: true,
+        clientIp: 'not an ip',
+      });
+      expect(fetchMock.mock.calls[0][0].headers.has('X-Client-IP')).toBe(false);
+
+      vi.stubEnv('BACKEND_INTERNAL_KEY', '');
+      await callBackend((client) => healthCheck({ client }), {
+        shared: true,
+        clientIp: '203.0.113.7',
+      });
+      expect(fetchMock.mock.calls[1][0].headers.has('X-Client-IP')).toBe(false);
+    });
+
     it('keeps no-store and the session for ordinary calls', async () => {
       fetchMock.mockResolvedValue(jsonResponse({ status: 'ok' }));
 

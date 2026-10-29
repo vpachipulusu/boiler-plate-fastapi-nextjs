@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OfferCta } from '@/components/offer/offer-cta';
+import { OfferHero } from '@/components/offer/offer-hero';
+import { CATEGORIES, OFFERS } from '@/lib/catalogue/fixtures';
 
 describe('OfferCta', () => {
   it('opens the demo offer dialog when the call to action is clicked', async () => {
     const user = userEvent.setup();
-    render(<OfferCta offerType="free_sample" ended={false} categorySlug="beauty" />);
+    render(<OfferCta offerType="free_sample" demo />);
 
     await user.click(screen.getByRole('button', { name: /get this free sample/i }));
 
@@ -17,7 +19,7 @@ describe('OfferCta', () => {
 
   it('closes on Escape and returns focus to the call to action', async () => {
     const user = userEvent.setup();
-    render(<OfferCta offerType="free_trial" ended={false} categorySlug="beauty" />);
+    render(<OfferCta offerType="free_trial" demo />);
     const trigger = screen.getByRole('button', { name: /start the free trial/i });
 
     await user.click(trigger);
@@ -29,7 +31,7 @@ describe('OfferCta', () => {
   });
 
   it('labels the button by offer type and never links to an external site', () => {
-    render(<OfferCta offerType="competition" ended={false} categorySlug="home-cleaning" />);
+    render(<OfferCta offerType="competition" demo />);
 
     expect(screen.getByRole('button', { name: /enter this competition/i })).toBeInTheDocument();
     expect(screen.getByText(/to request your entry/i)).toBeInTheDocument();
@@ -42,11 +44,18 @@ describe('OfferCta', () => {
     );
   });
 
-  it('replaces the button with an ended panel that links onward', () => {
-    render(<OfferCta offerType="free_sample" ended categorySlug="home-cleaning" />);
+  it('has no ended state of its own: the hero renders the ended panel instead', () => {
+    render(
+      <OfferHero
+        offer={{ ...OFFERS[0], demo: true }}
+        merchant={{ slug: 'm', name: 'M', logoUrl: null }}
+        category={{ ...CATEGORIES[0], slug: 'home-cleaning' }}
+        ended
+      />
+    );
 
     expect(screen.getByRole('heading', { name: 'This offer has ended' })).toBeInTheDocument();
-    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('button', { name: /get this|start the|enter this/i })).toBeNull();
     expect(screen.getByRole('link', { name: /more in this category/i })).toHaveAttribute(
       'href',
       '/category/home-cleaning'

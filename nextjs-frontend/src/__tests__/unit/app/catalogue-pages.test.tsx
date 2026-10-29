@@ -10,25 +10,30 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() }),
 }));
 
-import CategoryPage, {
-  generateMetadata as categoryMetadata,
-  generateStaticParams,
-} from '@/app/(public)/category/[slug]/page';
-import FreebiesPage, { generateMetadata as freebiesMetadata } from '@/app/(public)/freebies/page';
+import CategoryPage, * as categoryRoute from '@/app/(public)/category/[slug]/page';
+import FreebiesPage, * as freebiesRoute from '@/app/(public)/freebies/page';
 import { CatalogueHeading, CatalogueResults } from '@/components/catalogue/catalogue-results';
 import { FilterSidebar } from '@/components/catalogue/filter-sidebar';
 import {
   CATALOGUE_PAGE_SIZE,
   DEFAULT_QUERY,
   getCategories,
-  getOfferBySlug,
+  lookupOffer,
   parseCatalogueParams,
   searchOffers,
   type CatalogueQuery,
 } from '@/lib/catalogue';
 import { FIXTURE_TODAY } from '@/lib/catalogue/fixtures';
 
+const categoryMetadata = categoryRoute.generateMetadata;
+const freebiesMetadata = freebiesRoute.generateMetadata;
 const noParams = Promise.resolve({});
+
+/** A found offer, or null: the page-level lookup without the ended state. */
+async function getOfferBySlug(slug: string) {
+  const lookup = await lookupOffer(slug);
+  return lookup.kind === 'found' ? lookup.offer : null;
+}
 
 function cardSlugs(): string[] {
   return screen
@@ -174,10 +179,10 @@ describe('category page', () => {
     expect(mocks.notFound).toHaveBeenCalledTimes(1);
   });
 
-  it('builds a static page for every enabled category', async () => {
-    const categories = await getCategories();
-
-    expect(await generateStaticParams()).toEqual(categories.map(({ slug }) => ({ slug })));
+  it('renders per request so an outage can never be baked into a prerendered page', () => {
+    expect(categoryRoute.dynamic).toBe('force-dynamic');
+    expect(freebiesRoute.dynamic).toBe('force-dynamic');
+    expect('generateStaticParams' in categoryRoute).toBe(false);
   });
 
   it('sets the category title, canonical and OpenGraph, and stays out of search for now', async () => {

@@ -1,67 +1,73 @@
 /**
- * Catalogue facade. Pages import from here only. Every function is async so Phase 2 can swap the
- * fixtures for the catalogue API without changing a single call site.
+ * Catalogue facade. Pages import from here only. Each function is async and answers from the
+ * configured source: the catalogue API in production, fixtures for local design work and unit tests
+ * (`CATALOGUE_SOURCE`, see `source.ts`). Reads that cannot reach the API throw
+ * `CatalogueUnavailableError`; pages turn that into an error state with `settle`.
  */
-import { CATEGORIES, FIXTURE_TODAY, MERCHANTS, OFFERS } from './fixtures';
-import { filterOffers, isLive, paginate, relatedOffers, sortOffers } from './query';
+import { apiSource } from './api-source';
+import { fixtureSource } from './fixture-source';
+import { getConfiguredSource, type CatalogueBackend, type CatalogueSource } from './source';
 import type { CatalogueQuery, Category, Merchant, Offer, Page } from './types';
 
 export * from './types';
 export { DEFAULT_QUERY, parseCatalogueParams, toCatalogueHref, withQuery } from './offer-url';
 export { isLive, normaliseQuery } from './query';
+export {
+  CATALOGUE_UNAVAILABLE_MESSAGE,
+  CatalogueUnavailableError,
+  settle,
+  type Loaded,
+} from './errors';
+export type { CatalogueSource, EndedOffer, OfferLookup } from './source';
 
-export async function getToday(): Promise<string> {
-  return FIXTURE_TODAY;
+function backend(): CatalogueBackend {
+  return getConfiguredSource() === 'api' ? apiSource : fixtureSource;
 }
 
-export async function getCategories(): Promise<Category[]> {
-  return CATEGORIES.filter((category) => category.enabled)
-    .map((category) => ({ ...category }))
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+/** Whether the site reads the catalogue API or the fixtures, independent of what is live right now. */
+export async function getCatalogueSource(): Promise<CatalogueSource> {
+  return getConfiguredSource();
 }
 
-export async function getCategoryBySlug(slug: string): Promise<Category | null> {
-  const category = CATEGORIES.find((entry) => entry.slug === slug && entry.enabled);
-  return category ? { ...category } : null;
+/** Today's calendar date: the fixture date, or the Europe/London date when API-backed. */
+export function getToday(): Promise<string> {
+  return backend().getToday();
 }
 
-export async function getMerchants(): Promise<Merchant[]> {
-  return MERCHANTS.map((merchant) => ({ ...merchant }));
+export function getCategories(): Promise<Category[]> {
+  return backend().getCategories();
 }
 
-export async function getMerchantBySlug(slug: string): Promise<Merchant | null> {
-  const merchant = MERCHANTS.find((entry) => entry.slug === slug);
-  return merchant ? { ...merchant } : null;
+export function getCategoryBySlug(slug: string): Promise<Category | null> {
+  return backend().getCategoryBySlug(slug);
 }
 
-/** Returns expired offers too so the detail page can show the ended state; hides draft/archived. */
-export async function getOfferBySlug(slug: string): Promise<Offer | null> {
-  const offer = OFFERS.find((entry) => entry.slug === slug);
-  if (!offer || (offer.status !== 'published' && offer.status !== 'expired')) return null;
-  return offer;
+/** Fixture merchants. API offers carry their merchant (`Offer.merchant`), so this is empty for the API. */
+export function getMerchants(): Promise<Merchant[]> {
+  return backend().getMerchants();
 }
 
-export async function getLiveOffers(): Promise<Offer[]> {
-  return sortOffers(
-    OFFERS.filter((offer) => isLive(offer, FIXTURE_TODAY)),
-    'newest'
-  );
+export function getMerchantBySlug(slug: string): Promise<Merchant | null> {
+  return backend().getMerchantBySlug(slug);
 }
 
-export async function getFeaturedOffers(limit = 8): Promise<Offer[]> {
-  const live = await getLiveOffers();
-  return live.filter((offer) => offer.featured).slice(0, Math.max(0, limit));
+/** The offer page's lookup: found, ended (the API's 410) or not found. */
+export function lookupOffer(slug: string) {
+  return backend().lookupOffer(slug);
 }
 
-export async function searchOffers(query: CatalogueQuery): Promise<Page<Offer>> {
-  const matches = filterOffers(OFFERS, query, {
-    today: FIXTURE_TODAY,
-    merchants: MERCHANTS,
-    categories: CATEGORIES,
-  });
-  return paginate(sortOffers(matches, query.sort), query.page);
+export function getLiveOffers(): Promise<Offer[]> {
+  return backend().getLiveOffers();
 }
 
-export async function getRelatedOffers(offer: Offer, limit = 4): Promise<Offer[]> {
-  return relatedOffers(offer, OFFERS, FIXTURE_TODAY, limit);
+export function getFeaturedOffers(limit = 8): Promise<Offer[]> {
+  return backend().getFeaturedOffers(limit);
+}
+
+export function searchOffers(query: CatalogueQuery): Promise<Page<Offer>> {
+  return backend().searchOffers(query);
+}
+
+export function getRelatedOffers(offer: Offer, limit = 4): Promise<Offer[]> {
+  return backend().getRelatedOffers(offer, limit);
 }

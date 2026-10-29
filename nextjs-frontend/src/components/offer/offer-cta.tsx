@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, CalendarOff } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogClose,
@@ -16,48 +17,45 @@ import { CTA_LABELS, REQUEST_KIND } from './offer-format';
 
 interface OfferCtaProps {
   offerType: OfferType;
-  ended: boolean;
-  categorySlug: string;
+  /** True for fixture offers (design preview); false for real catalogue offers. */
+  demo: boolean;
+}
+
+/** Wording for the dialog and the notes under the button; nothing here links off-site yet. */
+function ctaCopy(demo: boolean, offerType: OfferType) {
+  if (demo) {
+    return {
+      title: 'Demo offer',
+      description: 'This is a design preview with sample data, so there is nothing to claim yet.',
+      bullets: [
+        'Real offers will link to the provider through a Freejoy redirect, with an affiliate disclosure next to the button.',
+        'Nothing was clicked through and no other website was opened.',
+      ],
+      note: `Demo offer: this button stays on Freejoy. A real offer will take you to the brand's website to request your ${REQUEST_KIND[offerType]}.`,
+      disclosure: ': on real offers we may earn a commission if you qualify.',
+    };
+  }
+  return {
+    title: 'Claim link coming soon',
+    description:
+      'Freejoy does not send you on to the provider from this page yet, so there is nothing to claim here right now.',
+    bullets: [
+      'Once it is switched on, this button will take you to the provider’s own website, with an affiliate disclosure next to it.',
+      'Nothing was clicked through and no other website was opened.',
+    ],
+    note: `This button stays on Freejoy for now. Once the claim link is live it will take you to the brand's website to request your ${REQUEST_KIND[offerType]}.`,
+    disclosure: ': we may earn a commission if you qualify.',
+  };
 }
 
 /**
- * Primary call to action. Fixture offers have no destination, so the button opens a "Demo offer"
- * dialog instead of linking out: nothing here renders an external href. When the offer has ended
- * the button is replaced by a calm panel with two ways onward.
+ * Primary call to action. No offer has a destination yet (the `/go/[id]` redirect is Phase 3), so
+ * the button opens a dialog instead of linking out: nothing here renders an external href. A real
+ * offer's button says "Coming soon" on its face so it never promises a claim it cannot make. The
+ * ended state is rendered by the (server) hero instead of this client component.
  */
-export function OfferCta({ offerType, ended, categorySlug }: OfferCtaProps) {
-  if (ended) {
-    return (
-      <section aria-labelledby="offer-ended-heading" className="rounded-card bg-warn p-5">
-        <h2
-          id="offer-ended-heading"
-          className="flex items-center gap-2 font-display text-lg font-bold text-warn-foreground"
-        >
-          <CalendarOff className="h-5 w-5" aria-hidden="true" />
-          This offer has ended
-        </h2>
-        <p className="mt-2 text-sm text-warn-foreground">
-          The provider is no longer accepting requests for this one. There are plenty of other happy
-          finds to explore.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm font-bold">
-          <Link
-            href={`/category/${categorySlug}`}
-            className="inline-flex min-h-11 items-center text-accent-ink underline-offset-4 hover:underline"
-          >
-            More in this category
-          </Link>
-          <Link
-            href="/freebies"
-            className="inline-flex min-h-11 items-center text-accent-ink underline-offset-4 hover:underline"
-          >
-            Browse all freebies
-          </Link>
-        </div>
-      </section>
-    );
-  }
-
+export function OfferCta({ offerType, demo }: OfferCtaProps) {
+  const copy = ctaCopy(demo, offerType);
   return (
     <div>
       <Dialog>
@@ -65,23 +63,30 @@ export function OfferCta({ offerType, ended, categorySlug }: OfferCtaProps) {
           <Button
             type="button"
             variant="accent"
-            className="h-14 w-full justify-between rounded-pill px-7 text-base font-bold shadow-sm"
+            aria-label={demo ? undefined : `${CTA_LABELS[offerType]}, coming soon`}
+            className={cn(
+              'w-full justify-between rounded-pill px-7 text-base font-bold shadow-sm',
+              demo ? 'h-14' : 'h-auto min-h-14 whitespace-normal py-2.5 text-start'
+            )}
           >
-            {CTA_LABELS[offerType]}
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {CTA_LABELS[offerType]}
+              {!demo && (
+                <span className="rounded-pill border border-current px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+                  Coming soon
+                </span>
+              )}
+            </span>
             <ArrowRight aria-hidden="true" />
           </Button>
         </DialogTrigger>
         <DialogContent className="rounded-card">
-          <DialogTitle>Demo offer</DialogTitle>
-          <DialogDescription>
-            This is a design preview with sample data, so there is nothing to claim yet.
-          </DialogDescription>
+          <DialogTitle>{copy.title}</DialogTitle>
+          <DialogDescription>{copy.description}</DialogDescription>
           <ul className="list-disc space-y-2 ps-5 text-sm text-foreground">
-            <li>
-              Real offers will link to the provider through a Freejoy redirect, with an affiliate
-              disclosure next to the button.
-            </li>
-            <li>Nothing was clicked through and no other website was opened.</li>
+            {copy.bullets.map((bullet) => (
+              <li key={bullet}>{bullet}</li>
+            ))}
           </ul>
           <DialogClose asChild>
             <Button type="button" variant="outline" className="rounded-pill">
@@ -90,15 +95,12 @@ export function OfferCta({ offerType, ended, categorySlug }: OfferCtaProps) {
           </DialogClose>
         </DialogContent>
       </Dialog>
-      <p className="mt-3 px-3 text-xs text-muted-foreground">
-        Demo offer: this button stays on Freejoy. A real offer will take you to the brand&apos;s
-        website to request your {REQUEST_KIND[offerType]}.
-      </p>
+      <p className="mt-3 px-3 text-xs text-muted-foreground">{copy.note}</p>
       <p className="mt-1 px-3 text-xs text-muted-foreground">
         <Link href="/affiliate-disclosure" className="underline underline-offset-2">
           Affiliate disclosure
         </Link>
-        : on real offers we may earn a commission if you qualify.
+        {copy.disclosure}
       </p>
     </div>
   );

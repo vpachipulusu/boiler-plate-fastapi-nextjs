@@ -10,7 +10,7 @@ import {
   getLiveOffers,
   getMerchantBySlug,
   getMerchants,
-  getOfferBySlug,
+  lookupOffer,
   getRelatedOffers,
   getToday,
   normaliseQuery,
@@ -20,6 +20,12 @@ import {
   withQuery,
 } from '@/lib/catalogue';
 import { FIXTURE_TODAY } from '@/lib/catalogue/fixtures';
+
+/** A found offer, or null: the page-level lookup without the ended state. */
+async function getOfferBySlug(slug: string) {
+  const lookup = await lookupOffer(slug);
+  return lookup.kind === 'found' ? lookup.offer : null;
+}
 
 describe('catalogue facade re-exports', () => {
   it('exposes the label maps and url helpers', () => {

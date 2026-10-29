@@ -39,6 +39,23 @@ Measured on the dev machine (Windows 11, 4 workers), five specs (button-contrast
 
 So a clean worktree went from about 4 min of install plus a flaky 3.4 min run to under 2 min, and a repeat run is about 30 s.
 
+## Real catalogue data
+
+The e2e server runs with `CATALOGUE_SOURCE=fixture` (set in `scripts/e2e-env.cjs`), so the homepage, catalogue,
+offer-detail and alerts specs run on the 24 sample offers with no seeded backend. `catalogue-live.spec.ts` (the
+journeys on real published offers) is skipped unless `E2E_LIVE_CATALOGUE=1`, which starts the server with
+`CATALOGUE_SOURCE=api`. It needs a backend seeded with published offers (the dev seed command, FREEJ-20) on the
+TEST database, plus `BACKEND_API_URL` and `BACKEND_INTERNAL_KEY` as below:
+
+```bash
+export E2E_LIVE_CATALOGUE=1 BACKEND_API_URL=http://127.0.0.1:8170 BACKEND_INTERNAL_KEY=<the same key>
+export E2E_ENDED_OFFER_SLUG=<slug of a seeded offer that was published and has ended>   # optional, journey 5
+npm run test:e2e:local -- src/__tests__/e2e/catalogue-live.spec.ts
+```
+
+Run the fixture specs without `E2E_LIVE_CATALOGUE`; they skip themselves when it is set. The live specs were
+written in FREEJ-21 but have not been run (no seeded backend existed yet).
+
 ## Setup before the first run
 
 Run it for user-facing changes and record the command and result in the PR ([workflow.md](workflow.md)).

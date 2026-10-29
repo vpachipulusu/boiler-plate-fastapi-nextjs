@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import { CatalogueHeader } from '@/components/catalogue/catalogue-header';
 import { CatalogueLayout } from '@/components/catalogue/catalogue-layout';
-import { parseCatalogueParams } from '@/lib/catalogue';
+import { getCatalogueSource, parseCatalogueParams } from '@/lib/catalogue';
 import { isCatalogueApiBacked, isRefinedQuery } from '@/lib/seo/indexing';
-import { loadLiveOffersForSeo } from '@/lib/seo/live-offers';
 import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+/** Rendered per request: the query string drives the page, and an outage is never baked in. */
+export const dynamic = 'force-dynamic';
 
 const OG_TITLE = 'All freebies';
 const DESCRIPTION =
@@ -19,9 +21,10 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const query = parseCatalogueParams(await searchParams);
   const title = query.q === '' ? 'All freebies' : `Search: ${query.q}`;
-  // Page 1 with no filter or search is the one indexable view, and only once the catalogue is
-  // API-backed. Every other view is noindex but followable; all canonicalise to /freebies.
-  const indexable = isCatalogueApiBacked(await loadLiveOffersForSeo('freebies metadata'));
+  // Page 1 with no filter or search is the one indexable view, and only when API-backed. Every
+  // other view is noindex but followable; all canonicalise to /freebies. An outage does not change
+  // this: the page keeps its normal robots while it shows the error (see freejoy-seo.md).
+  const indexable = isCatalogueApiBacked(await getCatalogueSource());
   return {
     title,
     description: DESCRIPTION,
@@ -33,10 +36,11 @@ export async function generateMetadata({
 
 export default async function FreebiesPage({ searchParams }: { searchParams: SearchParams }) {
   const query = parseCatalogueParams(await searchParams);
+  const demo = (await getCatalogueSource()) === 'fixture';
 
   return (
     <>
-      <CatalogueHeader query={query} />
+      <CatalogueHeader query={query} demo={demo} />
       <CatalogueLayout query={query} />
     </>
   );
