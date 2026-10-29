@@ -156,6 +156,7 @@ async def test_duplicate_title_is_409_and_explicit_slug_resolves_it(
         "https://evil.example.com\\@shop.example.com/",
         "https://shop.example.com/%0d%0aSet-Cookie:a=b",
         "https://127.0.0.1/admin",
+        "https://0x7f.0.0.0x1/",
         "https://shop.example.com:8443/",
         "https://shop.example.com/ x",
     ],

@@ -540,3 +540,22 @@ async def test_audit_and_verified_timestamps_use_the_injected_clock(harness):
         result = await client.post("/v1/admin/offers/off1/verify")
 
     assert result.json()["data"]["last_verified_at"].startswith("2026-06-01T12:00:00")
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "body", "permission"),
+    [row for row in ROUTES if row[0] in ("POST", "PATCH") and row[2] is not None],
+    ids=[
+        f"{m} {p}" for m, p, b, _ in ROUTES if m in ("POST", "PATCH") and b is not None
+    ],
+)
+async def test_a_partial_admin_sending_an_invalid_body_gets_403_not_422(
+    harness, method, path, body, permission
+):
+    harness.grants["partial"] = [p for p in CATALOGUE_PERMISSIONS if p != permission]
+
+    async with harness.client("partial") as client:
+        result = await client.request(method, path, json={"title": 5, "bogus": 1})
+
+    assert result.status_code == 403
+    assert result.json() == {"success": False, "error": "Forbidden"}

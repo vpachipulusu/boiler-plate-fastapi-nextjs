@@ -1,5 +1,7 @@
 """AdminOfferService rules with in-memory fakes: no database, no network."""
 
+from datetime import timedelta
+
 import pytest
 
 from app.core.permissions import AdminContext
@@ -485,7 +487,8 @@ async def test_update_link_changes_fields_and_audits():
     assert updated.destination_url == "https://new.example.com/x" and not updated.active
     (row,) = auditor.rows
     assert row["action"] == "admin.offer_links.update"
-    assert row["before"] == {"active": True} and row["after"] == {"active": False}
+    assert row["before"] == {"active": True, "destination_host": "shop.example.com"}
+    assert row["after"] == {"active": False, "destination_host": "new.example.com"}
     assert row["details"]["fields"] == ["active", "destination_url"]
     assert "new.example.com/x" not in repr(row)
 
@@ -534,3 +537,48 @@ async def test_deactivating_a_link_is_fine_when_another_or_a_source_url_remains(
     await service.update_link(ACTOR, "off1", "l2", {"active": False})
 
     assert not store.links["l1"].active and not store.links["l2"].active
+
+
+async def test_an_expired_but_published_offer_stays_editable():
+    service, store, *_ = build(
+        verified(id="off1", status=OfferStatus.PUBLISHED, end_at=EARLIER)
+    )
+
+    renamed = await service.update_offer(ACTOR, "off1", {"title": "x"})
+
+    assert renamed.offer.title == "x" and renamed.offer.end_at == EARLIER
+    with pytest.raises(PublishBlocked) as still_past:
+        await service.update_offer(
+            ACTOR, "off1", {"end_at": EARLIER - timedelta(days=1)}
+        )
+    assert still_past.value.reasons == ["end_date_passed"]
+    moved = await service.update_offer(ACTOR, "off1", {"end_at": LATER})
+    assert moved.offer.end_at == LATER
+    assert store.offers["off1"].status is OfferStatus.PUBLISHED
+
+
+async def test_an_expired_published_offer_still_obeys_the_other_publish_rules():
+    service, *_ = build(
+        verified(id="off1", status=OfferStatus.PUBLISHED, end_at=EARLIER)
+    )
+
+    with pytest.raises(PublishBlocked) as raised:
+        await service.update_offer(ACTOR, "off1", {"source_url": None})
+
+    assert raised.value.reasons == ["no_destination"]
+
+
+async def test_update_link_audits_the_destination_host_before_and_after_never_the_url():
+    service, _, auditor, _ = build(offer("off1"), links=[link("l1")])
+
+    await service.update_link(
+        ACTOR,
+        "off1",
+        "l1",
+        {"destination_url": "https://other.example.org/p?aff=SECRET"},
+    )
+
+    (row,) = auditor.rows
+    assert row["before"] == {"destination_host": "shop.example.com"}
+    assert row["after"] == {"destination_host": "other.example.org"}
+    assert "SECRET" not in repr(row) and "/p" not in repr(row)
