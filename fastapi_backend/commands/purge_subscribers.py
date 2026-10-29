@@ -44,7 +44,12 @@ class PurgeStore(Protocol):
         after_id: str,
         limit: int,
     ) -> list[PurgeCandidate]: ...
-    async def delete_many(self, subscriber_ids: Sequence[str]) -> int: ...
+    async def delete_many(
+        self,
+        subscriber_ids: Sequence[str],
+        pending_before: datetime,
+        unsubscribed_before: datetime,
+    ) -> int: ...
 
 
 class Committer(Protocol):
@@ -93,7 +98,9 @@ async def purge_subscribers(
                 continue
             removable.append(candidate.id)
         if removable:
-            deleted += await store.delete_many(removable)
+            deleted += await store.delete_many(
+                removable, pending_before, unsubscribed_before
+            )
             await session.commit()
     return PurgeSummary(pending, unsubscribed, deleted, failures, dry_run=False)
 

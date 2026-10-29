@@ -4,7 +4,6 @@ from html import escape
 
 from app.core.email_provider import EmailMessage
 
-SUBJECT = "Confirm your Freejoy alerts"
 CONFIRM_HOURS = 24
 
 
@@ -44,7 +43,7 @@ def confirmation_message(
     )
     return EmailMessage(
         to=to,
-        subject=SUBJECT,
+        subject=f"Confirm your {brand} alerts",
         text=text,
         html=html,
         headers=unsubscribe_headers(one_click_url),

@@ -290,9 +290,13 @@ class UpstashRateLimiter:
 
 
 # Alerts sign-up (POST /v1/subscribers): each call can send an email to an address the caller chose, so it
-# is capped per client IP and per address. Fail closed: an outage must not open a mail relay.
-SUBSCRIBE_POLICY = RateLimitPolicy(
-    "subscribe", limit=5, window_seconds=60 * 60, fail_closed=True
+# is capped per client IP (a shared network may hold several visitors) and, tighter, per address.
+# Fail closed: an outage must not open a mail relay.
+SUBSCRIBE_IP_POLICY = RateLimitPolicy(
+    "subscribe", limit=20, window_seconds=60 * 60, fail_closed=True
+)
+SUBSCRIBE_EMAIL_POLICY = RateLimitPolicy(
+    "subscribe_email", limit=5, window_seconds=60 * 60, fail_closed=True
 )
 # Confirm and unsubscribe by signed token (unguessable). Unsubscribes arrive from mailbox providers'
 # servers, so the per-IP limit is generous. Fail open: a Redis outage must not stop an unsubscribe.

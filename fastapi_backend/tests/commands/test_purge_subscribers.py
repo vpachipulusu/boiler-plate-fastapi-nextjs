@@ -38,7 +38,12 @@ class FakePurgeStore:
             :limit
         ]
 
-    async def delete_many(self, subscriber_ids: Sequence[str]) -> int:
+    async def delete_many(
+        self,
+        subscriber_ids: Sequence[str],
+        pending_before: datetime,
+        unsubscribed_before: datetime,
+    ) -> int:
         self.deleted.extend(subscriber_ids)
         return len(subscriber_ids)
 

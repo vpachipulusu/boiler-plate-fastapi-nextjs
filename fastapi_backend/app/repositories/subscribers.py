@@ -152,8 +152,21 @@ class SubscriberRepository(BaseRepository):
         )
         return [PurgeCandidate(*row) for row in rows.all()]
 
-    async def delete_many(self, subscriber_ids: Sequence[str]) -> int:
+    async def delete_many(
+        self,
+        subscriber_ids: Sequence[str],
+        pending_before: datetime,
+        unsubscribed_before: datetime,
+    ) -> int:
+        """Delete the given rows that are still expired; the count is the rows really deleted.
+
+        The retention test is applied again here, so a row that was confirmed or re-opened between listing
+        and deleting survives.
+        """
         result = await self._session.execute(
-            delete(EmailSubscriber).where(EmailSubscriber.id.in_(subscriber_ids))
+            delete(EmailSubscriber).where(
+                EmailSubscriber.id.in_(subscriber_ids),
+                _expired(pending_before, unsubscribed_before),
+            )
         )
         return int(getattr(result, "rowcount", 0) or 0)

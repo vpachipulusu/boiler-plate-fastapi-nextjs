@@ -129,3 +129,14 @@ def test_blank_secrets_copied_from_the_example_file_count_as_unset(
 
     assert settings.SUBSCRIBER_TOKEN_SECRET is None
     assert settings.EMAIL_PROVIDER_API_KEY is None
+
+
+def test_a_vercel_preview_cannot_switch_on_the_fake_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    env = production_env(
+        SUBSCRIBER_TOKEN_SECRET=SECRET, EMAIL_PROVIDER="fake", VERCEL_ENV="preview"
+    )
+
+    with pytest.raises(ValidationError, match="only allowed in local and test"):
+        load(monkeypatch, **env)

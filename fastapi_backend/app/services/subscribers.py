@@ -149,21 +149,22 @@ class SubscriberService:
     async def _reopen(
         self, email: str, values: dict[str, Any], now: datetime
     ) -> str | None:
-        """The address already has a row: its id when a new confirmation may go out, else None."""
+        """The address already has a row: its id when a new confirmation may go out, else None.
+
+        Only a PENDING row is re-opened. A CONFIRMED subscriber is never changed, and an UNSUBSCRIBED
+        address is never re-opened by an anonymous submission (anyone can type it): bringing it back is an
+        operator action. A re-sent confirmation keeps the first request's consent record, so the 30 day
+        retention of an unconfirmed sign-up ages from the first request and cannot be extended by resubmitting.
+        """
         existing = await self._store.get_by_email(email, lock=True)
-        if existing is None or existing.status is SubscriberStatus.CONFIRMED:
+        if existing is None or existing.status is not SubscriberStatus.PENDING:
             return None
         sent = existing.confirmation_sent_at
         if sent is not None and now - sent < RESEND_INTERVAL:
             return None
         await self._store.update(
             existing.id,
-            {
-                **values,
-                "status": SubscriberStatus.PENDING,
-                "confirmed_at": None,
-                "unsubscribed_at": None,
-            },
+            {"categories": values["categories"], "frequency": values["frequency"]},
         )
         return existing.id
 

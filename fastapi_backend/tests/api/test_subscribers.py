@@ -13,7 +13,7 @@ from app.api.deps import get_rate_limiter, get_session_provider
 from app.api.v1.subscribers import get_subscriber_service
 from app.core.config import settings
 from app.core.email_provider import EmailProviderError
-from app.core.rate_limit import SUBSCRIBE_POLICY
+from app.core.rate_limit import SUBSCRIBE_EMAIL_POLICY, SUBSCRIBE_IP_POLICY
 from app.main import create_app
 from tests.fakes import (
     FakeRateLimiter,
@@ -115,9 +115,18 @@ async def test_subscribe_is_limited_by_client_ip_and_a_hash_of_the_address() -> 
     identifiers = [identifier for identifier, _ in limiter.hits]
     assert len(identifiers) == 2
     assert identifiers[0].startswith("subscribe:ip:")
-    assert identifiers[1].startswith("subscribe:email:")
+    assert identifiers[1].startswith("subscribe_email:email:")
     assert EMAIL not in " ".join(identifiers)
-    assert {policy for _, policy in limiter.hits} == {SUBSCRIBE_POLICY}
+    assert [policy for _, policy in limiter.hits] == [
+        SUBSCRIBE_IP_POLICY,
+        SUBSCRIBE_EMAIL_POLICY,
+    ]
+
+
+def test_the_ip_limit_is_looser_than_the_address_limit() -> None:
+    assert SUBSCRIBE_IP_POLICY.limit == 20
+    assert SUBSCRIBE_EMAIL_POLICY.limit == 5
+    assert SUBSCRIBE_IP_POLICY.fail_closed and SUBSCRIBE_EMAIL_POLICY.fail_closed
 
 
 async def test_the_sixth_request_for_one_address_is_refused_with_429() -> None:
@@ -126,10 +135,10 @@ async def test_the_sixth_request_for_one_address_is_refused_with_429() -> None:
     async with http:
         statuses = [
             (await http.post("/v1/subscribers", json=VALID)).status_code
-            for _ in range(SUBSCRIBE_POLICY.limit + 1)
+            for _ in range(SUBSCRIBE_EMAIL_POLICY.limit + 1)
         ]
 
-    assert statuses == [202] * SUBSCRIBE_POLICY.limit + [429]
+    assert statuses == [202] * SUBSCRIBE_EMAIL_POLICY.limit + [429]
 
 
 async def test_a_limiter_outage_refuses_signups_instead_of_opening_a_mail_relay() -> (
@@ -350,4 +359,37 @@ async def test_a_non_ascii_address_is_refused_before_anything_is_stored() -> Non
         )
 
     assert response.status_code == 422
+    assert harness.provider.sent == []
+
+
+async def test_one_ip_may_sign_up_many_different_addresses_up_to_its_own_limit() -> (
+    None
+):
+    http, _, _ = build()
+
+    async with http:
+        statuses = [
+            (
+                await http.post(
+                    "/v1/subscribers", json={**VALID, "email": f"person{n}@example.com"}
+                )
+            ).status_code
+            for n in range(SUBSCRIBE_IP_POLICY.limit + 1)
+        ]
+
+    assert statuses == [202] * SUBSCRIBE_IP_POLICY.limit + [429]
+
+
+async def test_a_vercel_preview_without_a_provider_refuses_signups(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    http, harness, _ = build()
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "VERCEL_ENV", "preview")
+    monkeypatch.setattr(settings, "EMAIL_PROVIDER", "")
+
+    async with http:
+        response = await http.post("/v1/subscribers", json=VALID)
+
+    assert response.status_code == 503
     assert harness.provider.sent == []

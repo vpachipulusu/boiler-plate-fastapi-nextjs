@@ -316,7 +316,7 @@ async def test_a_confirmed_subscriber_is_untouched_by_a_later_signup_form(
     assert len(provider.sent) == 1
 
 
-async def test_an_unsubscribed_address_can_opt_in_again(
+async def test_an_unsubscribed_address_is_never_reopened_by_a_form_submission(
     client: AsyncClient, engine: AsyncEngine, provider: FakeEmailProvider
 ) -> None:
     await client.post("/v1/subscribers", json=BODY)
@@ -331,12 +331,62 @@ async def test_an_unsubscribed_address_can_opt_in_again(
                 "SET confirmation_sent_at = now() - interval '2 hours'"
             )
         )
+    before = await only_row(engine)
 
+    again = await client.post("/v1/subscribers", json=BODY)
+
+    assert again.status_code == 202
+    assert await only_row(engine) == before
+    assert before["status"] == "UNSUBSCRIBED"
+    assert len(provider.sent) == 1
+
+
+async def test_a_resent_confirmation_keeps_the_first_consent_time(
+    client: AsyncClient, engine: AsyncEngine, provider: FakeEmailProvider
+) -> None:
     await client.post("/v1/subscribers", json=BODY)
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE email_subscribers SET consent_at = now() - interval '31 days', "
+                "confirmation_sent_at = now() - interval '2 hours'"
+            )
+        )
+    first = (await only_row(engine))["consent_at"]
+
+    await client.post("/v1/subscribers", json={**BODY, "frequency": "DAILY"})
 
     row = await only_row(engine)
-    assert (row["status"], row["unsubscribed_at"]) == ("PENDING", None)
     assert len(provider.sent) == 2
+    assert row["consent_at"] == first
+    assert row["frequency"] == "DAILY"
+
+
+async def test_a_pending_signup_first_requested_31_days_ago_is_purged_even_if_resubmitted_today(
+    client: AsyncClient, engine: AsyncEngine, provider: FakeEmailProvider
+) -> None:
+    await client.post("/v1/subscribers", json=BODY)
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE email_subscribers SET consent_at = now() - interval '31 days', "
+                "confirmation_sent_at = now() - interval '2 hours'"
+            )
+        )
+    await client.post("/v1/subscribers", json=BODY)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+
+    async with maker() as session:
+        done = await purge_subscribers(
+            SubscriberRepository(session),
+            session,
+            FakeEmailProvider(),
+            datetime.now(UTC),
+            dry_run=False,
+        )
+
+    assert done.deleted == 1
+    assert await rows(engine) == []
 
 
 async def test_simultaneous_submissions_make_one_row_and_one_email(
@@ -421,7 +471,10 @@ async def test_rate_limits_key_on_ip_and_a_hash_not_the_address(
     await client.post("/v1/subscribers", json=BODY)
 
     identifiers = [identifier for identifier, _ in limiter.hits]
-    assert [i.split(":")[1] for i in identifiers] == ["ip", "email"]
+    assert [":".join(i.split(":")[:2]) for i in identifiers] == [
+        "subscribe:ip",
+        "subscribe_email:email",
+    ]
     assert all(EMAIL not in identifier for identifier in identifiers)
 
 
@@ -495,3 +548,26 @@ async def test_retention_keeps_a_row_whose_provider_erase_fails(
 
     assert (done.deleted, done.provider_failures) == (0, 1)
     assert [row["id"] for row in await rows(engine)] == [kept]
+
+
+async def test_delete_many_applies_the_retention_test_again(
+    engine: AsyncEngine,
+) -> None:
+    now = datetime.now(UTC)
+    confirmed = await insert_row(
+        engine,
+        status="CONFIRMED",
+        consent_at=now - timedelta(days=900),
+        confirmed_at=now - timedelta(days=899),
+    )
+    expired = await insert_row(engine, consent_at=now - timedelta(days=31))
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+
+    async with maker() as session:
+        count = await SubscriberRepository(session).delete_many(
+            [confirmed, expired], now - timedelta(days=30), now - timedelta(days=365)
+        )
+        await session.commit()
+
+    assert count == 1
+    assert [row["id"] for row in await rows(engine)] == [confirmed]

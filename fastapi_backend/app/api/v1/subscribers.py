@@ -24,9 +24,13 @@ from app.api.rate_limit import (
     limit_by_client_ip,
     limit_by_client_ip_and_email,
 )
-from app.core.config import settings
+from app.core.config import LOCAL_ENVIRONMENTS, settings
 from app.core.errors import ErrorResponse
-from app.core.rate_limit import SUBSCRIBE_POLICY, SUBSCRIBER_TOKEN_POLICY
+from app.core.rate_limit import (
+    SUBSCRIBE_EMAIL_POLICY,
+    SUBSCRIBE_IP_POLICY,
+    SUBSCRIBER_TOKEN_POLICY,
+)
 from app.core.subscriber_tokens import MAX_TOKEN_LENGTH, SubscriberTokens
 from app.models.platform.email_subscriber import AlertFrequency
 from app.repositories.subscribers import SubscriberRepository
@@ -147,7 +151,8 @@ def require_email_delivery() -> None:
     """Refuse sign-ups in production while no provider is set: nobody should be told to check an inbox
     for a message that will never come. Local and test runs accept them (nothing is sent).
     """
-    if not settings.EMAIL_PROVIDER and not settings.relaxed_environment:
+    # ENVIRONMENT only: a Vercel preview is a deployed site, not a local run.
+    if not settings.EMAIL_PROVIDER and settings.ENVIRONMENT not in LOCAL_ENVIRONMENTS:
         raise _unavailable()
 
 
@@ -166,7 +171,11 @@ router = APIRouter(
     summary="Start an alerts sign-up",
     dependencies=[
         Depends(require_email_delivery),
-        Depends(limit_by_client_ip_and_email(SUBSCRIBE_POLICY, subscribe_email)),
+        Depends(
+            limit_by_client_ip_and_email(
+                SUBSCRIBE_IP_POLICY, SUBSCRIBE_EMAIL_POLICY, subscribe_email
+            )
+        ),
     ],
     responses=RATE_LIMIT_FAIL_CLOSED_RESPONSES,
 )

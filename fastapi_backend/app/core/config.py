@@ -138,7 +138,8 @@ class Settings(BaseSettings):
             raise ValueError("SUBSCRIBER_TOKEN_SECRET must have at least 32 characters")
         if secret is None and not relaxed:
             raise ValueError("SUBSCRIBER_TOKEN_SECRET must be set in production")
-        if provider == "fake" and not relaxed:
+        # ENVIRONMENT only: a Vercel preview must not be able to switch the fake provider on.
+        if provider == "fake" and self.ENVIRONMENT not in LOCAL_ENVIRONMENTS:
             raise ValueError("EMAIL_PROVIDER=fake is only allowed in local and test")
         if provider == "brevo":
             if not (

@@ -93,8 +93,11 @@ async def test_resubmitting_after_the_hour_sends_a_fresh_link_and_voids_the_old_
     await harness.service.confirm(harness.last_links()["confirm"])
 
 
-async def test_resubmission_while_pending_updates_the_choices_and_consent() -> None:
+async def test_resubmission_while_pending_updates_the_choices_but_keeps_the_first_consent() -> (
+    None
+):
     harness = await subscribed()
+    first_consent_at = harness.clock.now
     harness.clock.advance(RESEND_INTERVAL)
 
     await harness.service.subscribe(
@@ -104,7 +107,29 @@ async def test_resubmission_while_pending_updates_the_choices_and_consent() -> N
     (row,) = harness.store.rows.values()
     assert row.categories == ("food-drink",)
     assert row.frequency is AlertFrequency.DAILY
-    assert row.consent_at == harness.clock.now
+    assert row.consent_at == first_consent_at
+    assert row.confirmation_sent_at == harness.clock.now
+
+
+async def test_a_pending_row_inside_the_resend_interval_is_left_alone_and_sends_nothing() -> (
+    None
+):
+    harness = await subscribed()
+    before = next(iter(harness.store.rows.values()))
+    harness.clock.advance(timedelta(minutes=5))
+
+    await harness.service.subscribe(
+        make_request(EMAIL, categories=("pets",), frequency=AlertFrequency.DAILY)
+    )
+
+    assert next(iter(harness.store.rows.values())) == before
+    assert len(harness.provider.sent) == 1
+
+
+async def test_the_confirmation_subject_names_the_brand() -> None:
+    harness = await subscribed()
+
+    assert harness.provider.sent[0].subject == "Confirm your Freejoy alerts"
 
 
 async def test_a_confirmed_subscriber_is_not_changed_or_emailed() -> None:
@@ -120,18 +145,16 @@ async def test_a_confirmed_subscriber_is_not_changed_or_emailed() -> None:
     assert len(harness.provider.sent) == 1
 
 
-async def test_an_unsubscribed_address_can_start_again() -> None:
+async def test_subscribe_for_an_unsubscribed_address_sends_nothing() -> None:
     harness = await confirmed()
     await harness.service.unsubscribe(harness.last_links()["unsubscribe"])
-    harness.clock.advance(RESEND_INTERVAL)
+    before = next(iter(harness.store.rows.values()))
+    harness.clock.advance(timedelta(days=30))
 
     await harness.service.subscribe(make_request(EMAIL))
 
-    (row,) = harness.store.rows.values()
-    assert row.status is SubscriberStatus.PENDING
-    assert row.unsubscribed_at is None
-    assert row.confirmed_at is None
-    assert len(harness.provider.sent) == 2
+    assert next(iter(harness.store.rows.values())) == before
+    assert len(harness.provider.sent) == 1
 
 
 async def test_a_failed_send_stores_nothing_and_asks_to_retry() -> None:
