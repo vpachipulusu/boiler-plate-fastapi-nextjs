@@ -104,8 +104,13 @@ class OutboundClickService:
         offer_id: str,
         referrer_host: str | None,
         user_agent_class: UserAgentClass | None,
+        *,
+        record: bool = True,
     ) -> ClickOutcome:
-        """Resolve the destination and write one click event, or write nothing."""
+        """Resolve the destination and write one click event, or write nothing.
+
+        ``record=False`` (the per-offer cap is spent) still returns the destination but writes no click.
+        """
         offer = await self._offers.get_offer_by_id(offer_id)
         if offer is None or isinstance(offer, ExpiredOffer):
             return offer
@@ -113,13 +118,14 @@ class OutboundClickService:
         if found is None:
             return None
         link, destination = found
-        await self._store.add_click(
-            offer_id=offer.id,
-            affiliate_link_id=link.id,
-            referrer_host=clean_referrer_host(referrer_host),
-            user_agent_class=user_agent_class,
-        )
-        await self._session.commit()
+        if record:
+            await self._store.add_click(
+                offer_id=offer.id,
+                affiliate_link_id=link.id,
+                referrer_host=clean_referrer_host(referrer_host),
+                user_agent_class=user_agent_class,
+            )
+            await self._session.commit()
         return ClickRedirect(destination)
 
     async def _first_usable_link(self, offer_id: str) -> tuple[LinkRecord, str] | None:

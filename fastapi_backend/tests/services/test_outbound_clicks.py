@@ -254,3 +254,24 @@ async def test_refusals_are_logged_without_the_destination(
 )
 def test_clean_referrer_host(raw: str | None, expected: str | None) -> None:
     assert clean_referrer_host(raw) == expected
+
+
+async def test_record_false_returns_the_destination_without_writing_a_click() -> None:
+    service, store, committer = build(make_offer(), [make_link()])
+
+    outcome = await service.record_click("offer_1", "news.example", None, record=False)
+
+    assert outcome == ClickRedirect(AWIN)
+    assert store.clicks == [] and committer.commits == 0
+
+
+async def test_record_false_still_refuses_what_is_not_followable() -> None:
+    hostile = make_link(destination_url="javascript:alert(1)")
+    service, store, committer = build(make_offer(), [hostile])
+    ended, _, _ = build(make_offer(end_at=NOW - timedelta(days=1)), [make_link()])
+
+    assert await service.record_click("offer_1", None, None, record=False) is None
+    assert isinstance(
+        await ended.record_click("offer_1", None, None, record=False), ExpiredOffer
+    )
+    assert store.clicks == [] and committer.commits == 0

@@ -217,22 +217,67 @@ async def test_rate_limit_is_keyed_by_the_forwarded_client_ip_and_by_the_offer()
     ]
 
 
-async def test_one_offer_is_capped_across_all_clients_with_the_same_429() -> None:
-    http, store, _, _ = build(make_offer())
+async def test_past_the_offer_cap_the_visitor_still_gets_the_destination_but_no_click() -> (
+    None
+):
+    http, store, committer, _ = build(make_offer())
+    limit = OUTBOUND_OFFER_POLICY.limit
 
     async with http:
         responses = [
             await http.post(PATH, headers={"X-Client-IP": f"10.{n // 250}.{n % 250}.1"})
-            for n in range(OUTBOUND_OFFER_POLICY.limit + 1)
+            for n in range(limit + 5)
         ]
 
-    assert [r.status_code for r in responses[:-1]] == [
-        200
-    ] * OUTBOUND_OFFER_POLICY.limit
+    assert [r.status_code for r in responses] == [200] * (limit + 5)
+    assert all(r.json()["data"]["destination_url"] == DESTINATION for r in responses)
+    assert all("Retry-After" not in r.headers for r in responses)
+    assert len(store.clicks) == limit
+    assert committer.commits == limit
+
+
+async def test_the_per_client_limit_still_refuses_with_429() -> None:
+    http, store, _, _ = build(make_offer())
+
+    async with http:
+        responses = [
+            await http.post(PATH, headers={"X-Client-IP": "203.0.113.9"})
+            for _ in range(OUTBOUND_CLICK_POLICY.limit + 1)
+        ]
+
     assert responses[-1].status_code == 429
-    assert responses[-1].json() == {"success": False, "error": "Too many requests"}
     assert "Retry-After" in responses[-1].headers
-    assert len(store.clicks) == OUTBOUND_OFFER_POLICY.limit
+    assert len(store.clicks) == OUTBOUND_CLICK_POLICY.limit
+
+
+async def test_a_capped_offer_still_refuses_what_it_would_refuse_anyway() -> None:
+    bad = make_link(destination_url="https://evil.example/")
+    http, store, _, _ = build(make_offer(), [bad])
+    limit = OUTBOUND_OFFER_POLICY.limit
+
+    async with http:
+        for n in range(limit):
+            await http.post(PATH, headers={"X-Client-IP": f"10.{n // 250}.{n % 250}.1"})
+        over = await http.post(PATH, headers={"X-Client-IP": "10.9.9.9"})
+
+    assert over.status_code == 404
+    assert store.clicks == []
+
+
+async def test_an_offer_cap_outage_records_the_click_as_usual() -> None:
+    class OfferKeyOutage(FakeRateLimiter):
+        async def hit(self, identifier, policy):  # type: ignore[no-untyped-def]
+            if identifier.startswith("outbound_offer:"):
+                raise RuntimeError("redis down")
+            return await super().hit(identifier, policy)
+
+    http, store, _, _ = build(make_offer(), limiter=OfferKeyOutage())
+
+    async with http:
+        response = await http.post(PATH)
+
+    assert response.status_code == 200
+    assert len(store.clicks) == 1
 
 
 async def test_the_offer_cap_is_per_offer() -> None:

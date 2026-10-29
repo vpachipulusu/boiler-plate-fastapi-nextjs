@@ -11,6 +11,7 @@ returns the stored affiliate destination, or refuses without writing anything:
 Every response is ``Cache-Control: no-store``. The destination is never logged.
 """
 
+import logging
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response
@@ -21,19 +22,20 @@ from app.api.deps import SessionDep
 from app.api.rate_limit import (
     RATE_LIMIT_RESPONSES,
     RateLimiterDep,
-    enforce_rate_limit,
     limit_by_client_ip,
 )
 from app.api.v1.catalogue_schemas import ExpiredOfferResponse, expired_response
 from app.core.config import settings
 from app.core.errors import ErrorResponse
 from app.core.rate_limit import OUTBOUND_CLICK_POLICY, OUTBOUND_OFFER_POLICY
+from app.core.sentry import report_exception
 from app.models.platform.click_event import UserAgentClass
 from app.repositories.catalogue import CatalogueRepository
 from app.repositories.outbound_clicks import OutboundClickRepository
 from app.services.catalogue import CatalogueService, ExpiredOffer
 from app.services.outbound_clicks import MAX_HOST_LENGTH, OutboundClickService
 
+logger = logging.getLogger("yourapp.outbound")
 NO_STORE = {"Cache-Control": "no-store"}
 OFFER_ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
 
@@ -51,14 +53,31 @@ router = APIRouter(
 OfferIdPath = Annotated[str, Path(pattern=OFFER_ID_PATTERN)]
 
 
-async def limit_by_offer(
-    request: Request, response: Response, limiter: RateLimiterDep, offer_id: OfferIdPath
-) -> None:
-    """Second limit, per offer id, after the per-IP one: caps what any crowd can add to one offer."""
+async def offer_has_room(
+    request: Request, limiter: RateLimiterDep, offer_id: OfferIdPath
+) -> bool:
+    """Second limit, per offer id: True while this offer may still gain a recorded click this minute.
+
+    Past the cap the visitor is still sent on (``record`` is False): refusing would punish the visitor for
+    a crowd, while capping only limits how many clicks one offer can add per minute. A limiter outage
+    records the click as usual, like the other public routes (the policy fails open).
+    """
     identifier = f"{OUTBOUND_OFFER_POLICY.scope}:offer:{offer_id}"
-    await enforce_rate_limit(
-        request, response, limiter, OUTBOUND_OFFER_POLICY, [identifier]
-    )
+    try:
+        decision = await limiter.hit(identifier, OUTBOUND_OFFER_POLICY)
+    except Exception as exc:
+        request_id = request.scope.get("state", {}).get("request_id")
+        logger.warning(
+            "offer cap limiter unavailable, recording the click",
+            exc_info=exc,
+            extra={"request_id": request_id},
+        )
+        report_exception(exc)
+        return True
+    return decision.allowed
+
+
+RecordAllowed = Annotated[bool, Depends(offer_has_room)]
 
 
 class ClickRequest(BaseModel):
@@ -113,7 +132,6 @@ def _no_store(body: BaseModel, status_code: int = 200) -> Response:
     "/offers/{offer_id}/click",
     response_model=ClickResponse,
     summary="Record an outbound click and return the destination",
-    dependencies=[Depends(limit_by_offer)],
     responses={
         404: {"model": ErrorResponse, "description": "Not available"},
         410: {"model": ExpiredOfferResponse, "description": "The offer has ended"},
@@ -122,12 +140,13 @@ def _no_store(body: BaseModel, status_code: int = 200) -> Response:
 async def record_click(
     offer_id: OfferIdPath,
     service: ClickServiceDep,
+    record: RecordAllowed,
     body: Annotated[ClickRequest | None, Body()] = None,
 ) -> Response:
     """Write one click event for a live offer and return its affiliate destination."""
     request = body or ClickRequest()
     outcome = await service.record_click(
-        offer_id, request.referrer_host, request.user_agent_class
+        offer_id, request.referrer_host, request.user_agent_class, record=record
     )
     if outcome is None:
         raise HTTPException(404, "Offer not found", headers=NO_STORE)
