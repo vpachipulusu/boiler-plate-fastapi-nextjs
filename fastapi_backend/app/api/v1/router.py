@@ -6,6 +6,7 @@ from app.api.v1 import (
     admin_subscriptions,
     admin_users,
     auth,
+    catalogue,
     health,
     me,
     me_export,
@@ -29,6 +30,7 @@ api_router.include_router(admin_audit_logs.router)
 api_router.include_router(admin_analytics.router)
 api_router.include_router(organizations.router)
 api_router.include_router(settings.router)
+api_router.include_router(catalogue.router)
 
 # Stripe Billing module (docs/developer/modules.md): remove these three lines with the module.
 api_router.include_router(webhooks.router)
