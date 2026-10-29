@@ -99,7 +99,7 @@ logo_url}`, `offer_type`, `featured`, `image {tint, label, alt}`, `postage {kind
 stores the upper-case names.
 
 Never exposed: `publisher_notes`, `status`, category and merchant ids, `source_url`, merchant `website`, timestamps other than the ones
-above, and anything from `affiliate_links` (destinations are resolved server-side by the later redirect story). The
+above, and anything from `affiliate_links` (destinations are resolved server-side by the outbound click endpoint, see [freejoy-affiliate.md](freejoy-affiliate.md)). The
 repository selects an explicit column list, so those columns never leave the database layer, and the response models
 are a second, independent allowlist. To expose another field, add it to `OfferRecord`, the select list, `OfferData` and
 the allowlist test together.
