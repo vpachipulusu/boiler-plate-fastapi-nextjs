@@ -22,6 +22,7 @@ Start here, then follow the links. Root-level overview: [`../../README.md`](../.
 | --- | --- |
 | [architecture.md](architecture.md) | The two apps, the auth flow, the backend layering, data, logging |
 | [freejoy-frontend.md](freejoy-frontend.md) | Freejoy Phase 1: public routes, fixture catalogue, trust rules, theme, tests |
+| [freejoy-seo.md](freejoy-seo.md) | Freejoy SEO: indexing policy, sitemap, robots, JSON-LD, expired offers, owner follow-ups |
 | [platform-models.md](platform-models.md) | SQLAlchemy models and the Alembic baseline |
 | [backend-auth.md](backend-auth.md) | Session endpoints, Firebase verification, internal key |
 | [backend-totp.md](backend-totp.md) | Two-factor authentication |
