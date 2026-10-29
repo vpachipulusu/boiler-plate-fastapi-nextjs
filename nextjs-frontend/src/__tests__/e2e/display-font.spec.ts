@@ -4,8 +4,8 @@ import { waitForPageReady } from './helpers/e2e-utils';
 /**
  * Display font E2E
  *
- * - h1 renders in the Fraunces display font
- * - body text keeps the admin-selectable body font (never Fraunces)
+ * - h1 renders in the Inter display face at weight 800 through --font-display
+ * - body text keeps the admin-selectable body font (never the serif the template used)
  * - landing page layout shift stays below the 0.1 CLS budget
  */
 
@@ -18,13 +18,14 @@ test.describe('Display font', () => {
     await page.evaluate(() => document.fonts.ready);
   });
 
-  test('h1 computed font-family starts with Fraunces', async ({ page }) => {
-    const family = await page
+  test('h1 renders in the Inter display face at weight 800', async ({ page }) => {
+    const [family, weight] = await page
       .locator('h1')
       .first()
-      .evaluate((el) => getComputedStyle(el).fontFamily);
+      .evaluate((el) => [getComputedStyle(el).fontFamily, getComputedStyle(el).fontWeight]);
 
-    expect(family.replace(/["']/g, '')).toMatch(/^Fraunces\b/);
+    expect(family.replace(/["']/g, '')).toMatch(/^(__)?Inter/);
+    expect(weight).toBe('800');
   });
 
   test('body text keeps the body font, not the display font', async ({ page }) => {

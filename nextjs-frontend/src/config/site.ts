@@ -4,9 +4,11 @@
  * admin settings, seed scripts) reads it from here.
  */
 export const siteConfig = {
-  name: process.env.NEXT_PUBLIC_APP_NAME || 'Your App',
-  description: 'A modern Next.js 16 boilerplate with TypeScript, React 19, Tailwind CSS, and more',
-  keywords: ['Next.js', 'React', 'TypeScript', 'Tailwind CSS', 'Boilerplate', 'Starter'],
+  name: process.env.NEXT_PUBLIC_APP_NAME || 'Freejoy',
+  description:
+    'Discover genuine UK free samples, trials and offers, with postage and terms shown before you click.',
+  keywords: ['free samples UK', 'freebies', 'free trials', 'UK offers', 'free stuff'],
+  tagline: 'Good things, zero spend.',
   url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@example.com',
   ogImage: '/og-image.png',

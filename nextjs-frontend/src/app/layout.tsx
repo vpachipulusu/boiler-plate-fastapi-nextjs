@@ -24,14 +24,14 @@ export const metadata: Metadata = {
   keywords: siteConfig.keywords,
   authors: [
     {
-      name: 'Your Name',
+      name: siteConfig.name,
       url: siteConfig.url,
     },
   ],
-  creator: 'Your Name',
+  creator: siteConfig.name,
   openGraph: {
     type: 'website',
-    locale: 'en_US',
+    locale: 'en_GB',
     url: siteConfig.url,
     title: siteConfig.name,
     description: siteConfig.description,
@@ -50,7 +50,6 @@ export const metadata: Metadata = {
     title: siteConfig.name,
     description: siteConfig.description,
     images: [siteConfig.ogImage],
-    creator: '@yourusername',
   },
   robots: {
     index: true,

@@ -13,12 +13,13 @@ const config: Config = {
       center: true,
       padding: '2rem',
       screens: {
-        '2xl': '1400px',
+        // 1314px content width plus the 24px gutters of the 1440 artboard
+        '2xl': '1362px',
       },
     },
     extend: {
       fontFamily: {
-        display: ['var(--font-display)', 'Georgia', 'serif'],
+        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
         body: ['var(--font-body)', 'system-ui', 'sans-serif'],
         sans: ['var(--font-body)', 'system-ui', 'sans-serif'],
       },
@@ -94,6 +95,15 @@ const config: Config = {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        // Freejoy radii (design_tokens.json): inputs 12, cards 16, editorial panels 24, pills 999
+        input: '0.75rem',
+        card: '1rem',
+        editorial: '1.5rem',
+        pill: '999px',
+      },
+      maxWidth: {
+        // 1314px content width on the 1440 artboard
+        content: '82.125rem',
       },
       keyframes: {
         'accordion-down': {

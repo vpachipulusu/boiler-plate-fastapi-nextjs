@@ -52,20 +52,23 @@ describe('display font', () => {
     mockActiveFont.mockReset();
   });
 
-  it('loads Fraunces as --font-display with opsz axis, latin subset, swap and no weight', async () => {
+  it('loads Inter 700/800 as --font-display with latin subset, swap and a sans fallback', async () => {
     await import('@/config/fonts');
 
-    const fraunces = loaderCalls.find((call) => call.name === 'Fraunces');
-    expect(fraunces).toBeDefined();
-    expect(fraunces?.options).toMatchObject({
-      axes: ['opsz'],
+    const display = loaderCalls.find(
+      (call) => call.name === 'Inter' && call.options.variable === '--font-display'
+    );
+    expect(display).toBeDefined();
+    expect(display?.options).toMatchObject({
+      weight: ['700', '800'],
       subsets: ['latin'],
       display: 'swap',
       variable: '--font-display',
     });
-    expect(fraunces?.options).not.toHaveProperty('weight');
-    expect(fraunces?.options).not.toHaveProperty('style');
-    expect(fraunces?.options.fallback).toEqual(['Georgia', 'Times New Roman', 'serif']);
+    expect(display?.options).not.toHaveProperty('axes');
+    expect(display?.options).not.toHaveProperty('style');
+    expect(display?.options.fallback).toContain('system-ui');
+    expect(loaderCalls.some((call) => call.name === 'Fraunces')).toBe(false);
   });
 
   it('never reuses the body font variable for the display font', async () => {
