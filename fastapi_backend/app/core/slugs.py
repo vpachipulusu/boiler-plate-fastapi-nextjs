@@ -9,6 +9,7 @@ list are refused so an organisation cannot take a platform host.
 """
 
 import re
+import unicodedata
 
 SLUG_MIN_LENGTH = 3
 SLUG_MAX_LENGTH = 63
@@ -115,3 +116,42 @@ def normalize_slug(raw: str) -> str:
     if slug in RESERVED_SLUGS:
         raise ReservedSlug
     return slug
+
+
+# Catalogue slugs (categories, merchants, offers) are URL path segments, not host labels:
+# shorter minimum, longer maximum, no reserved list.
+CATALOGUE_SLUG_MIN_LENGTH = 2
+CATALOGUE_SLUG_MAX_LENGTH = 80
+
+
+def slugify(text: str, max_length: int = CATALOGUE_SLUG_MAX_LENGTH) -> str:
+    """Derive a catalogue slug from a title or name.
+
+    Accents are folded (``Café`` becomes ``cafe``), every other run of characters outside
+    ``a-z0-9`` becomes one hyphen, the result is cut at ``max_length`` on a word edge where
+    possible and never starts or ends with a hyphen. Raises ``InvalidSlug`` when nothing usable
+    is left (for example a title made only of symbols).
+    """
+    folded = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^a-z0-9]+", "-", folded.lower()).strip("-")
+    if len(slug) > max_length:
+        cut = slug[:max_length]
+        if slug[max_length] != "-" and "-" in cut:
+            cut = cut.rsplit("-", 1)[0]  # do not end on half a word
+        slug = cut.strip("-")
+    return validate_catalogue_slug(slug)
+
+
+def validate_catalogue_slug(raw: str) -> str:
+    """Return ``raw`` unchanged when it is a valid catalogue slug, else raise ``InvalidSlug``.
+
+    Lower-case ASCII, digits and single hyphens only, so a slug is always safe in a path and
+    in a URL without encoding. It is not normalised: an upper-case slug is refused.
+    """
+    if not raw.isascii():
+        raise InvalidSlug
+    if not CATALOGUE_SLUG_MIN_LENGTH <= len(raw) <= CATALOGUE_SLUG_MAX_LENGTH:
+        raise InvalidSlug
+    if _SLUG_PATTERN.fullmatch(raw) is None:
+        raise InvalidSlug
+    return raw
