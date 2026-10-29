@@ -83,7 +83,7 @@ Import direction is one way: routers may import services, schemas and `core`; se
 returns the default provider (the platform database, NullPool). Tests override that one dependency with a fake
 provider (`tests/fakes.py`).
 
-**Alembic.** One baseline revision `0001`; `env.py` connects with `DATABASE_URL_DIRECT` when set, else `DATABASE_URL`.
+**Alembic.** Baseline revision `0001` plus `0002` (Freejoy catalogue tables); `env.py` connects with `DATABASE_URL_DIRECT` when set, else `DATABASE_URL`.
 No deploy or build step runs `alembic upgrade head` (ADR-011); the backend workflow runs upgrade, `alembic check`
 and downgrade against a throwaway Postgres 17 service container. See [platform-models.md](platform-models.md).
 
