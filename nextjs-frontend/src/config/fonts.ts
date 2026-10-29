@@ -16,21 +16,21 @@ import {
   Source_Sans_3,
   Montserrat,
   Raleway,
-  Fraunces,
 } from 'next/font/google';
 
 /**
  * Display font (h1-h3, large figures).
  * Always loaded and independent of the admin-selectable body font, so it
  * uses its own CSS variable and is applied on <html> in the root layout.
- * Variable font: no weight list, optical-size axis only, normal style only.
+ * Freejoy headings are Inter at 700/800 (design_tokens.json), so the display
+ * face is a second Inter instance limited to the heavy weights.
  */
-export const displayFont = Fraunces({
+export const displayFont = Inter({
   subsets: ['latin'],
-  axes: ['opsz'],
+  weight: ['700', '800'],
   variable: '--font-display',
   display: 'swap',
-  fallback: ['Georgia', 'Times New Roman', 'serif'],
+  fallback: ['system-ui', 'Segoe UI', 'Helvetica Neue', 'Arial', 'sans-serif'],
 });
 
 /**

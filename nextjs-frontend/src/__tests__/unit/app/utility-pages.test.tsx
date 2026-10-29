@@ -10,7 +10,7 @@ import NotFound from '@/app/not-found';
 import ErrorPage from '@/app/error';
 import GlobalError from '@/app/global-error';
 import Loading from '@/app/loading';
-import ContactPage from '@/app/contact/page';
+import ContactPage from '@/app/(public)/contact/page';
 
 /** system and utility pages follow the tokens and the plan 5.8 field pattern. */
 

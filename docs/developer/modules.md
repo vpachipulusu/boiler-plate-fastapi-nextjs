@@ -96,7 +96,7 @@ Wraps the web app in iOS and Android projects. Nothing in the web code depends o
 | `nextjs-frontend/package.json` | `@capacitor/*` dependencies, `@capacitor/cli`, the `cap:*`, `build:mobile`, `ios:build`, `android:build` scripts |
 | `nextjs-frontend/.env.example` | the "Capacitor mobile module" block |
 | root `.gitignore` | the `nextjs-frontend/ios/`, `android/`, `capacitor.config.json` lines |
-| `src/app/page.tsx` | the "Capacitor" item in the tech list on the landing page |
+| `src/app/(public)/page.tsx` | the public landing page no longer lists the stack; nothing Capacitor-specific remains on it |
 
 Removing it: delete `capacitor.config.ts`, `npm uninstall` the `@capacitor/*` packages, remove the scripts,
 env block, gitignore lines and landing-page item. Using it: `npm run cap:add:ios` / `cap:add:android` once,
