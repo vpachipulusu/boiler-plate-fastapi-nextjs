@@ -30,6 +30,7 @@ Start here, then follow the links. Root-level overview: [`../../README.md`](../.
 | [backend-organizations.md](backend-organizations.md) | Organisations and memberships |
 | [backend-plan-limits.md](backend-plan-limits.md) | Plan definitions and limit checks |
 | [backend-public-settings.md](backend-public-settings.md) | Public settings read by the frontend |
+| [backend-catalogue.md](backend-catalogue.md) | Public catalogue API: offers, offer detail, categories |
 | [backend-frontend-seams.md](backend-frontend-seams.md) | Endpoints that keep `stripe` and `firebase-admin` out of the frontend |
 | [backend-audit-logs.md](backend-audit-logs.md) | Audit log model and admin API |
 | [backend-admin-users.md](backend-admin-users.md) | Admin user management |

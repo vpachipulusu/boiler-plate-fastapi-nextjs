@@ -21,7 +21,7 @@ SQLAlchemy models for the platform database are in `fastapi_backend/app/models/p
 - `audit_logs.metadata` is the `metadata` column, exposed as `AuditLog.metadata_` (the name `metadata` is reserved on
   declarative classes). `audit_logs` has no foreign keys, so the trail outlives users and organisations.
 - Catalogue enum values are the upper-case names (`FREE_SAMPLE`); the frontend contract in
-  `nextjs-frontend/src/lib/catalogue/types.ts` uses lower-case values, so the Phase 2 API schemas convert at the edge.
+  `nextjs-frontend/src/lib/catalogue/types.ts` uses lower-case values, so the catalogue API schemas convert at the edge (see [backend-catalogue.md](backend-catalogue.md)).
 - Money is an integer in minor units (`offers.postage_amount_minor`) plus a 3-letter currency, never a float.
 - Lists the page renders as a whole (offer `description` paragraphs, claim `steps`, a subscriber's `categories`) are
   `jsonb` arrays with a `'[]'` server default; there is no index on them yet (the alert job adds a GIN index on
