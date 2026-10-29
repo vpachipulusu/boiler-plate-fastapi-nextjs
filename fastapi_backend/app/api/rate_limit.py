@@ -204,6 +204,31 @@ async def _no_email() -> None:
     return None
 
 
+def limit_by_client_ip_and_email(
+    policy: RateLimitPolicy,
+    email_dependency: Callable[..., str | Awaitable[str]],
+) -> Callable[..., Awaitable[None]]:
+    """Dependency factory for public routes that act on an address the caller supplies.
+
+    Limits by client IP and by the keyed HMAC of the address (never the address itself), so one address
+    cannot be mailed in bulk from many IPs and one IP cannot mail many addresses.
+    """
+
+    async def dependency(
+        request: Request,
+        response: Response,
+        limiter: RateLimiterDep,
+        email: Annotated[str, Depends(email_dependency)],
+    ) -> None:
+        identifiers = [
+            f"{policy.scope}:ip:{client_key(request)}",
+            f"{policy.scope}:email:{email_digest(email)}",
+        ]
+        await enforce_rate_limit(request, response, limiter, policy, identifiers)
+
+    return dependency
+
+
 def limit_auth_attempts(
     email_dependency: Callable[..., str | None | Awaitable[str | None]] | None = None,
 ) -> Callable[..., Awaitable[None]]:
