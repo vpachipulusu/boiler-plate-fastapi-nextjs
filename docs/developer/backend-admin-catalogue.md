@@ -92,11 +92,24 @@ in the audit trail, with the optional note) and then `publish`. The database CHE
 is the backstop. There is no staleness window: an old `last_verified_at` still publishes. Add one if the
 compliance review asks for it.
 
-A published offer must keep meeting rules 1 to 5 at write time: a `PATCH` that would set a past `end_at`, remove the
-last destination or point it at a disabled category or inactive merchant is refused (422 `publish_blocked`), and so
-is deactivating the last active link of a published offer without a `source_url`. Disabling a category or
-deactivating a merchant does **not** unpublish its offers; the public read API must hide offers whose category is
-disabled or merchant inactive.
+A published offer must keep meeting rules 1 to 5 at write time: a `PATCH` that would remove the last destination,
+point it at a disabled category or inactive merchant, or set a past `end_at` is refused (422 `publish_blocked`), and so
+is deactivating the last active link of a published offer without a `source_url`. The end date is judged only when the
+request changes `end_at`: a published offer whose date has already passed (nothing unpublishes it automatically) stays
+editable, but cannot be given another past date; all other rules still apply to the merged record.
+
+Disabling a category or deactivating a merchant does **not** unpublish its offers: an admin list can therefore show
+`PUBLISHED` offers under a disabled category, and the public read API hides them. Publish and the disable cannot
+interleave: publish and offer edits read the category and then the merchant under a share lock (`FOR SHARE`, after the
+offer row lock), and the disable or deactivate takes the row lock (`FOR UPDATE`), so one waits for the other's commit
+and a publish that starts after a disable commits is refused. The lock order is always offer, category, merchant.
+`tests/api/test_admin_catalogue_locks_e2e.py` holds one transaction open and shows the other waits, in both orders.
+
+**URLs of unpublished offers.** Unpublish and archive turn a formerly public offer URL into a 404, not a 410 Gone.
+That is a product and SEO decision made here; revisit it if search engines should be told the page is gone for good.
+
+**Concurrent edits.** `PATCH` is last-write-wins. Optimistic concurrency (an `updated_at` precondition) can be added
+with the admin UI story. Status changes are serialised by the offer row lock.
 
 ## Slugs
 
@@ -112,8 +125,9 @@ to resolve a clash.
 `app/core/catalogue_urls.py`, applied in the services on every write to `source_url`, `destination_url`, merchant
 `website` and `logo_url`: https only; ASCII only (punycode hosts); at most 2048 characters; no whitespace, control or
 format characters, no backslash and no percent-encoded control character; no user info (`https://good@evil`); no
-IPv6 literal; port 443 or none; the host is a DNS name with at least two labels whose last label is not all digits
-(so `127.0.0.1`, `2130706433` and `localhost` fail). The scheme and host are lower-cased. Anything else is
+IPv6 literal; port 443 or none; the host is a DNS name with at least two labels whose last label is not a number
+(decimal digits, or `0x` plus hex digits: the WHATWG "ends in a number" rule), so `127.0.0.1`, `2130706433`,
+`0x7f.0.0.0x1`, `1.0x` and `localhost` fail. The scheme and host are lower-cased. Anything else is
 **422 `invalid_url`**. Open-redirect style inputs are covered in `tests/core/test_catalogue_urls.py` and the e2e
 suite.
 
@@ -139,9 +153,11 @@ Every write stages one `audit_logs` row on the request's session and commits onc
 its audit row commit or roll back together (a test makes the audit write fail and checks the offer is not stored).
 Actions: `admin.offers.create|update|publish|unpublish|expire|archive|verify`, `admin.offer_links.create|update`,
 `admin.categories.create|update|enable|disable`, `admin.merchants.create|update|activate|deactivate` (resources
-`offers`, `affiliate_links`, `categories`, `merchants`). Rows hold ids, enums, flags and dates (`before` and `after`),
-and the names of changed free-text fields, never their content. Link rows record the destination **host** only (the
-path and query can carry tracking ids), never the URL or `tracking_id`. The `verify` note is stored in `details`. No
+`offers`, `affiliate_links`, `categories`, `merchants`). Rows hold ids, enums, flags and dates (`before` and `after`). Offer and category titles or names (public content)
+and the `verify` note (at most 500 characters, passed through the audit secret-pattern sanitiser) **are** recorded.
+URLs, tracking ids and all other free text (summaries, descriptions, steps, notes, eligibility) are **not**: only the
+names of the changed fields are. Link rows record the destination **host** only (before and after when it changes),
+since the path and query can carry tracking ids. No
 subscriber data is written. Enabling a category that is already enabled (and the merchant equivalent) is a no-op that
 writes nothing and stages no audit row. Denied requests write no row.
 
@@ -154,3 +170,7 @@ writes nothing and stages no audit row. Denied requests write no row.
   error mapping, with fakes behind the real dependency chain.
 - `tests/api/test_admin_catalogue_e2e.py`, `test_admin_categories_merchants_e2e.py`: real Postgres through the
   Alembic migrations (helpers in `tests/catalogue_e2e_support.py`); they run only with `TEST_DATABASE_URL`.
+- `tests/api/test_admin_catalogue_locks_e2e.py`: publish against a concurrent category disable or merchant
+  deactivate, two sessions.
+- `tests/services/test_admin_catalogue_atomicity.py`: slug races (unique violation, with and without `__cause__`) and
+  a failing audit write, deterministic and without a database.
