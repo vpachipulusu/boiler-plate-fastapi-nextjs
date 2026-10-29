@@ -95,7 +95,7 @@ domain outside the allowed research list; it is treated here as a product decisi
 - **Freejoy:** `/affiliate-disclosure` exists as a draft and is linked from the offer CTA and footer. It is the
   explanation, not the label.
 - **Where:** `src/app/(public)/affiliate-disclosure/page.tsx`, `src/components/site/nav-items.ts` (footer link).
-- **Status:** `Done` for the page and its links (draft, stated as planned: see audit finding F-01); labelling itself is A1/A2.
+- **Status:** `Done` for the page and its links (draft, worded to be true whether or not a live offer is showing: see audit finding F-01); labelling itself is A1/A2.
 - **Evidence:** `home-and-legal-pages.test.tsx`, "affiliate disclosure page" cases.
 
 ### A4. Both the business and its affiliate networks are responsible
@@ -111,13 +111,13 @@ domain outside the allowed research list; it is treated here as a product decisi
 
 - **Rule:** Not a legal rule. Search engines ask that paid or affiliate links carry `rel="sponsored"`; the owner also wants `nofollow`. The redirect must not hide the destination or the affiliate nature of the link.
 - **Source:** Product decision (the search-engine guidance is outside the allowed research domains: unverified, to confirm).
-- **Freejoy:** No affiliate link exists yet. The affiliate-disclosure page now says the redirect and `rel="sponsored nofollow"` are planned.
+- **Freejoy:** The `/go/[offerId]` redirect and the `rel="sponsored nofollow noopener"` anchor (`src/components/offer/outbound-link.tsx`) are built (FREEJ-23, see `docs/developer/freejoy-affiliate.md`). The public pages on `main` still show only demo offers, which do not link out, so no live offer uses it yet. The affiliate-disclosure page is worded to be true either way: it describes how links work where an offer has one.
 - **Where:** `/go/[offerId]` route handler and `src/lib/seo/` (Phase 3 developers), `src/app/robots.ts`.
-- **Status:** `Pending Phase 3`
+- **Status:** `Built, awaiting live offers` (route, anchor, robots and tests exist; reviewer sign-off on the Ad label wording is still open under A2).
 - **Acceptance criteria:**
   1. Every anchor whose `href` starts with `/go/` has `rel="sponsored nofollow"` (plus `noopener` if `target="_blank"` is used), enforced by one shared link component and a unit test that fails if any `/go/` anchor lacks it.
   2. `/go/` is disallowed in `robots.txt` and absent from the sitemap.
-  3. The redirect destination comes only from the stored offer record: no query string, header or request body can influence it. The response carries `Referrer-Policy: no-referrer`.
+  3. The redirect destination comes only from the stored offer record: no query string, header or request body can influence it. The response carries `Referrer-Policy: strict-origin-when-cross-origin`: the destination learns only the Freejoy origin, never a path or query. This replaces the earlier `no-referrer` criterion by decision (affiliate networks verify the referring domain, and `no-referrer` can leave clicks unattributed). The owner is asked to sign this off.
   4. The redirect sets no cookie, performs no interstitial that hides the destination, and answers a non-live or unknown offer with a normal 404 or a page that says the offer has ended, never a redirect.
 
 ### A6. Sponsored or paid placements
@@ -397,7 +397,7 @@ Method: searched `nextjs-frontend/src` and `package.json` for `cookie`, `cookies
 
 - **Rule:** The notice must give: the controller's name and contact details; each purpose; lawful basis; legitimate interests relied on; recipients; transfers outside the UK and safeguards; retention or the criteria; the rights that match the basis; the right to withdraw consent; the right to complain to the ICO; whether providing data is required; any automated decision-making. The right to object to marketing must be shown clearly and separately.
 - **Source:** S16; S15 Article 21(4).
-- **Freejoy:** `/privacy` is a draft with a reviewer checklist and no invented facts. It now also discloses what is true today (hosting logs, `?email=` in the URL from the homepage band, possible error reporting) and describes the planned alerts and click events as planned.
+- **Freejoy:** `/privacy` is a draft with a reviewer checklist and no invented facts. It now also discloses what is true today (hosting logs, `?email=` in the URL from the homepage band, possible error reporting) and describes the planned alerts as planned. The outbound click record (what it holds, that it holds no IP address or cookie identifier, and that rows are deleted after 13 months / 395 days by `commands/prune_click_events.py`) is described as live behaviour.
 - **Where:** `src/app/(public)/privacy/page.tsx`.
 - **Status:** `Needs professional review`
 
@@ -490,7 +490,7 @@ is owned by someone else and the coordinator should apply the suggested wording.
 
 | ID | Where | Problem | Rule | Result |
 | --- | --- | --- | --- | --- |
-| F-01 | `src/app/(public)/affiliate-disclosure/page.tsx:19-20` (before) | "Some links on Freejoy are affiliate links" in the present tense, though none exists; "may earn" is the ambiguous wording | S5; CAP 3.1 | Fixed. States the redirect `/go/`, `rel="sponsored nofollow"`, "Ad" labelling and commission wording as planned, and says no commission can be earned today. |
+| F-01 | `src/app/(public)/affiliate-disclosure/page.tsx:19-20` (before) | "Some links on Freejoy are affiliate links" in the present tense, though none exists; "may earn" is the ambiguous wording | S5; CAP 3.1 | Fixed, then reworded in FREEJ-23. The page first described the redirect, `rel` marking and "Ad" label as planned and said no commission could be earned today and that there were no outbound links. Because the redirect is now built and the page must stay true whether or not a live offer is showing, it now says how links work where an offer has one (the `/go/` address, the paid-link marking, the "Ad" label and commission sentence, that the brand pays the commission, and what a click records: no IP address, no cookie, no identifier), with no "planned" or "no outbound links" wording. It stays a draft for legal review. A unit test fails if those phrases return. |
 | F-02 | same, lines 24-26 | "never changes the terms ... editorial choice made independently" stated as a fact | CAP 3.7 (evidence) | Fixed. Reworded as intentions, to be confirmed by the reviewer. |
 | F-03 | `src/app/(public)/privacy/page.tsx:19-20` | "does not save any information" ignores hosting logs, error reporting and the e-mail address carried in the URL by the homepage band | UK GDPR transparency; S16 | Fixed. Describes what is true today and marks the rest planned. |
 | F-04 | `src/app/(public)/privacy/page.tsx:22-27` | No mention of the planned double opt-in, consent record, click events or processors | S16; F1 to F4 | Fixed. Added as planned, plus reviewer checklist items. |

@@ -29,12 +29,13 @@ the `affiliate_links` row, the backend response to the Next.js server, and the `
 | Outcome | `/go/<id>` answers | Backend answer | Click row |
 |---|---|---|---|
 | Live offer, usable link | `307` to the destination | `200 {"success": true, "data": {"destination_url": ...}}` | one |
-| Offer that was public and has ended | `302` to `/freebies/<slug>?ended=1` | `410` with `expired: true` and the slug (same body as `GET /v1/catalogue/offers/{slug}`) | none |
+| Offer that was public and has ended | `302` to the **relative** `/freebies/<slug>?ended=1` | `410` with `expired: true` and the slug (same body as `GET /v1/catalogue/offers/{slug}`) | none |
 | Unknown, draft, archived, never-live, hidden category or inactive merchant | `404` | `404 Offer not found` (one identical body) | none |
 | Live offer with no usable link (none active, bad URL, host not allowed) | `404` | the same `404 Offer not found` | none |
 | Malformed id | `404`, backend not called | `422` if called | none |
-| Rate limited | `429` with `Retry-After` | `429` | none |
-| Backend down, key missing, bad response | `503` plain text, no backend text | any other status | none |
+| Rate limited | `429` with the backend's `Retry-After` (default 60 s, capped at 3600) | `429` | none |
+| Backend down, key missing, bad response, or a destination the route refuses | `503` plain text, no backend text, `Retry-After: 30` | any other status | none |
+| Not a top-level navigation (`Sec-Fetch-Mode` present and not `navigate`, or `Sec-Fetch-Dest` present and not `document`: an image, iframe, script or `fetch()`) | `204`, `no-store` | not called | none |
 | Speculative load (`Sec-Purpose: prefetch`) | `204` | not called | none |
 | `HEAD` | `405` | not called | none |
 
@@ -58,8 +59,11 @@ Applied twice, in the backend and again in the route, so a bug in one layer is n
    active link that passes is used; if none passes the answer is the 404.
 4. **The route repeats the https check** (`parseHttpsDestination`): a clean absolute `https:` URL with a host, no
    user info, default port, none of the forbidden characters. The `Location` is built from the resulting `URL`
-   object, never by string concatenation. The ended-offer redirect uses a slug checked against the slug pattern and
-   a cloned `nextUrl`, so it can only be `/freebies/<slug>?ended=1`.
+   object, never by string concatenation. It also mirrors the backend host rule: ASCII only (an IDN must be
+   punycode, so a Cyrillic lookalike is refused), at least one dot, no trailing dot, no IPv6 literal, and a last
+   label that is not a number. The ended-offer redirect uses a slug checked against the slug pattern and a
+   **relative** `Location` (`/freebies/<slug>?ended=1`), so neither `Host` nor `X-Forwarded-Host` can put another
+   origin into it.
 
 The backend logs a link id and a reason code for a refused link, never the destination. The route logs the offer id
 only. Neither logs query strings, headers or request bodies.
@@ -110,13 +114,18 @@ API only allows `^[a-z0-9][a-z0-9_-]{0,39}$`). A host matches an entry when it i
 | `partnerize` | `prf.hn` |
 | `rakuten` | `linksynergy.com` |
 | `tradedoubler` | `tradedoubler.com` |
-| `direct` | the host of the **merchant's stored website** (or a subdomain; a leading `www.` is ignored). A merchant with no website cannot have a `direct` link followed |
+| `direct` | exactly the host of the **merchant's stored website**, or that host with `www.` added or removed. No other subdomain. A merchant with no website cannot have a `direct` link followed |
 | `sample` | `example.com`, and only when `ENVIRONMENT` is `local`/`test` or Vercel is `preview`/`development` (what `commands.seed_catalogue` writes) |
 | anything else | never followed |
 
 The hosts above are the networks' tracking domains as commonly used; **confirm each against the network's own
 documentation or your account before relying on it** (they are unverified here). Networks that use a vanity domain
 per publisher (for example Impact) are deliberately not listed: add the exact domain you were given.
+
+**`direct` trusts the merchant website.** The merchant's `website` is written by an admin through the admin API, so a
+`direct` link is only as trustworthy as that field and the admin accounts that can edit it. Every create and update
+of a merchant is audited (`admin.merchants.create` / `admin.merchants.update`) and the audit row holds the old and
+new `website`, so a change can be traced. Treat `merchants.write` as a sensitive permission.
 
 **Add a provider:**
 
@@ -126,19 +135,48 @@ per publisher (for example Impact) are deliberately not listed: add the exact do
    redirect if an admin account or a database row is ever wrong.
 3. Add a test in `tests/core/test_affiliate_hosts.py` (the parametrised test covers every registered provider
    automatically) and, for a real link shape, a case in `tests/services/test_outbound_clicks.py`.
-4. Create the affiliate link in the admin with `provider` set to the new key. The admin API validates the URL shape
-   when it is saved, and the redirect checks the host every time it is followed.
+4. Create the affiliate link in the admin with `provider` set to the new key. The admin API checks the URL shape
+   **and** the provider/host pair when a link is created or when its provider or destination changes: an unknown
+   provider is a `422` (`unknown_provider`) and a host the provider may not use is a `422` (`destination_not_allowed`,
+   "Destination host is not allowed for this provider"). Switching a link on or off does not re-check, so a link
+   that predates a rule can still be deactivated.
 
-The admin API does not check the host against the provider at save time (it cannot tell a typo from a new network);
-a link with a host that is not allowed saves fine and simply is not followed (the offer's `/go/` answers 404 and the
-backend logs `affiliate link <id> refused: host not allowed`). Watch for that log line after adding links.
+The redirect repeats the check every time a link is followed, because rows can change outside the admin API and a
+merchant's website can change after a `direct` link was saved. A link that fails there is skipped (the offer's
+`/go/` answers 404 and the backend logs `affiliate link <id> refused: host not allowed`).
 
 ## Rate limits
 
-- `src/proxy.ts` rate limits every `/go/*` request with the general policy (200 per minute per client, in-memory,
-  keyed by `x-vercel-forwarded-for` on Vercel and one shared bucket elsewhere). `/api/*` rules are unchanged.
-- The backend limits `POST .../click` with `OUTBOUND_CLICK_POLICY` (60 per minute per forwarded client IP, fails
-  open like the other public catalogue routes).
+- `src/proxy.ts` rate limits every `/go/*` request with the general policy (200 per minute per client, in-memory).
+  `/api/*` rules are unchanged. Buckets are kept **per scope** (`auth`, `api`, `general`), so `/go/` traffic cannot
+  spend the auth bucket and an exhausted auth bucket does not block `/go/`. A refused request is `429`,
+  `Cache-Control: no-store`, with the security headers.
+- The client key is `x-vercel-forwarded-for` on Vercel. **Off Vercel there is no trusted proxy header, so every
+  client shares one `unknown` bucket per scope** (all `/go/` traffic together counts against 200 per minute). That
+  is fine for local runs and previews behind a single caller; do not rely on this limiter alone behind another host.
+- The backend limits `POST .../click` twice: `OUTBOUND_CLICK_POLICY` (60 per minute per forwarded client IP) and
+  `OUTBOUND_OFFER_POLICY` (600 per minute per offer id, in `app/core/rate_limit.py`, so a crowd of distinct clients
+  cannot inflate one offer's count faster than that). Both fail open like the other public catalogue routes, and
+  both answer `429` with `Retry-After`.
+
+## Retention
+
+Click rows are kept for **13 months (395 days)** and then deleted by `commands/prune_click_events.py`:
+
+```bash
+uv run python -m commands.prune_click_events            # default --days 395
+uv run python -m commands.prune_click_events --days 90  # a shorter period; 0 or less is refused
+```
+
+It deletes rows whose `occurred_at` is older than the period and prints how many went. Run it on a schedule (for
+example monthly, from a cron job or a scheduled workflow with `DATABASE_URL` set); it is safe to repeat. The period is
+stated on the privacy page ("If you use an offer button"): change both together. Nothing schedules it yet.
+
+## Referrer policy
+
+The redirect sends `Referrer-Policy: strict-origin-when-cross-origin`. The destination learns only the Freejoy
+**origin** (never a path or query), which affiliate networks use to verify the referring domain; `no-referrer`
+would leave clicks unattributed. This is a deliberate decision, recorded in the compliance checklist (A5.3).
 
 ## Running and testing it locally
 
@@ -173,7 +211,8 @@ setup project first and therefore needs `.env.e2e.local` ([local-e2e.md](local-e
 - The "Ad" label and the sentence "Freejoy is paid a commission by the brand if you take up this offer through this
   link." are from the compliance checklist and still need the reviewer's sign-off on wording. Offer cards do not
   carry the label yet (checklist A1.3).
-- The `Referrer-Policy` of the redirect is `strict-origin-when-cross-origin` (the story); checklist A5.3 says
-  `no-referrer`. Networks usually want the origin; decide with the compliance reviewer.
-- Each valid request writes a row; nothing deduplicates repeated clicks, and old rows are not pruned. Decide a
-  retention period before launch.
+- Each valid request writes a row; nothing deduplicates repeated clicks, so a visitor who clicks twice counts twice.
+  The per-client and per-offer limits only bound the rate.
+- `click_events.referrer_host` comes from the visitor's browser and is untrusted
+  (see [platform-models.md](platform-models.md)).
+- Nothing schedules `prune_click_events` yet.
