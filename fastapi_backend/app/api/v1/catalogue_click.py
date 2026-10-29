@@ -13,16 +13,21 @@ Every response is ``Cache-Control: no-store``. The destination is never logged.
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.auth import require_internal_key
 from app.api.deps import SessionDep
-from app.api.rate_limit import RATE_LIMIT_RESPONSES, limit_by_client_ip
+from app.api.rate_limit import (
+    RATE_LIMIT_RESPONSES,
+    RateLimiterDep,
+    enforce_rate_limit,
+    limit_by_client_ip,
+)
 from app.api.v1.catalogue_schemas import ExpiredOfferResponse, expired_response
 from app.core.config import settings
 from app.core.errors import ErrorResponse
-from app.core.rate_limit import OUTBOUND_CLICK_POLICY
+from app.core.rate_limit import OUTBOUND_CLICK_POLICY, OUTBOUND_OFFER_POLICY
 from app.models.platform.click_event import UserAgentClass
 from app.repositories.catalogue import CatalogueRepository
 from app.repositories.outbound_clicks import OutboundClickRepository
@@ -41,6 +46,19 @@ router = APIRouter(
     ],
     responses={**RATE_LIMIT_RESPONSES, 401: {"model": ErrorResponse}},
 )
+
+
+OfferIdPath = Annotated[str, Path(pattern=OFFER_ID_PATTERN)]
+
+
+async def limit_by_offer(
+    request: Request, response: Response, limiter: RateLimiterDep, offer_id: OfferIdPath
+) -> None:
+    """Second limit, per offer id, after the per-IP one: caps what any crowd can add to one offer."""
+    identifier = f"{OUTBOUND_OFFER_POLICY.scope}:offer:{offer_id}"
+    await enforce_rate_limit(
+        request, response, limiter, OUTBOUND_OFFER_POLICY, [identifier]
+    )
 
 
 class ClickRequest(BaseModel):
@@ -95,13 +113,14 @@ def _no_store(body: BaseModel, status_code: int = 200) -> Response:
     "/offers/{offer_id}/click",
     response_model=ClickResponse,
     summary="Record an outbound click and return the destination",
+    dependencies=[Depends(limit_by_offer)],
     responses={
         404: {"model": ErrorResponse, "description": "Not available"},
         410: {"model": ExpiredOfferResponse, "description": "The offer has ended"},
     },
 )
 async def record_click(
-    offer_id: Annotated[str, Path(pattern=OFFER_ID_PATTERN)],
+    offer_id: OfferIdPath,
     service: ClickServiceDep,
     body: Annotated[ClickRequest | None, Body()] = None,
 ) -> Response:

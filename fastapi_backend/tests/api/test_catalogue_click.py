@@ -12,7 +12,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.api.deps import get_rate_limiter
 from app.api.v1.catalogue_click import get_click_service
-from app.core.rate_limit import OUTBOUND_CLICK_POLICY
+from app.core.rate_limit import OUTBOUND_CLICK_POLICY, OUTBOUND_OFFER_POLICY
 from app.main import create_app
 from app.models.platform.click_event import UserAgentClass
 from app.models.platform.offer import OfferStatus
@@ -202,14 +202,47 @@ async def test_a_missing_or_wrong_internal_key_is_401_and_nothing_is_read() -> N
     assert store.asked == [] and store.clicks == []
 
 
-async def test_rate_limit_is_keyed_by_the_forwarded_client_ip() -> None:
+async def test_rate_limit_is_keyed_by_the_forwarded_client_ip_and_by_the_offer() -> (
+    None
+):
     http, _, _, limiter = build(make_offer())
 
     async with http:
         await http.post(PATH, headers={"X-Client-IP": "203.0.113.7"})
 
     assert isinstance(limiter, FakeRateLimiter)
-    assert limiter.hits == [("outbound_click:ip:203.0.113.7", OUTBOUND_CLICK_POLICY)]
+    assert limiter.hits == [
+        ("outbound_click:ip:203.0.113.7", OUTBOUND_CLICK_POLICY),
+        ("outbound_offer:offer:offer_1", OUTBOUND_OFFER_POLICY),
+    ]
+
+
+async def test_one_offer_is_capped_across_all_clients_with_the_same_429() -> None:
+    http, store, _, _ = build(make_offer())
+
+    async with http:
+        responses = [
+            await http.post(PATH, headers={"X-Client-IP": f"10.{n // 250}.{n % 250}.1"})
+            for n in range(OUTBOUND_OFFER_POLICY.limit + 1)
+        ]
+
+    assert [r.status_code for r in responses[:-1]] == [
+        200
+    ] * OUTBOUND_OFFER_POLICY.limit
+    assert responses[-1].status_code == 429
+    assert responses[-1].json() == {"success": False, "error": "Too many requests"}
+    assert "Retry-After" in responses[-1].headers
+    assert len(store.clicks) == OUTBOUND_OFFER_POLICY.limit
+
+
+async def test_the_offer_cap_is_per_offer() -> None:
+    http, _, _, limiter = build(make_offer())
+
+    async with http:
+        await http.post("/v1/catalogue/offers/other_offer/click")
+
+    assert isinstance(limiter, FakeRateLimiter)
+    assert limiter.hits[1][0] == "outbound_offer:offer:other_offer"
 
 
 async def test_requests_over_the_limit_get_429_and_write_no_click() -> None:
