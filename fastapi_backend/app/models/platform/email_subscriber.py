@@ -52,3 +52,5 @@ class EmailSubscriber(IdMixin, TimestampMixin, Base):
     provider_subscriber_id: Mapped[str | None]
     # Only a hash of the confirmation token is stored, never the token itself.
     confirmation_token_hash: Mapped[str | None] = mapped_column(unique=True)
+    # Anchor for the token's 24 hour expiry.
+    confirmation_sent_at: Mapped[datetime | None]

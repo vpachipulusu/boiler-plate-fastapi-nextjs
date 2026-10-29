@@ -24,7 +24,8 @@ SQLAlchemy models for the platform database are in `fastapi_backend/app/models/p
   `nextjs-frontend/src/lib/catalogue/types.ts` uses lower-case values, so the Phase 2 API schemas convert at the edge.
 - Money is an integer in minor units (`offers.postage_amount_minor`) plus a 3-letter currency, never a float.
 - Lists the page renders as a whole (offer `description` paragraphs, claim `steps`, a subscriber's `categories`) are
-  `jsonb` arrays with a `'[]'` server default; nothing queries inside them.
+  `jsonb` arrays with a `'[]'` server default; there is no index on them yet (the alert job adds a GIN index on
+  `categories` if it queries them).
 - Foreign keys state their delete behaviour: an offer's category and merchant are `RESTRICT` (neither can be deleted
   while it has offers), an offer's affiliate links and clicks `CASCADE`, and a click's `affiliate_link_id` is
   `SET NULL` so click counts survive when a link is replaced.
@@ -44,17 +45,25 @@ SQLAlchemy models for the platform database are in `fastapi_backend/app/models/p
 | `stripe_events` | Webhook idempotency (billing module). |
 | `categories` | Unique `slug`; `short_name`, `intro`, `tint`, `sort_order` (default 0) and `enabled` (default true) carry what the category pages show. |
 | `merchants` | Unique `slug`; `website` and `logo_url` are null until a licensed logo exists; `active` (default true). |
-| `offers` | Unique `slug`; `offer_type`, `status` (default `DRAFT`), `freshness` (editorial, nullable), `postage_kind`. Carries every field an offer page shows: image tint, label and alt, `steps`, `availability`, `eligibility`, `subscription_terms`, `requires_card`, `last_verified_at`. CHECK: `postage_amount_minor` and `postage_currency` are set exactly when `postage_kind` is `COST`. Indexes `(status, end_at)` and `(category_id, status)`. |
+| `offers` | Unique `slug`; `offer_type`, `status` (default `DRAFT`), `freshness` (editorial, nullable), `postage_kind`. Carries every field an offer page shows: image tint, label and alt, `steps`, `availability`, `eligibility`, `subscription_terms`, `requires_card`, `last_verified_at`. CHECKs: `postage_amount_minor` and `postage_currency` (an upper-case 3-letter code, `GBP`) are set exactly when `postage_kind` is `COST`; a `PUBLISHED` offer must have `last_verified_at` (the page always shows "Last checked"). `start_at` stays nullable: the Phase 2 mapper falls back to `created_at` for the frontend's `startAt`. `publisher_notes` is internal: the API never serialises it and it holds no personal contact data. Indexes `(status, end_at)`, `(category_id, status)` and `merchant_id`. |
 | `affiliate_links` | Per-offer destination and `tracking_id` for a `provider`; `destination_url` is read server-side only. Index `(offer_id, active)`. |
-| `click_events` | One row per outbound click. See the privacy rule below. |
+| `click_events` | One row per outbound click. See the privacy rule below. Indexes `(offer_id, occurred_at)` and `affiliate_link_id` (the `SET NULL` delete runs on every link delete). |
 | `email_subscribers` | Double opt-in alert subscribers; see the email decision below. |
 
 ### Click events are anonymous
 
 `click_events` stores the offer, the link, `occurred_at`, the referrer **host** and a coarse `user_agent_class`
 (`DESKTOP`, `MOBILE`, `TABLET`, `BOT`, `OTHER`). It never stores an IP address, a cookie id, a user id, an email, a session
-id or the raw user agent, so a click can be counted but never tied to a person. A metadata test fails if a column with
-such a name is added; change the rule in this document and the test together or not at all.
+id or the raw user agent, so a click can be counted but never tied to a person. A metadata test pins the exact column set (`id`, `offer_id`, `affiliate_link_id`, `occurred_at`, `referrer_host`,
+`user_agent_class`); adding a column means changing that test and this section together, after asking whether it could
+identify a visitor.
+
+- `occurred_at` is truncated to the minute by its server default (`date_trunc('minute', now())`), so a click cannot be
+  joined to a microsecond-precise access-log line that carries an IP address.
+- `referrer_host` is reduced to the registrable domain and capped at 253 characters by the redirect service (a later
+  story).
+- `consent_source` on subscribers is a short form identifier (`footer`, `offer_page`), never a URL with a query string.
+- `offers.publisher_notes` is internal: the API never serialises it and it holds no personal contact data.
 
 ### Subscriber email and tokens
 
@@ -64,6 +73,17 @@ managed Postgres does not always allow); instead the service lower-cases before 
 case-insensitive uniqueness guarantee. Only a hash of the confirmation token is stored (`confirmation_token_hash`,
 unique), never the token. `consent_text`, `consent_at` and `consent_source` record what the person agreed to, when, and
 where.
+
+- **Token lifecycle.** Tokens are at least 128 bits of randomness, stored as a SHA-256 hash. `confirmation_sent_at`
+  anchors the expiry: the service rejects tokens older than 24 hours and nulls `confirmation_token_hash` once the
+  subscriber is `CONFIRMED`.
+- **Lower-casing.** Python `str.lower()` and Postgres `lower()` differ on some non-ASCII input (for example the dotted
+  capital I), which would trip the CHECK. The Phase 2 service writes `func.lower(email)` or rejects non-ASCII local parts.
+- **Retention.** On `UNSUBSCRIBED` the service sets `categories` to `[]` and nulls `provider_subscriber_id` and
+  `confirmation_token_hash`, keeping only the suppression row (`email`, `status`, `consent_at`, `unsubscribed_at`). A
+  scheduled purge of `UNSUBSCRIBED` rows older than 12 months is a later story (recorded on FREEJ-24).
+- **No enumeration.** The subscribe endpoint (a later story) returns the same response whether the row was created or
+  already existed, and is rate limited.
 
 ## Subscription plan catalogue
 
@@ -78,6 +98,11 @@ in the Stripe Billing module ([modules.md](modules.md)).
 `DATABASE_URL_DIRECT` (an unpooled endpoint) is used by Alembic when set, else `DATABASE_URL`. `sslmode` in the URL is
 passed to asyncpg as `ssl`; other query parameters are dropped. Run `alembic upgrade head` only on a database you own.
 CI runs `upgrade head`, `alembic check` and `downgrade base` on a Postgres 17 service container.
+
+**Deploy note (0002).** `PLATFORM_HEAD` is now `0002`, so `GET /health/ready` answers 503 `migrations_pending` on every
+environment until the migration is applied. Run `uv run alembic upgrade head` against each environment before or right
+after the deploy; readiness fails until then. The `0002` downgrade drops the catalogue tables, including subscriber
+consent records and click records, so run it only against a throwaway database (CI, `*_test`).
 
 **Adding a revision.** `uv run alembic revision --autogenerate -m "<what changed>"`, then append the revision id to
 `PLATFORM_REVISIONS` in `app/core/platform_schema.py` (`tests/core/test_platform_schema.py` fails until you do), then

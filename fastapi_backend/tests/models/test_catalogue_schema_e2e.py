@@ -6,10 +6,12 @@ Alembic, then proves the constraints the models promise: the postage rule, lower
 subscriber email, unique slugs, delete behaviour of every foreign key, and the defaults.
 """
 
+import enum
 import os
 import subprocess
 import sys
 from collections.abc import AsyncIterator, Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +23,15 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from app.core.database import build_engine
 from app.core.ids import new_id
+from app.models.platform import (
+    AlertFrequency,
+    OfferFreshness,
+    OfferStatus,
+    OfferType,
+    PostageKind,
+    SubscriberStatus,
+    UserAgentClass,
+)
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -91,46 +102,60 @@ async def insert_merchant(conn: AsyncConnection) -> str:
     return merchant_id
 
 
+async def insert_row(conn: AsyncConnection, table: str, values: dict[str, Any]) -> str:
+    """Insert exactly the given columns, so a column left out takes its server default."""
+    row = {"id": new_id(), **values}
+    columns = ", ".join(row)
+    params = ", ".join(f":{name}" for name in row)
+    await conn.execute(text(f"INSERT INTO {table} ({columns}) VALUES ({params})"), row)
+    return str(row["id"])
+
+
 async def insert_offer(
     conn: AsyncConnection,
     category_id: str,
     merchant_id: str,
     **overrides: Any,
 ) -> str:
-    values: dict[str, Any] = {
-        "id": new_id(),
-        "category_id": category_id,
-        "merchant_id": merchant_id,
-        "offer_type": "FREE_SAMPLE",
-        "postage_kind": "FREE",
-        "postage_amount_minor": None,
-        "postage_currency": None,
-        "status": None,
-        **overrides,
-    }
-    values["slug"] = overrides.get("slug", f"offer-{values['id']}")
-    await conn.execute(
-        text(
-            "INSERT INTO offers (id, title, slug, summary, category_id, merchant_id,"
-            " offer_type, image_tint, image_label, image_alt, postage_kind,"
-            " postage_amount_minor, postage_currency, eligibility, availability"
-            ", status) VALUES (:id, 't', :slug, 's', :category_id, :merchant_id,"
-            " :offer_type, 'mint', 'l', 'a', :postage_kind, :postage_amount_minor,"
-            " :postage_currency, 'e', 'a', COALESCE(:status, 'DRAFT'))"
-        ),
-        values,
+    offer_id = new_id()
+    return await insert_row(
+        conn,
+        "offers",
+        {
+            "id": offer_id,
+            "title": "t",
+            "slug": f"offer-{offer_id}",
+            "summary": "s",
+            "category_id": category_id,
+            "merchant_id": merchant_id,
+            "offer_type": "FREE_SAMPLE",
+            "image_tint": "mint",
+            "image_label": "l",
+            "image_alt": "a",
+            "postage_kind": "FREE",
+            "eligibility": "e",
+            "availability": "a",
+            **overrides,
+        },
     )
-    return str(values["id"])
 
 
-async def insert_subscriber(conn: AsyncConnection, email: str) -> None:
-    await conn.execute(
-        text(
-            "INSERT INTO email_subscribers (id, email, frequency, consent_text,"
-            " consent_at, consent_source) VALUES (:id, :email, 'WEEKLY', 'ok', now(),"
-            " 'footer')"
-        ),
-        {"id": new_id(), "email": email},
+async def insert_click(conn: AsyncConnection, offer_id: str, **overrides: Any) -> str:
+    return await insert_row(conn, "click_events", {"offer_id": offer_id, **overrides})
+
+
+async def insert_subscriber(conn: AsyncConnection, email: str, **overrides: Any) -> str:
+    return await insert_row(
+        conn,
+        "email_subscribers",
+        {
+            "email": email,
+            "frequency": "WEEKLY",
+            "consent_text": "ok",
+            "consent_at": datetime.now(UTC),
+            "consent_source": "footer",
+            **overrides,
+        },
     )
 
 
@@ -187,6 +212,7 @@ async def test_postage_accepts_consistent_combinations(
         ("COST", 299, None),
         ("COST", None, "GBP"),
         ("COST", 299, "GB"),
+        ("COST", 299, "gbp"),
         ("COST", -1, "GBP"),
         ("FREE", 299, "GBP"),
         ("FREE", 299, None),
@@ -323,6 +349,9 @@ async def test_click_event_records_the_time_by_default(conn: AsyncConnection) ->
     )
 
     assert occurred_at.tzinfo is not None
+    # Truncated to the minute so it cannot be joined to a precise access-log time.
+    assert occurred_at.second == 0
+    assert occurred_at.microsecond == 0
 
 
 async def test_click_event_rejects_an_unknown_user_agent_class(
@@ -367,3 +396,112 @@ async def test_duplicate_subscriber_email_is_rejected(conn: AsyncConnection) -> 
 
     with pytest.raises(IntegrityError, match="uq_email_subscribers_email"):
         await insert_subscriber(conn, "pat@example.com")
+
+
+async def test_published_offer_without_a_verification_date_is_rejected(
+    conn: AsyncConnection,
+) -> None:
+    category_id = await insert_category(conn)
+    merchant_id = await insert_merchant(conn)
+
+    with pytest.raises(IntegrityError, match="ck_offers_published_is_verified"):
+        await insert_offer(conn, category_id, merchant_id, status="PUBLISHED")
+
+
+async def test_draft_without_a_date_and_published_with_one_are_accepted(
+    conn: AsyncConnection,
+) -> None:
+    category_id = await insert_category(conn)
+    merchant_id = await insert_merchant(conn)
+
+    await insert_offer(conn, category_id, merchant_id, status="DRAFT")
+    await insert_offer(
+        conn,
+        category_id,
+        merchant_id,
+        status="PUBLISHED",
+        last_verified_at=datetime.now(UTC),
+    )
+
+
+async def test_duplicate_confirmation_token_hash_is_rejected(
+    conn: AsyncConnection,
+) -> None:
+    await insert_subscriber(conn, "a@example.com", confirmation_token_hash="h1")
+
+    with pytest.raises(
+        IntegrityError, match="uq_email_subscribers_confirmation_token_hash"
+    ):
+        await insert_subscriber(conn, "b@example.com", confirmation_token_hash="h1")
+
+
+async def test_subscribers_without_a_token_hash_do_not_collide(
+    conn: AsyncConnection,
+) -> None:
+    await insert_subscriber(conn, "a@example.com")
+    await insert_subscriber(conn, "b@example.com")
+
+    count = await scalar(
+        conn,
+        "SELECT count(*) FROM email_subscribers"
+        " WHERE confirmation_token_hash IS NULL"
+        " AND email IN ('a@example.com', 'b@example.com')",
+    )
+    assert count == 2
+
+
+# Each enum column: every member is accepted and an unknown value is refused by its
+# CHECK. `alembic check` does not compare CHECK constraints, so this is what catches a
+# member added to a Python enum without a migration.
+ENUM_COLUMNS = [
+    ("offers", "offer_type", OfferType),
+    ("offers", "status", OfferStatus),
+    ("offers", "postage_kind", PostageKind),
+    ("offers", "freshness", OfferFreshness),
+    ("click_events", "user_agent_class", UserAgentClass),
+    ("email_subscribers", "status", SubscriberStatus),
+    ("email_subscribers", "frequency", AlertFrequency),
+]
+
+
+async def insert_with(
+    conn: AsyncConnection, table: str, column: str, value: str
+) -> None:
+    """Insert one valid row for `table` with `column` set to `value`."""
+    if table == "email_subscribers":
+        await insert_subscriber(
+            conn, f"{new_id().lower()}@example.com", **{column: value}
+        )
+        return
+    category_id = await insert_category(conn)
+    merchant_id = await insert_merchant(conn)
+    if table == "click_events":
+        offer_id = await insert_offer(conn, category_id, merchant_id)
+        await insert_click(conn, offer_id, **{column: value})
+        return
+    extra: dict[str, Any] = {"last_verified_at": datetime.now(UTC)}
+    if column == "postage_kind" and value == "COST":
+        extra |= {"postage_amount_minor": 299, "postage_currency": "GBP"}
+    await insert_offer(conn, category_id, merchant_id, **{**extra, column: value})
+
+
+@pytest.mark.parametrize(
+    ("table", "column", "members"),
+    [pytest.param(t, c, m, id=f"{t}.{c}") for t, c, m in ENUM_COLUMNS],
+)
+async def test_enum_column_accepts_every_member(
+    conn: AsyncConnection, table: str, column: str, members: type[enum.Enum]
+) -> None:
+    for member in members:
+        await insert_with(conn, table, column, member.name)
+
+
+@pytest.mark.parametrize(
+    ("table", "column", "members"),
+    [pytest.param(t, c, m, id=f"{t}.{c}") for t, c, m in ENUM_COLUMNS],
+)
+async def test_enum_column_rejects_an_unknown_value(
+    conn: AsyncConnection, table: str, column: str, members: type[enum.Enum]
+) -> None:
+    with pytest.raises(IntegrityError, match=f"ck_{table}_{column}_valid"):
+        await insert_with(conn, table, column, "NOT_A_MEMBER")

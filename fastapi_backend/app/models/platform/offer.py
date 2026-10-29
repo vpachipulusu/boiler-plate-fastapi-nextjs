@@ -46,7 +46,8 @@ class PostageKind(enum.StrEnum):
 POSTAGE_COST_COMPLETE = (
     "(postage_kind = 'COST' AND postage_amount_minor IS NOT NULL"
     " AND postage_amount_minor >= 0 AND postage_currency IS NOT NULL"
-    " AND char_length(postage_currency) = 3)"
+    " AND char_length(postage_currency) = 3"
+    " AND postage_currency = upper(postage_currency))"
     " OR (postage_kind <> 'COST' AND postage_amount_minor IS NULL"
     " AND postage_currency IS NULL)"
 )
@@ -60,6 +61,11 @@ class Offer(IdMixin, TimestampMixin, Base):
         Index("ix_offers_status_end_at", "status", "end_at"),
         Index("ix_offers_category_id_status", "category_id", "status"),
         CheckConstraint(POSTAGE_COST_COMPLETE, name="postage_cost_complete"),
+        # The page always renders "Last checked", so a live offer must have a date.
+        CheckConstraint(
+            "status <> 'PUBLISHED' OR last_verified_at IS NOT NULL",
+            name="published_is_verified",
+        ),
         enum_check("offer_type", OfferType),
         enum_check("status", OfferStatus),
         enum_check("postage_kind", PostageKind),

@@ -5,6 +5,10 @@ categories, merchants, offers, affiliate_links, click_events and email_subscribe
 (models in `app/models/platform/`). Enums are short text plus a named CHECK, like
 the baseline. `0001` is not edited.
 
+The downgrade drops the catalogue tables, including subscriber consent records and
+the affiliate click reconciliation record: run it only against a throwaway database
+(CI, `*_test`), never against data you need to keep.
+
 Revision ID: 0002
 Revises: 0001
 Create Date: 2026-10-29
@@ -203,10 +207,15 @@ def _create_offers() -> None:
         sa.CheckConstraint(
             "(postage_kind = 'COST' AND postage_amount_minor IS NOT NULL"
             " AND postage_amount_minor >= 0 AND postage_currency IS NOT NULL"
-            " AND char_length(postage_currency) = 3)"
+            " AND char_length(postage_currency) = 3"
+            " AND postage_currency = upper(postage_currency))"
             " OR (postage_kind <> 'COST' AND postage_amount_minor IS NULL"
             " AND postage_currency IS NULL)",
             name=op.f("ck_offers_postage_cost_complete"),
+        ),
+        sa.CheckConstraint(
+            "status <> 'PUBLISHED' OR last_verified_at IS NOT NULL",
+            name=op.f("ck_offers_published_is_verified"),
         ),
         sa.CheckConstraint(
             "freshness IN ('NEW_TODAY', 'JUST_ADDED', 'POPULAR', 'ENDS_SOON', 'LIMITED')",
@@ -301,7 +310,7 @@ def _create_click_events() -> None:
         sa.Column(
             "occurred_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.text("date_trunc('minute', now())"),
             nullable=False,
         ),
         sa.Column("referrer_host", sa.Text(), nullable=True),
@@ -341,6 +350,12 @@ def _create_click_events() -> None:
         "ix_click_events_offer_id_occurred_at",
         "click_events",
         ["offer_id", "occurred_at"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_click_events_affiliate_link_id"),
+        "click_events",
+        ["affiliate_link_id"],
         unique=False,
     )
 
@@ -383,6 +398,7 @@ def _create_email_subscribers() -> None:
         sa.Column("unsubscribed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("provider_subscriber_id", sa.Text(), nullable=True),
         sa.Column("confirmation_token_hash", sa.Text(), nullable=True),
+        sa.Column("confirmation_sent_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -425,6 +441,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_index(op.f("ix_click_events_affiliate_link_id"), table_name="click_events")
     op.drop_index("ix_click_events_offer_id_occurred_at", table_name="click_events")
     op.drop_table("click_events")
     op.drop_index("ix_affiliate_links_offer_id_active", table_name="affiliate_links")

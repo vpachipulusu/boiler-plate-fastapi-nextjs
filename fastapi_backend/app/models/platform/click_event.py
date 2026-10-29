@@ -23,7 +23,8 @@ class ClickEvent(IdMixin, Base):
     Privacy rule: this table holds no IP address, cookie id, user id, email or session
     id, and no raw user agent. Only the coarse `user_agent_class` and the referrer host
     are kept, so a click can be counted but never tied to a person.
-    `tests/models/test_platform_metadata.py` fails if such a column is added.
+    `tests/models/test_platform_metadata.py` pins the exact column set: adding a column
+    means changing that test and `docs/developer/platform-models.md` together.
     """
 
     __tablename__ = "click_events"
@@ -33,10 +34,14 @@ class ClickEvent(IdMixin, Base):
     )
 
     offer_id: Mapped[str] = mapped_column(ForeignKey("offers.id", ondelete="CASCADE"))
+    # Indexed so deleting a link (ON DELETE SET NULL) does not scan every click.
     affiliate_link_id: Mapped[str | None] = mapped_column(
-        ForeignKey("affiliate_links.id", ondelete="SET NULL")
+        ForeignKey("affiliate_links.id", ondelete="SET NULL"), index=True
     )
-    occurred_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # Truncated to the minute so it cannot be joined to a precise access-log timestamp.
+    occurred_at: Mapped[datetime] = mapped_column(
+        server_default=func.date_trunc("minute", func.now())
+    )
     referrer_host: Mapped[str | None]
     user_agent_class: Mapped[UserAgentClass | None] = mapped_column(
         enum_column(UserAgentClass)

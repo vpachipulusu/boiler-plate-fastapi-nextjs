@@ -1,4 +1,3 @@
-import re
 from typing import Any
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Table, UniqueConstraint
@@ -209,6 +208,10 @@ def test_offers_postage_amount_and_currency_only_for_cost():
     assert offers.columns["postage_currency"].nullable
 
 
+def test_published_offers_must_carry_a_verification_date():
+    assert "ck_offers_published_is_verified" in check_names("offers")
+
+
 def test_subscriber_email_is_stored_lower_case():
     assert "ck_email_subscribers_email_lowercase" in check_names("email_subscribers")
 
@@ -220,6 +223,8 @@ def test_foreign_key_delete_behaviour():
     assert foreign_key("click_events", "offer_id").ondelete == "CASCADE"
     assert foreign_key("click_events", "affiliate_link_id").ondelete == "SET NULL"
     assert table("click_events").columns["affiliate_link_id"].nullable
+    # SET NULL runs on every link delete, so the column needs an index.
+    assert ("affiliate_link_id",) in column_sets(table("click_events").indexes)
 
 
 def test_catalogue_defaults_are_server_side():
@@ -244,25 +249,26 @@ def test_catalogue_defaults_are_server_side():
         )
 
 
-PERSONAL_IDENTIFIER = re.compile(r"(^|_)(ip|cookie|email|session)(_|$)|user_id")
+# Privacy rule: a click can be counted but never tied to a person. Adding a column means
+# changing this test and the click-events section of docs/developer/platform-models.md
+# together, after asking whether it could identify a visitor.
+ANONYMOUS_CLICK_COLUMNS = {
+    "id",
+    "offer_id",
+    "affiliate_link_id",
+    "occurred_at",
+    "referrer_host",
+    "user_agent_class",
+}
 
 
-def test_click_events_hold_no_personal_identifier():
-    # Privacy rule: a click can be counted but never tied to a person.
-    for column in table("click_events").columns.keys():  # noqa: SIM118  (a ColumnCollection)
-        assert not PERSONAL_IDENTIFIER.search(column), f"click_events.{column}"
-    assert "user_agent" not in table("click_events").columns
-
-
-def test_personal_identifier_pattern_catches_the_forbidden_names():
-    for name in ["ip", "ip_address", "cookie_id", "user_id", "email", "session_id"]:
-        assert PERSONAL_IDENTIFIER.search(name), name
-    for name in ["referrer_host", "user_agent_class", "occurred_at", "offer_id"]:
-        assert not PERSONAL_IDENTIFIER.search(name), name
+def test_click_events_columns_are_exactly_the_anonymous_set():
+    assert set(table("click_events").columns.keys()) == ANONYMOUS_CLICK_COLUMNS
 
 
 def test_subscriber_stores_a_token_hash_not_a_token():
     columns = table("email_subscribers").columns.keys()
 
     assert "confirmation_token_hash" in columns
+    assert "confirmation_sent_at" in columns
     assert "confirmation_token" not in columns
