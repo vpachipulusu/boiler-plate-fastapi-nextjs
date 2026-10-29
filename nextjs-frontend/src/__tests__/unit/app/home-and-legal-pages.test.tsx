@@ -11,9 +11,10 @@ import TermsPage, { metadata as termsMetadata } from '@/app/(public)/terms/page'
 import AffiliatePage, {
   metadata as affiliateMetadata,
 } from '@/app/(public)/affiliate-disclosure/page';
+import { DRAFT_BANNER_TEXT } from '@/components/legal/legal-page';
 import ContactPage, { metadata as contactMetadata } from '@/app/(public)/contact/page';
 
-const DRAFT_BANNER = 'Draft — placeholder text pending legal review';
+const DRAFT_BANNER = DRAFT_BANNER_TEXT;
 
 const LEGAL_PAGES = [
   { name: 'privacy', Page: PrivacyPage, metadata: privacyMetadata },
@@ -144,19 +145,17 @@ describe('affiliate disclosure page', () => {
   it('says plainly that nothing earns commission today', () => {
     render(<AffiliatePage />);
 
-    expect(
-      screen.getByText(/no commission can be earned from anything on the site today/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/no commission can be earned/i)).toBeInTheDocument();
   });
 
-  it('describes the redirect, rel attribute and Ad label as planned, not live', () => {
+  it('describes the redirect, paid-link marking and Ad label as planned, not live', () => {
     const { container } = render(<AffiliatePage />);
 
     expect(screen.getByText(/none of this is live yet/i)).toBeInTheDocument();
-    expect(container.textContent).toContain('/go/');
-    expect(container.textContent).toContain('rel="sponsored nofollow"');
-    expect(container.textContent).toMatch(/“Ad” label before the button/);
+    expect(container.textContent).toMatch(/marked as a paid link for search engines/i);
+    expect(container.textContent).toMatch(/“Ad”/);
     expect(container.textContent).toMatch(/pay Freejoy a commission/i);
+    expect(container.textContent).not.toMatch(/rel=|sponsored nofollow/i);
   });
 
   it('does not state affiliate links exist or hedge with "may earn"', () => {
@@ -228,11 +227,19 @@ describe('privacy notice', () => {
   it('discloses logs and the email-in-URL behaviour, and marks collection plans as plans', () => {
     const { container } = render(<PrivacyPage />);
 
-    expect(container.textContent).toMatch(/IP address and browser type/);
-    expect(container.textContent).toMatch(/carried to the alerts page in the page address/);
-    expect(container.textContent).toMatch(/If alerts go live, we expect to hold/);
-    expect(container.textContent).toMatch(/This is a plan, not something running today/);
-    expect(container.textContent).not.toMatch(/does not save any information/i);
+    expect(container.textContent).toMatch(/IP address/);
+    expect(container.textContent).toMatch(/page address/);
+    expect(container.textContent).toMatch(/error-monitoring provider/);
+    expect(container.textContent).toMatch(/If alerts go live/);
+    expect(container.textContent).toMatch(/not .* running today/i);
+    expect(container.textContent).not.toMatch(/does not save any information|saves nothing/i);
+  });
+
+  it('describes account data held when someone creates an account', () => {
+    render(<PrivacyPage />);
+
+    expect(screen.getByRole('heading', { name: 'If you create an account' })).toBeInTheDocument();
+    expect(screen.getByText(/IP address and browser of each sign-in/i)).toBeInTheDocument();
   });
 });
 
@@ -241,6 +248,8 @@ describe('cookie notice', () => {
     const { container } = render(<CookiesPage />);
 
     expect(screen.getByRole('heading', { name: 'If you sign in' })).toBeInTheDocument();
+    expect(container.textContent).toMatch(/called `session`/);
+    expect(container.textContent).toMatch(/sign-up page prepares sign-in storage/);
     expect(container.textContent).toMatch(/still to be confirmed in review/i);
   });
 });

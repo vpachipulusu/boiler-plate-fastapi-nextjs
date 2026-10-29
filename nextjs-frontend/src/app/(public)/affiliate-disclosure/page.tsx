@@ -29,13 +29,10 @@ export default function AffiliateDisclosurePage() {
       <p>None of this is live yet. The plan is:</p>
       <ul>
         <li>
-          Offer buttons will go to a Freejoy address that starts with <code>/go/</code> and then on
-          to the brand&apos;s own website.
+          Offer buttons will go through a Freejoy address on the way to the brand&apos;s own
+          website.
         </li>
-        <li>
-          Each of those links will be marked <code>rel=&quot;sponsored nofollow&quot;</code>, so
-          search engines can tell it is a paid link.
-        </li>
+        <li>Those links will be marked as a paid link for search engines.</li>
         <li>
           Each offer with an affiliate link will carry an &ldquo;Ad&rdquo; label before the button,
           with a plain sentence saying the brand pays Freejoy a commission if you take up the offer

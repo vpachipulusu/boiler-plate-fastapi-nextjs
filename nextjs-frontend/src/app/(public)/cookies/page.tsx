@@ -16,17 +16,17 @@ export default function CookiesPage() {
     >
       <h2>Cookies in this release</h2>
       <p>
-        This release is intended to set no non-essential cookies and run no analytics, advertising
-        or tracking scripts. Browsing the public pages is not meant to store anything on your
-        device, so no cookie banner is shown at present. That is our current reading and it is still
-        to be confirmed in review.
+        This release is intended to set no non-essential cookies and run no analytics or advertising
+        scripts. If error monitoring is switched on, the privacy notice describes it. Browsing the
+        public pages is not meant to store anything on your device, so no cookie banner is shown at
+        present. That is our current reading and it is still to be confirmed in review.
       </p>
       <h2>If you sign in</h2>
       <p>
-        If you sign in to an account, a sign-in cookie keeps you signed in for up to five days. It
-        is needed for the sign-in you asked for and is not used for anything else. Signing in may
-        also make your browser keep sign-in state for the same reason. The final list will name each
-        item.
+        If you sign in to an account, a sign-in cookie called `session` keeps you signed in for up
+        to five days. It is needed for the sign-in you asked for and is not used for anything else.
+        Opening the sign-in or sign-up page prepares sign-in storage in your browser even if you do
+        not sign in; it is used only for signing in. The final list will name each item.
       </p>
       <h2>If that changes</h2>
       <p>

@@ -16,20 +16,29 @@ export default function PrivacyPage() {
     >
       <h2>What this release collects</h2>
       <p>
-        The design preview does not save the details you type into its forms. The alerts form does
-        not store your email address and the contact form is switched off.
+        The design preview does not save the details you type into the alerts form, and the contact
+        form is switched off. Accounts are different: see the next section.
       </p>
       <p>
         Like any website, the service that hosts Freejoy handles technical details of each request,
         such as your IP address and browser type, to deliver pages and keep the site secure. If
-        error reporting is switched on, details of a fault, which can include the same technical
-        details, may be sent to our error-monitoring provider. Who these providers are and how long
-        they keep the details will be added here.
+        error reporting is switched on, details of a fault, and a small sample of page-load timing
+        reports, which include the page address and browser details, may be sent to our
+        error-monitoring provider. Who these providers are and how long they keep the details will
+        be added here.
       </p>
       <p>
         One more thing to know: if you type your email address into the sign-up box on the home
         page, it is carried to the alerts page in the page address. That means it can appear in
-        request logs and browser history, even though the site itself saves nothing.
+        request logs, in browser history and, if error reporting is switched on, in the error and
+        performance reports sent to our error-monitoring provider, even though Freejoy itself does
+        not keep your address.
+      </p>
+      <h2>If you create an account</h2>
+      <p>
+        If you create an account, we hold your email address, your name if you give one, the times
+        you sign in, and the IP address and browser of each sign-in. If you switch on two-factor
+        sign-in, we also hold those settings. How long each of these is kept will be added here.
       </p>
       <h2>What we expect to collect later</h2>
       <p>
@@ -61,7 +70,7 @@ export default function PrivacyPage() {
           'Controller identity (legal name and address) and the data protection contact route',
           'Lawful basis for each purpose (consent for alerts, legitimate interests for site security)',
           'Whether the planned outbound-click counts are personal data',
-          'Retention periods for subscriber, confirmation-token and contact data',
+          'Retention periods for subscriber, confirmation-token, contact and sign-in history data',
           'Named processors (hosting, error monitoring, email sending) and any transfers outside the UK',
           'Right to object to direct marketing, minimum sign-up age and wording of data-subject rights',
           'Complaint route to the ICO and the data protection fee position',
