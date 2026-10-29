@@ -70,9 +70,7 @@ describe('AffiliateCta', () => {
 
 describe('OfferCta with an offer id', () => {
   it('links through /go/ instead of opening the demo dialog', () => {
-    render(
-      <OfferCta offerType="free_trial" ended={false} categorySlug="beauty" offerId="offer_9" />
-    );
+    render(<OfferCta offerType="free_trial" demo={false} offerId="offer_9" />);
 
     expect(screen.getByRole('link', { name: CTA_LABELS.free_trial })).toHaveAttribute(
       'href',
@@ -82,19 +80,15 @@ describe('OfferCta with an offer id', () => {
     expect(screen.queryByText(/demo offer/i)).toBeNull();
   });
 
-  it('shows the ended panel and no /go/ link once the offer has ended', () => {
-    const { container } = render(
-      <OfferCta offerType="free_trial" ended categorySlug="beauty" offerId="offer_9" />
-    );
+  it('keeps the demo dialog for a demo offer even if an id is passed', () => {
+    const { container } = render(<OfferCta offerType="free_sample" demo offerId="offer_9" />);
 
-    expect(screen.getByRole('heading', { name: 'This offer has ended' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: CTA_LABELS.free_sample })).toBeInTheDocument();
     expect(goAnchors(container)).toEqual([]);
   });
 
   it('keeps the demo dialog when there is no offer id', () => {
-    const { container } = render(
-      <OfferCta offerType="free_sample" ended={false} categorySlug="beauty" offerId={null} />
-    );
+    const { container } = render(<OfferCta offerType="free_sample" demo offerId={null} />);
 
     expect(screen.getByRole('button', { name: CTA_LABELS.free_sample })).toBeInTheDocument();
     expect(goAnchors(container)).toEqual([]);
@@ -138,5 +132,19 @@ describe('OfferHero', () => {
     for (const anchor of anchors) {
       expect(anchor).toHaveAttribute('rel', 'sponsored nofollow noopener');
     }
+  });
+
+  it('shows the ended panel and no /go/ link once a real offer has ended', () => {
+    const { container } = render(
+      <OfferHero
+        offer={{ ...live, demo: false, source: 'api' }}
+        merchant={merchant}
+        category={category}
+        ended
+      />
+    );
+
+    expect(screen.getByRole('heading', { name: 'This offer has ended' })).toBeInTheDocument();
+    expect(goAnchors(container)).toEqual([]);
   });
 });

@@ -78,11 +78,13 @@ export function OfferGrid({ offers, merchants, className }: OfferGridProps) {
       className={cn('grid grid-cols-2 gap-2.5 sm:gap-5 md:grid-cols-3 xl:grid-cols-4', className)}
     >
       {offers.map((offer) => {
-        const merchant = bySlug.get(offer.merchantSlug) ?? {
-          slug: offer.merchantSlug,
-          name: offer.merchantSlug,
-          logoUrl: null,
-        };
+        // API offers carry their merchant; fixture offers are looked up by slug.
+        const merchant = offer.merchant ??
+          bySlug.get(offer.merchantSlug) ?? {
+            slug: offer.merchantSlug,
+            name: offer.merchantSlug,
+            logoUrl: null,
+          };
         return (
           <li key={offer.id} className="flex">
             <OfferCard offer={offer} merchant={merchant} className="w-full" />

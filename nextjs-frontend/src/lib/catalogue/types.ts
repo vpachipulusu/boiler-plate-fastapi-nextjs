@@ -1,8 +1,8 @@
 /**
  * Freejoy catalogue contract.
  *
- * Phase 1 reads these shapes from the fixture module (`fixtures.ts`); Phase 2 maps the
- * catalogue API onto the same shapes so pages and components never change. Every value a page
+ * Fixtures (`fixtures.ts`, local design work and unit tests) and the catalogue API (`api-mapper.ts`) both
+ * produce these shapes, so pages and components never know which one they are reading. Every value a page
  * shows as a trust cue (verification date, freshness label, postage, card requirement) is an
  * explicit field here: nothing is derived from the wall clock or invented at render time.
  */
@@ -68,6 +68,8 @@ export interface Offer {
   description: string[];
   categorySlug: string;
   merchantSlug: string;
+  /** Set on API offers, which carry their merchant; fixture offers resolve it from `merchantSlug`. */
+  merchant?: Merchant;
   offerType: OfferType;
   status: OfferStatus;
   featured: boolean;
@@ -85,10 +87,10 @@ export interface Offer {
   lastVerifiedAt: string;
   freshness: Freshness | null;
   steps: ClaimStep[];
-  /** Always true for fixture offers: the UI shows a demo badge and never links out. */
+  /** True for fixture offers: the UI shows a demo badge and never links out. False for API offers. */
   demo: boolean;
   source: 'fixture' | 'api';
-  /** Null for fixtures. Phase 3 resolves real destinations server-side via /go/[id]. */
+  /** Null for fixtures and API offers. Phase 3 resolves real destinations server-side via /go/[id]. */
   destinationUrl: string | null;
 }
 

@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 vi.mock('@/app/globals.css', () => ({}));
 
 import HomePage, { generateMetadata as homeGenerateMetadata } from '@/app/(public)/page';
+import { HomeSections } from '@/components/home/home-sections';
 import AboutPage, { metadata as aboutMetadata } from '@/app/(public)/about/page';
 import PrivacyPage, { metadata as privacyMetadata } from '@/app/(public)/privacy/page';
 import CookiesPage, { metadata as cookiesMetadata } from '@/app/(public)/cookies/page';
@@ -27,8 +28,14 @@ const LEGAL_PAGES = [
 const COMPLIANCE_CLAIMS =
   /fully compliant|(gdpr|pecr|ico|asa|cma)[- ]compliant|compliant with|ico[- ]registered|registered with the ico|registration number|approved by|certified|verified by|guaranteed|completely free|100% free/i;
 
+/**
+ * The page streams the catalogue sections through Suspense, so render the page shell and the
+ * resolved sections side by side. `container` is the whole document body.
+ */
 async function renderHome() {
-  return render(await HomePage());
+  render(await HomePage());
+  render(await HomeSections({ demo: true }));
+  return { container: document.body };
 }
 
 describe('homepage', () => {

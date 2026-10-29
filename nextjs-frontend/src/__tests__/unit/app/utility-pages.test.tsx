@@ -9,7 +9,7 @@ vi.mock('@/app/globals.css', () => ({}));
 import NotFound from '@/app/not-found';
 import ErrorPage from '@/app/error';
 import GlobalError from '@/app/global-error';
-import Loading from '@/app/loading';
+import { RouteSkeleton as Loading } from '@/components/site/route-skeleton';
 import ContactPage from '@/app/(public)/contact/page';
 
 /** system and utility pages follow the tokens and the plan 5.8 field pattern. */

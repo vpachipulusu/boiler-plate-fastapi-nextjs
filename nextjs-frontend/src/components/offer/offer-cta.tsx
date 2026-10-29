@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, CalendarOff } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -17,51 +17,20 @@ import { AffiliateCta } from './outbound-link';
 
 interface OfferCtaProps {
   offerType: OfferType;
-  ended: boolean;
-  categorySlug: string;
+  /** True for fixture offers (design preview); false for real catalogue offers. */
+  demo: boolean;
   /** Set for a real offer: the CTA links to `/go/<offerId>`. Null or absent keeps the demo dialog. */
   offerId?: string | null;
 }
 
 /**
- * Primary call to action. Fixture offers have no destination, so the button opens a "Demo offer"
- * dialog instead of linking out: nothing here renders an external href. When the offer has ended
- * the button is replaced by a calm panel with two ways onward.
+ * Primary call to action. A real offer (`offerId` set) links to the first-party `/go/<offerId>` redirect
+ * with the "Ad" label and commission sentence. A demo offer has no destination, so its button opens a
+ * "Demo offer" dialog instead: nothing here renders an external href. The ended state is rendered by the
+ * (server) hero instead of this client component.
  */
-export function OfferCta({ offerType, ended, categorySlug, offerId = null }: OfferCtaProps) {
-  if (ended) {
-    return (
-      <section aria-labelledby="offer-ended-heading" className="rounded-card bg-warn p-5">
-        <h2
-          id="offer-ended-heading"
-          className="flex items-center gap-2 font-display text-lg font-bold text-warn-foreground"
-        >
-          <CalendarOff className="h-5 w-5" aria-hidden="true" />
-          This offer has ended
-        </h2>
-        <p className="mt-2 text-sm text-warn-foreground">
-          The provider is no longer accepting requests for this one. There are plenty of other happy
-          finds to explore.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm font-bold">
-          <Link
-            href={`/category/${categorySlug}`}
-            className="inline-flex min-h-11 items-center text-accent-ink underline-offset-4 hover:underline"
-          >
-            More in this category
-          </Link>
-          <Link
-            href="/freebies"
-            className="inline-flex min-h-11 items-center text-accent-ink underline-offset-4 hover:underline"
-          >
-            Browse all freebies
-          </Link>
-        </div>
-      </section>
-    );
-  }
-
-  if (offerId) return <AffiliateCta offerId={offerId} offerType={offerType} />;
+export function OfferCta({ offerType, demo, offerId = null }: OfferCtaProps) {
+  if (offerId && !demo) return <AffiliateCta offerId={offerId} offerType={offerType} />;
 
   return (
     <div>

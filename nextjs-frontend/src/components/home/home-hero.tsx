@@ -3,7 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { HomeHeroArt } from './home-hero-art';
 
 /** Cream editorial hero (design screens 01/05): copy and two pills, illustration on the right. */
-export function HomeHero() {
+export function HomeHero({ demo }: { demo: boolean }) {
   return (
     <section
       aria-labelledby="home-hero-heading"
@@ -42,12 +42,14 @@ export function HomeHero() {
               How it works
             </Link>
           </div>
-          <p className="mt-5 flex items-center gap-2 text-xs font-bold text-accent-ink">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-accent-ink" />
-            Design preview with sample listings
-          </p>
+          {demo && (
+            <p className="mt-5 flex items-center gap-2 text-xs font-bold text-accent-ink">
+              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-accent-ink" />
+              Design preview with sample listings
+            </p>
+          )}
         </div>
-        <HomeHeroArt className="mx-auto w-4/5 max-w-sm lg:w-full lg:max-w-none" />
+        <HomeHeroArt demo={demo} className="mx-auto w-4/5 max-w-sm lg:w-full lg:max-w-none" />
       </div>
     </section>
   );
