@@ -14,6 +14,9 @@ import {
   RateLimitConfig,
 } from '@/lib/middleware/rate-limit';
 
+/** The first-party affiliate redirect. Rate limited with the general policy; never part of the /api allowlist. */
+const OUTBOUND_PREFIX = '/go/';
+
 /** Security headers shared by every response the proxy lets through. */
 function applySecurityHeaders(response: NextResponse): void {
   response.headers.set('X-Content-Type-Options', 'nosniff');
@@ -59,8 +62,8 @@ function applyRateLimit(request: NextRequest, pathname: string): NextResponse | 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // Apply rate limiting to API routes
-  if (pathname.startsWith('/api/')) {
+  // Apply rate limiting to API routes and to the outbound redirect (`/go/`, general policy)
+  if (pathname.startsWith('/api/') || pathname.startsWith(OUTBOUND_PREFIX)) {
     const rateLimitResponse = applyRateLimit(request, pathname);
     if (rateLimitResponse) {
       return rateLimitResponse;
