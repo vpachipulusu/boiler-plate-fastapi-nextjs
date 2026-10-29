@@ -49,7 +49,10 @@ class ClaimStep:
 
 @dataclass(frozen=True)
 class OfferSeed:
-    """One sample offer. ``*_days`` are offsets from the day the seed runs."""
+    """One sample offer. ``*_days`` are offsets from the day the seed runs.
+
+    ``availability`` may hold ``{end}``, replaced by the date ``end_days`` falls on.
+    """
 
     slug: str
     title: str
