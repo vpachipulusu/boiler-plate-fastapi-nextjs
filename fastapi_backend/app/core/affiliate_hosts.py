@@ -11,9 +11,10 @@ A host matches an allowed entry when it is that host or a subdomain of it
 
 * ``PROVIDER_HOSTS`` is the reviewed registry of affiliate networks. To support a new network,
   add it here in a pull request (see ``docs/developer/freejoy-affiliate.md``).
-* ``direct`` links point at the merchant's own site: the host must be the host of the
-  merchant's stored website (or a subdomain of it; a leading ``www.`` is ignored). A merchant
-  without a website cannot have a ``direct`` link followed.
+* ``direct`` links point at the merchant's own site: the host must be exactly the host of the
+  merchant's stored website, or that host with ``www.`` added or removed (no other subdomain).
+  The website is written by an admin and is therefore trusted. A merchant without a website
+  cannot have a ``direct`` link followed.
 * ``sample`` is the provider the local seed command uses, with ``example.com`` links. It is
   honoured only in local, test and Vercel preview/development environments.
 * An unknown provider is never followed.
@@ -64,8 +65,13 @@ def destination_allowed(
     """Whether a link of ``provider`` may send a visitor to ``host`` (already lower-cased)."""
     if provider == DIRECT_PROVIDER:
         merchant = _merchant_host(merchant_website)
-        return merchant is not None and host_matches(host, frozenset({merchant}))
+        return merchant is not None and host in (merchant, f"www.{merchant}")
     if provider == SAMPLE_PROVIDER:
         return allow_sample and host_matches(host, SAMPLE_HOSTS)
     allowed = PROVIDER_HOSTS.get(provider)
     return allowed is not None and host_matches(host, allowed)
+
+
+def is_known_provider(provider: str) -> bool:
+    """Whether ``provider`` has any rule at all; an unknown provider is never followed."""
+    return provider in PROVIDER_HOSTS or provider in (DIRECT_PROVIDER, SAMPLE_PROVIDER)

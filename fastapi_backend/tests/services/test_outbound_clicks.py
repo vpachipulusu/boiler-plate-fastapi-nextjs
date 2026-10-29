@@ -144,6 +144,11 @@ HOSTILE = [
     "https://evil.example/",
     "https://127.0.0.1/",
     "https://www.awin1.com:8443/",
+    "https://www.awin1.com./cread.php",
+    "https://www.awin1.com.123/x",
+    "https://xn--win1-nza.com/cread.php",
+    "https://аwin1.com/cread.php",
+    "https://www.awin1.com。evil.example/x",
     "",
 ]
 

@@ -417,19 +417,19 @@ async def test_create_link_validates_the_url_and_audits_only_the_host():
         "off1",
         {
             "provider": "awin",
-            "destination_url": "https://Track.Example.com/c?id=SECRET-TRACKING",
+            "destination_url": "https://Www.Awin1.com/c?id=SECRET-TRACKING",
             "tracking_id": "t-1",
             "active": True,
         },
     )
 
-    assert created.destination_url == "https://track.example.com/c?id=SECRET-TRACKING"
+    assert created.destination_url == "https://www.awin1.com/c?id=SECRET-TRACKING"
     (row,) = auditor.rows
     assert row["action"] == "admin.offer_links.create"
     assert row["resource"] == "affiliate_links" and row["resource_id"] == created.id
     assert row["details"] == {
         "offer_id": "off1",
-        "destination_host": "track.example.com",
+        "destination_host": "www.awin1.com",
     }
     assert "SECRET-TRACKING" not in repr(row) and session.commits == 1
 
@@ -437,7 +437,7 @@ async def test_create_link_validates_the_url_and_audits_only_the_host():
 @pytest.mark.parametrize(
     "url",
     [
-        "http://track.example.com",
+        "http://www.awin1.com",
         "javascript:alert(1)",
         "https://good.example.com@evil.example.com",
         "//evil.example.com",
@@ -463,7 +463,7 @@ async def test_links_cannot_be_added_to_missing_or_archived_offers():
     service, *_ = build(offer("gone", status=OfferStatus.ARCHIVED))
     data = {
         "provider": "awin",
-        "destination_url": "https://a.example.com",
+        "destination_url": "https://www.awin1.com",
         "tracking_id": None,
         "active": True,
     }
@@ -481,16 +481,16 @@ async def test_update_link_changes_fields_and_audits():
         ACTOR,
         "off1",
         "l1",
-        {"destination_url": "https://new.example.com/x", "active": False},
+        {"destination_url": "https://www.awin1.com/x", "active": False},
     )
 
-    assert updated.destination_url == "https://new.example.com/x" and not updated.active
+    assert updated.destination_url == "https://www.awin1.com/x" and not updated.active
     (row,) = auditor.rows
     assert row["action"] == "admin.offer_links.update"
     assert row["before"] == {"active": True, "destination_host": "shop.example.com"}
-    assert row["after"] == {"active": False, "destination_host": "new.example.com"}
+    assert row["after"] == {"active": False, "destination_host": "www.awin1.com"}
     assert row["details"]["fields"] == ["active", "destination_url"]
-    assert "new.example.com/x" not in repr(row)
+    assert "awin1.com/x" not in repr(row)
 
 
 async def test_update_link_errors():
@@ -508,7 +508,7 @@ async def test_update_link_errors():
         await service.update_link(ACTOR, "gone", "l1", {"active": False})
     with pytest.raises(InvalidInput):
         await service.update_link(
-            ACTOR, "off1", "l1", {"destination_url": "http://x.example.com"}
+            ACTOR, "off1", "l1", {"destination_url": "http://www.awin1.com"}
         )
 
 
@@ -575,10 +575,89 @@ async def test_update_link_audits_the_destination_host_before_and_after_never_th
         ACTOR,
         "off1",
         "l1",
-        {"destination_url": "https://other.example.org/p?aff=SECRET"},
+        {"destination_url": "https://www.awin1.com/p?aff=SECRET"},
     )
 
     (row,) = auditor.rows
     assert row["before"] == {"destination_host": "shop.example.com"}
-    assert row["after"] == {"destination_host": "other.example.org"}
+    assert row["after"] == {"destination_host": "www.awin1.com"}
     assert "SECRET" not in repr(row) and "/p" not in repr(row)
+
+
+def link_data(provider="awin", url="https://www.awin1.com/c?id=1"):
+    return {
+        "provider": provider,
+        "destination_url": url,
+        "tracking_id": None,
+        "active": True,
+    }
+
+
+@pytest.mark.parametrize(
+    ("provider", "url", "code"),
+    [
+        ("awin", "https://www.tradedoubler.com/x", "destination_not_allowed"),
+        ("awin", "https://awin1.com.evil.example/x", "destination_not_allowed"),
+        ("direct", "https://evil.example/x", "destination_not_allowed"),
+        ("direct", "https://deals.acme.example/x", "destination_not_allowed"),
+        ("mystery", "https://www.awin1.com/x", "unknown_provider"),
+    ],
+)
+async def test_create_link_refuses_a_destination_the_provider_may_not_use(
+    provider, url, code
+):
+    service, store, auditor, session = build(offer("off1"))
+
+    with pytest.raises(InvalidInput) as raised:
+        await service.create_link(ACTOR, "off1", link_data(provider, url))
+
+    assert raised.value.code == code
+    assert store.links == {} and auditor.rows == [] and session.commits == 0
+
+
+@pytest.mark.parametrize(
+    "url", ["https://acme.example/x", "https://www.acme.example/x"]
+)
+async def test_a_direct_link_on_the_merchant_website_is_accepted(url):
+    service, store, *_ = build(offer("off1"))
+
+    created = await service.create_link(ACTOR, "off1", link_data("direct", url))
+
+    assert created.id in store.links
+
+
+async def test_a_direct_link_needs_a_merchant_website():
+    service, store, *_ = build(offer("off1"))
+    store.websites["mer1"] = None
+
+    with pytest.raises(InvalidInput) as raised:
+        await service.create_link(
+            ACTOR, "off1", link_data("direct", "https://acme.example/x")
+        )
+
+    assert raised.value.code == "destination_not_allowed"
+
+
+async def test_update_link_checks_the_host_when_the_url_or_provider_changes():
+    service, store, auditor, _ = build(offer("off1"), links=[link("l1")])
+
+    with pytest.raises(InvalidInput) as moved:
+        await service.update_link(
+            ACTOR, "off1", "l1", {"destination_url": "https://www.tradedoubler.com/x"}
+        )
+    with pytest.raises(InvalidInput) as renamed:
+        await service.update_link(ACTOR, "off1", "l1", {"provider": "mystery"})
+
+    assert moved.value.code == "destination_not_allowed"
+    assert renamed.value.code == "unknown_provider"
+    assert store.links["l1"].destination_url == "https://shop.example.com/go"
+    assert auditor.rows == []
+
+
+async def test_update_link_can_still_switch_off_a_link_that_predates_the_allowlist():
+    service, store, *_ = build(offer("off1"), links=[link("l1")])
+
+    updated = await service.update_link(ACTOR, "off1", "l1", {"active": False})
+
+    assert updated.active is False
+    assert store.links["l1"].destination_url == "https://shop.example.com/go"

@@ -143,7 +143,7 @@ ROUTES: list[tuple[str, str, dict[str, Any] | None, str]] = [
     (
         "POST",
         "/v1/admin/offers/off1/links",
-        {"provider": "awin", "destination_url": "https://a.example.com"},
+        {"provider": "awin", "destination_url": "https://www.awin1.com"},
         "offers.write",
     ),
     ("PATCH", "/v1/admin/offers/off1/links/l1", {"active": False}, "offers.write"),
@@ -428,7 +428,7 @@ async def test_link_routes_create_update_and_report_missing_links(harness):
     async with harness.client() as client:
         created = await client.post(
             "/v1/admin/offers/off1/links",
-            json={"provider": "awin", "destination_url": "https://a.example.com/x"},
+            json={"provider": "awin", "destination_url": "https://www.awin1.com/x"},
         )
         updated = await client.patch(
             "/v1/admin/offers/off1/links/l1",
@@ -439,11 +439,11 @@ async def test_link_routes_create_update_and_report_missing_links(harness):
         )
         unsafe = await client.post(
             "/v1/admin/offers/off1/links",
-            json={"provider": "awin", "destination_url": "http://a.example.com"},
+            json={"provider": "awin", "destination_url": "http://www.awin1.com"},
         )
         bad_provider = await client.post(
             "/v1/admin/offers/off1/links",
-            json={"provider": "AWIN!", "destination_url": "https://a.example.com"},
+            json={"provider": "AWIN!", "destination_url": "https://www.awin1.com"},
         )
         empty_patch = await client.patch("/v1/admin/offers/off1/links/l1", json={})
         null_url = await client.patch(

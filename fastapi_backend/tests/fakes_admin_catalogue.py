@@ -126,6 +126,7 @@ class FakeOfferStore:
         self.links: dict[str, AffiliateLinkRecord] = {}
         self.categories = {"cat1": True}
         self.merchants = {"mer1": True}
+        self.websites: dict[str, str | None] = {"mer1": "https://www.acme.example"}
         self.locked: list[str] = []
         self.filters: list[tuple[OfferFilters, int, int]] = []
 
@@ -158,6 +159,9 @@ class FakeOfferStore:
 
     async def merchant_active(self, merchant_id: str) -> bool | None:
         return self.merchants.get(merchant_id)
+
+    async def merchant_website(self, merchant_id: str) -> str | None:
+        return self.websites.get(merchant_id)
 
     async def list_links(self, offer_id: str) -> list[AffiliateLinkRecord]:
         return [item for item in self.links.values() if item.offer_id == offer_id]

@@ -2,7 +2,12 @@
 
 import pytest
 
-from app.core.affiliate_hosts import PROVIDER_HOSTS, destination_allowed, host_matches
+from app.core.affiliate_hosts import (
+    PROVIDER_HOSTS,
+    destination_allowed,
+    host_matches,
+    is_known_provider,
+)
 
 
 def allowed(
@@ -48,7 +53,8 @@ def test_a_direct_link_must_stay_on_the_merchant_website() -> None:
 
     assert allowed("direct", "acme.example", site)
     assert allowed("direct", "www.acme.example", site)
-    assert allowed("direct", "deals.acme.example", site)
+    assert not allowed("direct", "deals.acme.example", site)
+    assert not allowed("direct", "shop.www.acme.example", site)
     assert not allowed("direct", "acme.example.evil.example", site)
     assert not allowed("direct", "evil.example", site)
 
@@ -64,3 +70,11 @@ def test_the_sample_provider_works_only_when_samples_are_allowed() -> None:
     assert allowed("sample", "example.com", sample=True)
     assert not allowed("sample", "example.com", sample=False)
     assert not allowed("sample", "evil.example", sample=True)
+
+
+def test_known_providers_are_the_registry_direct_and_sample() -> None:
+    assert all(
+        is_known_provider(name) for name in [*PROVIDER_HOSTS, "direct", "sample"]
+    )
+    assert not is_known_provider("mystery")
+    assert not is_known_provider("")

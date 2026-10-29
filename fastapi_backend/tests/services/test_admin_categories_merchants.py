@@ -181,3 +181,33 @@ async def test_merchant_list_clamps_paging():
     page = await service.list_merchants(None, None, 10_000, -1)
 
     assert page.total_count == 2
+
+
+async def test_a_website_change_is_audited_with_the_old_and_new_value():
+    service, _, auditor, _ = merchants(merchant("m1"))
+
+    await service.update_merchant(ACTOR, "m1", {"website": "https://First.example.com"})
+    await service.update_merchant(
+        ACTOR, "m1", {"website": "https://second.example.com"}
+    )
+    await service.update_merchant(ACTOR, "m1", {"website": None})
+
+    changes = [(row["before"], row["after"]) for row in auditor.rows]
+    assert changes == [
+        ({"website": None}, {"website": "https://first.example.com"}),
+        (
+            {"website": "https://first.example.com"},
+            {"website": "https://second.example.com"},
+        ),
+        ({"website": "https://second.example.com"}, {"website": None}),
+    ]
+
+
+async def test_creating_a_merchant_audits_its_website():
+    service, _, auditor, _ = merchants()
+
+    await service.create_merchant(
+        ACTOR, {"name": "Acme Ltd", "website": "https://Acme.example.com"}
+    )
+
+    assert auditor.rows[0]["after"]["website"] == "https://acme.example.com"

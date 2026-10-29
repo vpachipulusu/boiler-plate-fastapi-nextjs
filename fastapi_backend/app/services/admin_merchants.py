@@ -27,7 +27,8 @@ from app.services.admin_catalogue_errors import CatalogueNotFound, SlugTaken
 __all__ = ["AdminMerchantService"]
 
 EDITABLE_FIELDS = frozenset({"name", "website", "logo_url"})
-AUDITED_FIELDS = frozenset({"name"})
+# The website is audited because it decides where ``direct`` affiliate links may point.
+AUDITED_FIELDS = frozenset({"name", "website"})
 URL_FIELDS = ("website", "logo_url")
 RESOURCE = "merchants"
 
@@ -86,6 +87,7 @@ class AdminMerchantService:
                 "name": created.name,
                 "slug": created.slug,
                 "active": created.active,
+                "website": created.website,
             },
         )
         await self.session.commit()
