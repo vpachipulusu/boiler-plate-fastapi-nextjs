@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import app.core.config as config_module
 from app.core.database import build_engine
+from app.core.ids import new_id
 from app.models.platform import (
     AffiliateLink,
     Category,
@@ -54,6 +55,7 @@ FIXTURES_TS = (
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 TODAY = date(2026, 10, 29)
+LOCAL_URL = "postgresql+asyncpg://user:pw@localhost:5432/freejoy"
 
 needs_database = pytest.mark.skipif(
     not TEST_DATABASE_URL, reason="TEST_DATABASE_URL is not set"
@@ -64,7 +66,7 @@ class ForbiddenMaker:
     """A session maker that fails the test if the command ever reaches the database."""
 
     def __call__(self) -> Any:
-        raise AssertionError("the database must not be opened")
+        pytest.fail("the database must not be opened")
 
 
 class LeakyMaker:
@@ -72,6 +74,13 @@ class LeakyMaker:
 
     def __call__(self) -> Any:
         raise RuntimeError("postgresql://user:hunter2@db.example.invalid/prod")
+
+
+def refuse(capsys: pytest.CaptureFixture[str], **kwargs: Any) -> str:
+    """Run ``main`` with a maker that must never be used; return its output."""
+    exit_code = seed_catalogue.main(maker=ForbiddenMaker(), **kwargs)
+    assert exit_code == 1
+    return capsys.readouterr().out
 
 
 # --- environment guard ------------------------------------------------------------------------
@@ -94,10 +103,8 @@ class LeakyMaker:
 def test_refuses_to_run_outside_local_and_test(
     environment: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    exit_code = seed_catalogue.main(environment=environment, maker=ForbiddenMaker())
+    output = refuse(capsys, environment=environment, database_url=LOCAL_URL)
 
-    output = capsys.readouterr().out
-    assert exit_code == 1
     assert "refusing to run" in output
     assert "Nothing was written" in output
 
@@ -116,13 +123,12 @@ def test_reads_the_environment_from_settings_when_not_given(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(
-        config_module, "settings", SimpleNamespace(ENVIRONMENT="production")
+        config_module,
+        "settings",
+        SimpleNamespace(ENVIRONMENT="production", DATABASE_URL=LOCAL_URL),
     )
 
-    exit_code = seed_catalogue.main(maker=ForbiddenMaker())
-
-    assert exit_code == 1
-    assert "refusing to run" in capsys.readouterr().out
+    assert "ENVIRONMENT must be" in refuse(capsys)
 
 
 def test_refuses_when_settings_cannot_be_loaded(
@@ -130,10 +136,7 @@ def test_refuses_when_settings_cannot_be_loaded(
 ) -> None:
     monkeypatch.delattr(config_module, "settings")
 
-    exit_code = seed_catalogue.main(maker=ForbiddenMaker())
-
-    assert exit_code == 1
-    assert "refusing to run" in capsys.readouterr().out
+    assert "refusing to run" in refuse(capsys)
 
 
 def test_refusal_never_prints_the_connection_string(
@@ -146,9 +149,8 @@ def test_refusal_never_prints_the_connection_string(
         SimpleNamespace(ENVIRONMENT="production", DATABASE_URL=secret),
     )
 
-    seed_catalogue.main(maker=ForbiddenMaker())
+    output = refuse(capsys)
 
-    output = capsys.readouterr().out
     assert "hunter2" not in output
     assert "postgresql" not in output
 
@@ -157,7 +159,10 @@ def test_takes_no_command_line_arguments(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     exit_code = seed_catalogue.main(
-        environment="local", maker=ForbiddenMaker(), argv=["--force"]
+        environment="local",
+        database_url=LOCAL_URL,
+        maker=ForbiddenMaker(),
+        argv=["--force"],
     )
 
     assert exit_code == 2
@@ -167,13 +172,103 @@ def test_takes_no_command_line_arguments(
 def test_reports_only_the_error_type_when_the_database_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    exit_code = seed_catalogue.main(environment="test", maker=LeakyMaker())
+    exit_code = seed_catalogue.main(
+        environment="test", database_url=LOCAL_URL, maker=LeakyMaker()
+    )
 
     output = capsys.readouterr().out
     assert exit_code == 1
     assert "RuntimeError" in output
     assert "hunter2" not in output
     assert "db.example.invalid" not in output
+
+
+REMOTE_URLS = [
+    (
+        "postgresql+asyncpg://neon_user:s3cret@"
+        + "ep-cool-name-123456.eu-west-2.aws.neon.tech/neondb?sslmode=require",
+        ("s3cret", "neon.tech", "neon_user"),
+    ),
+    (
+        "postgresql+asyncpg://u:s3cret@db.remote.example.invalid:5432/freejoy_test",
+        ("s3cret", "example.invalid", "freejoy_test"),
+    ),
+    (
+        "postgresql+asyncpg://u:s3cret@localhost.example.invalid/freejoy",
+        ("s3cret", "example.invalid"),
+    ),
+    ("postgresql+asyncpg://u:s3cret@127.0.0.2/freejoy", ("s3cret", "127.0.0.2")),
+    ("postgresql+asyncpg://u:s3cret@10.0.0.5/freejoy", ("s3cret", "10.0.0.5")),
+    ("postgresql+asyncpg:///freejoy?host=/var/run/postgresql", ("var/run",)),
+    (
+        "postgresql+asyncpg://u:s3cret@localhost/freejoy?host=db.remote.example.invalid",
+        ("s3cret", "example.invalid"),
+    ),
+    ("", ()),
+    ("not a url", ("not a url",)),
+]
+
+
+@pytest.mark.parametrize(("url", "secrets"), REMOTE_URLS)
+def test_refuses_a_database_that_is_not_on_this_machine(
+    url: str, secrets: tuple[str, ...], capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = refuse(capsys, environment="local", database_url=url)
+
+    assert "DATABASE_URL must point at localhost, 127.0.0.1 or ::1" in output
+    assert "Nothing was written" in output
+    assert "postgresql" not in output
+    assert all(secret not in output for secret in secrets)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgresql+asyncpg://u:p@localhost/db",
+        "postgresql+asyncpg://u:p@127.0.0.1:5433/db",
+        "postgresql+asyncpg://u:p@[::1]:5432/db",
+    ],
+)
+def test_loopback_databases_pass_the_locality_guard(
+    url: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    exit_code = seed_catalogue.main(
+        environment="test", database_url=url, maker=LeakyMaker()
+    )
+
+    assert seed_catalogue.is_local_database(url)
+    assert exit_code == 1
+    assert "RuntimeError" in capsys.readouterr().out
+
+
+def test_an_unset_database_url_is_not_local() -> None:
+    assert not seed_catalogue.is_local_database(None)
+    assert not seed_catalogue.is_local_database("")
+
+
+def test_refuses_a_remote_database_url_read_from_settings(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    remote = "postgresql+asyncpg://u:s3cret@db.remote.example.invalid/freejoy"
+    monkeypatch.setattr(
+        config_module,
+        "settings",
+        SimpleNamespace(ENVIRONMENT="local", DATABASE_URL=remote),
+    )
+
+    output = refuse(capsys)
+
+    assert "DATABASE_URL must point at" in output
+    assert "s3cret" not in output
+    assert "example.invalid" not in output
+
+
+def test_refuses_when_the_database_url_cannot_be_read(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(config_module, "settings", SimpleNamespace(ENVIRONMENT="local"))
+
+    assert "DATABASE_URL must point at" in refuse(capsys)
 
 
 # --- sample data ------------------------------------------------------------------------------
@@ -244,6 +339,7 @@ def test_ended_offers_have_ended_and_live_offers_have_not() -> None:
             assert offer.end_days < 0
         if offer.status is OfferStatus.PUBLISHED and offer.end_days is not None:
             assert offer.end_days >= 0
+        assert offer.end_days is None or offer.start_days < offer.end_days
 
 
 def test_steps_are_available_for_every_offer_type() -> None:
@@ -278,17 +374,24 @@ def _migrate_to_head(url: str) -> None:
     )
 
 
-@pytest.fixture
-def maker() -> Iterator[async_sessionmaker[AsyncSession]]:
-    """Session maker on an empty, migrated catalogue (the per-worker ``*_test`` database)."""
-    assert TEST_DATABASE_URL is not None
+@pytest.fixture(scope="module")
+def migrated_url() -> str:
+    """The per-worker ``*_test`` database URL, migrated to head once for this module."""
+    if TEST_DATABASE_URL is None:
+        pytest.skip("TEST_DATABASE_URL is not set")
     target = make_url(TEST_DATABASE_URL)
-    assert (target.database or "").endswith("_test"), (
-        "refusing to wipe a non-test database"
-    )
-    assert target.host in LOCAL_HOSTS, "refusing to wipe a non-local database"
+    if not (target.database or "").endswith("_test"):
+        pytest.fail("refusing to wipe a non-test database")
+    if target.host not in LOCAL_HOSTS:
+        pytest.fail("refusing to wipe a non-local database")
     _migrate_to_head(TEST_DATABASE_URL)
-    engine = build_engine(TEST_DATABASE_URL)
+    return TEST_DATABASE_URL
+
+
+@pytest.fixture
+def maker(migrated_url: str) -> Iterator[async_sessionmaker[AsyncSession]]:
+    """Session maker on an empty catalogue: tables are truncated before and after a test."""
+    engine = build_engine(migrated_url)
     session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
     async def clear() -> None:
@@ -324,7 +427,12 @@ def _counts(session_maker: async_sessionmaker[AsyncSession]) -> dict[str, int]:
 
 
 def _seed(session_maker: async_sessionmaker[AsyncSession], today: date = TODAY) -> int:
-    return seed_catalogue.main(environment="test", maker=session_maker, today=today)
+    return seed_catalogue.main(
+        environment="test",
+        database_url=TEST_DATABASE_URL,
+        maker=session_maker,
+        today=today,
+    )
 
 
 EXPECTED_COUNTS = {"categories": 6, "merchants": 8, "offers": 24, "affiliate_links": 24}
@@ -337,7 +445,12 @@ def test_seeds_an_empty_database_in_local_and_test(
     environment: str,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    exit_code = seed_catalogue.main(environment=environment, maker=maker, today=TODAY)
+    exit_code = seed_catalogue.main(
+        environment=environment,
+        database_url=TEST_DATABASE_URL,
+        maker=maker,
+        today=TODAY,
+    )
 
     assert exit_code == 0
     assert _counts(maker) == EXPECTED_COUNTS
@@ -348,7 +461,12 @@ def test_seeds_an_empty_database_in_local_and_test(
 
 @needs_database
 def test_refusal_writes_nothing(maker: async_sessionmaker[AsyncSession]) -> None:
-    exit_code = seed_catalogue.main(environment="production", maker=maker, today=TODAY)
+    exit_code = seed_catalogue.main(
+        environment="production",
+        database_url=TEST_DATABASE_URL,
+        maker=maker,
+        today=TODAY,
+    )
 
     assert exit_code == 1
     assert all(count == 0 for count in _counts(maker).values())
@@ -382,6 +500,8 @@ def test_every_offer_is_sample_data_with_an_example_destination(
             links = list(await session.scalars(select(AffiliateLink)))
             return offers, links
 
+    ended = {"laundry-sheets-sample", "bedtime-hamper-prize-draw"}
+
     _seed(maker)
     offers, links = run(load())
 
@@ -396,6 +516,8 @@ def test_every_offer_is_sample_data_with_an_example_destination(
         for o in offers
     )
     assert len({link.offer_id for link in links}) == 24
+    slug_by_id = {o.id: o.slug for o in offers}
+    assert {slug_by_id[link.offer_id] for link in links if not link.active} == ended
 
 
 @needs_database
@@ -433,7 +555,9 @@ def test_changed_rows_are_updated_by_slug(
                 update(Offer).where(Offer.slug == offer_slug).values(title="Edited")
             )
             await session.execute(
-                update(Merchant).where(Merchant.slug == "good-beans").values(name="X")
+                update(Merchant)
+                .where(Merchant.slug == "good-beans")
+                .values(name="X (Sample)")
             )
             await session.execute(
                 update(Category).where(Category.slug == "pets").values(enabled=False)
@@ -466,7 +590,7 @@ def test_changed_rows_are_updated_by_slug(
     assert offer.id == offer_id
     assert merchant.name == "Good Beans (Sample)"
     assert merchant.id == merchant_id
-    assert category.enabled is True
+    assert category.enabled is False  # categories are insert-only
     assert all(url.startswith("https://example.com/go/") for url in urls)
     assert _counts(maker) == EXPECTED_COUNTS
 
@@ -486,7 +610,7 @@ async def _merchant_id(session_maker: async_sessionmaker[AsyncSession]) -> str:
 
 
 @needs_database
-def test_rows_that_are_not_sample_data_are_left_alone(
+def test_rows_with_other_slugs_are_left_alone(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
     async def add_real_merchant() -> None:
@@ -503,3 +627,116 @@ def test_rows_that_are_not_sample_data_are_left_alone(
 
     assert "Kept" in run(names())
     assert _counts(maker)["merchants"] == 9
+
+
+def _real_offer(slug: str, category_id: str, merchant_id: str) -> Offer:
+    return Offer(
+        slug=slug,
+        title="Real title",
+        summary="s",
+        category_id=category_id,
+        merchant_id=merchant_id,
+        offer_type=OfferType.VOUCHER,
+        image_tint="blush",
+        image_label="l",
+        image_alt="a",
+        postage_kind=PostageKind.FREE,
+        eligibility="e",
+        availability="a",
+        publisher_notes="my own notes",
+    )
+
+
+def _real_category(slug: str, **overrides: Any) -> Category:
+    values: dict[str, Any] = {
+        "name": "Real",
+        "short_name": "Real",
+        "description": "d",
+        "intro": "i",
+        "tint": "sky",
+    }
+    return Category(slug=slug, **{**values, **overrides})
+
+
+@needs_database
+def test_a_real_offer_with_a_seed_slug_is_never_overwritten(
+    maker: async_sessionmaker[AsyncSession], capsys: pytest.CaptureFixture[str]
+) -> None:
+    async def add_real_offer() -> None:
+        async with maker() as session, session.begin():
+            category = _real_category("real-cat", id=new_id())
+            merchant = Merchant(id=new_id(), slug="real-merchant", name="Real")
+            session.add_all([category, merchant])
+            await session.flush()
+            session.add(_real_offer("coffee-discovery-pack", category.id, merchant.id))
+
+    async def title() -> str | None:
+        async with maker() as session:
+            return await session.scalar(
+                select(Offer.title).where(Offer.slug == "coffee-discovery-pack")
+            )
+
+    run(add_real_offer())
+    before = _counts(maker)
+
+    exit_code = _seed(maker)
+
+    output = capsys.readouterr().out
+    assert exit_code == 1
+    assert "offers row 'coffee-discovery-pack' is not sample data" in output
+    assert "Nothing was written" in output
+    assert run(title()) == "Real title"
+    assert _counts(maker) == before
+
+
+@needs_database
+def test_a_real_merchant_with_a_seed_slug_is_never_overwritten(
+    maker: async_sessionmaker[AsyncSession], capsys: pytest.CaptureFixture[str]
+) -> None:
+    async def add_real_merchant() -> None:
+        async with maker() as session, session.begin():
+            session.add(Merchant(slug="tea-time", name="Tea Time"))
+
+    run(add_real_merchant())
+
+    assert _seed(maker) == 1
+
+    assert "merchants row 'tea-time' is not sample data" in capsys.readouterr().out
+    assert _counts(maker) == {
+        "categories": 0,
+        "merchants": 1,
+        "offers": 0,
+        "affiliate_links": 0,
+    }
+
+
+@needs_database
+def test_an_existing_category_is_never_modified(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    async def add_category() -> None:
+        async with maker() as session, session.begin():
+            session.add(
+                _real_category("beauty", name="Custom", enabled=False, sort_order=9)
+            )
+
+    async def load() -> Category:
+        async with maker() as session:
+            found = await session.scalar(
+                select(Category).where(Category.slug == "beauty")
+            )
+            assert found is not None
+            return found
+
+    run(add_category())
+
+    assert _seed(maker) == 0
+
+    beauty = run(load())
+    assert (beauty.name, beauty.tint, beauty.enabled, beauty.sort_order) == (
+        "Custom",
+        "sky",
+        False,
+        9,
+    )
+    assert _counts(maker) == EXPECTED_COUNTS
