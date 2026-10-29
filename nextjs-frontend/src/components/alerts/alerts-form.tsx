@@ -39,12 +39,41 @@ export interface AlertsCategory {
 
 interface AlertsFormProps {
   categories: AlertsCategory[];
+  /**
+   * False until alerts are open (see the page): the form is replaced by a plain notice and nothing can be
+   * submitted, so nobody is invited to sign up for mail that cannot be sent.
+   */
+  live: boolean;
 }
 
 const LABEL_CLASS = 'text-[11px] font-bold uppercase tracking-wider text-foreground';
 const ERROR_CLASS = 'mt-2 text-sm font-medium text-crit-foreground';
 const CARD_CLASS =
   'flex min-h-11 cursor-pointer items-center gap-3 rounded-input border border-border bg-background px-3 text-sm font-bold text-foreground transition-colors has-[:checked]:border-accent-ink has-[:checked]:bg-good has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring';
+
+function NotOpenYet() {
+  return (
+    <div>
+      <h2 className="font-display text-3xl font-extrabold tracking-tight">
+        Create your free alerts
+      </h2>
+      <div className="mt-6 rounded-card bg-warn p-5 text-warn-foreground">
+        <p className="font-bold">Alerts aren&apos;t open yet.</p>
+        <p className="mt-2 text-sm">
+          Nothing you could enter here would be sent or saved, so the sign-up form is switched off
+          until alerts launch. In the meantime you can browse every freebie on the site.
+        </p>
+        <Link
+          href="/freebies"
+          className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-pill bg-cta px-6 text-sm font-bold text-cta-foreground hover:bg-cta-hover"
+        >
+          Browse freebies
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
@@ -61,7 +90,7 @@ function FieldError({ id, message }: { id: string; message?: string }) {
  * "check your inbox" answer is the same for every address, so it never reveals who is already signed up.
  * A failed request keeps the answers and offers a retry with a curated message.
  */
-export function AlertsForm({ categories }: AlertsFormProps) {
+export function AlertsForm({ categories, live }: AlertsFormProps) {
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const {
@@ -76,6 +105,7 @@ export function AlertsForm({ categories }: AlertsFormProps) {
   });
 
   const onSubmit = async (values: AlertsValues) => {
+    if (!live) return;
     setFailure(null);
     try {
       const result = await subscribeToAlertsAction(values);
@@ -90,6 +120,8 @@ export function AlertsForm({ categories }: AlertsFormProps) {
   const categoriesError = errors.categories?.message;
   const consentError = errors.consent?.message;
 
+  if (!live) return <NotOpenYet />;
+
   return (
     <div>
       <h2 className="font-display text-3xl font-extrabold tracking-tight">
@@ -99,7 +131,16 @@ export function AlertsForm({ categories }: AlertsFormProps) {
         Choose what you&apos;d like to hear about. You can change this anytime.
       </p>
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6">
+      <form
+        onSubmit={(event) => {
+          // One request at a time. aria-disabled (not disabled) keeps keyboard focus on the button, so a
+          // second press or Enter reaches here and is dropped.
+          if (isSubmitting) event.preventDefault();
+          else void handleSubmit(onSubmit)(event);
+        }}
+        noValidate
+        className="mt-6"
+      >
         <fieldset disabled={sentTo !== null} className="space-y-7 border-0 p-0">
           <div>
             <label htmlFor="alerts-email" className={LABEL_CLASS}>
@@ -242,27 +283,29 @@ export function AlertsForm({ categories }: AlertsFormProps) {
               </div>
             </div>
           ) : (
-            <>
-              {failure ? (
-                <p
-                  role="alert"
-                  className="mb-4 rounded-input bg-crit px-4 py-3 text-sm font-medium text-crit-foreground"
-                >
-                  {failure} Your answers are still here: press the button to try again.
-                </p>
-              ) : null}
-              <Button
-                type="submit"
-                variant="accent"
-                disabled={isSubmitting}
-                className="h-14 w-full justify-between rounded-pill px-7 text-base font-bold shadow-sm"
-              >
-                {isSubmitting ? 'Sending…' : 'Send me free alerts'}
-                <ArrowRight aria-hidden="true" />
-              </Button>
-            </>
+            <Button
+              type="submit"
+              variant="accent"
+              aria-disabled={isSubmitting || undefined}
+              onClick={(event) => {
+                if (isSubmitting) event.preventDefault();
+              }}
+              className="h-14 w-full justify-between rounded-pill px-7 text-base font-bold shadow-sm aria-disabled:opacity-50"
+            >
+              {isSubmitting ? 'Sending…' : 'Send me free alerts'}
+              <ArrowRight aria-hidden="true" />
+            </Button>
           )}
         </div>
+        {/* Outside the polite region and below the button, so it is announced once and does not move the button. */}
+        {failure && sentTo === null ? (
+          <p
+            role="alert"
+            className="mt-4 rounded-input bg-crit px-4 py-3 text-sm font-medium text-crit-foreground"
+          >
+            {failure} Your answers are still here: press the button to try again.
+          </p>
+        ) : null}
       </form>
 
       <p className="mt-4 text-xs text-muted-foreground">

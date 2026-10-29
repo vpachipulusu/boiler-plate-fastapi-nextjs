@@ -13,7 +13,7 @@ export const CONSENT_TAIL = '.';
 export const ALERTS_CONSENT_TEXT = `${CONSENT_LEAD}${CONSENT_LINK_TEXT}${CONSENT_TAIL}`;
 
 /** The form this consent was given on; the backend allowlists the values it accepts. */
-export const ALERTS_CONSENT_SOURCE = 'alerts_page';
+export const ALERTS_CONSENT_SOURCE = 'alerts_page' as const;
 
 export const ALERT_FREQUENCIES = [
   { value: 'daily', label: 'Daily highlights' },

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LegalPage, ReviewerChecklist } from '@/components/legal/legal-page';
+import { CONFIRM_WINDOW_TEXT } from '@/lib/alerts/consent';
 
 export const metadata: Metadata = {
   title: 'Privacy notice',
@@ -32,7 +33,8 @@ export default function PrivacyPage() {
       <p>
         The email address you give for alerts is sent to us in the body of a request, never in the
         page address. The links in our emails do carry a single-use code in the page address, so
-        that code can appear in request logs; it stops working once it has been used.
+        that code can appear in request logs of our host; it stops working once it has been used.
+        Error reports sent to our error-monitoring provider have that code removed first.
       </p>
       <h2>If you create an account</h2>
       <p>
@@ -44,7 +46,7 @@ export default function PrivacyPage() {
       <p>
         We use a double opt-in. After you submit the alerts form we email you a confirmation link,
         and you are added to the alert list only when you open it and press the button. The link
-        works for 24 hours and once. Until then we send nothing else. We keep the details above so
+        works for {CONFIRM_WINDOW_TEXT} and once. Until then we send nothing else. We keep the details above so
         that we can send the alerts you asked for and show that you asked.
       </p>
       <p>

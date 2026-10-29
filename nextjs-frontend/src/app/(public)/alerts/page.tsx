@@ -5,10 +5,11 @@ import { getCategories } from '@/lib/catalogue';
 import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
 /**
- * Flip to true once alerts are live in production (a real email provider configured, ADR-012); until then
- * the page stays noindex and the backend refuses sign-ups, so nobody is told to check an inbox for nothing.
+ * Alerts are open only when ALERTS_FORM_LIVE=true is set (server-only, read when the page is built). Set it
+ * once a real email provider is configured in production (ADR-012). Until then the page shows a plain "not
+ * open yet" notice instead of the form, stays noindex, and the backend refuses sign-ups as a last line.
  */
-const ALERTS_FORM_LIVE = false;
+const ALERTS_FORM_LIVE = process.env.ALERTS_FORM_LIVE === 'true';
 
 const ALERTS_TITLE = 'Free alerts';
 const ALERTS_DESCRIPTION =
@@ -61,7 +62,10 @@ export default async function AlertsPage() {
           </div>
         </section>
         <section className="px-6 py-10 sm:px-10 sm:py-12">
-          <AlertsForm categories={categories.map(({ slug, name }) => ({ slug, name }))} />
+          <AlertsForm
+            categories={categories.map(({ slug, name }) => ({ slug, name }))}
+            live={ALERTS_FORM_LIVE}
+          />
         </section>
       </div>
     </div>

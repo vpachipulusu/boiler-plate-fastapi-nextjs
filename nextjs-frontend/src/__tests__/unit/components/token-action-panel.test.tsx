@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -56,13 +57,89 @@ describe('TokenActionPanel', () => {
     expect(document.body.innerHTML).not.toContain(TOKEN);
   });
 
+  it('works under React Strict Mode: the button appears and the action gets the token once', async () => {
+    const action = vi.fn().mockResolvedValue({ success: true });
+    render(
+      <StrictMode>
+        <TokenActionPanel copy={COPY} action={action} />
+      </StrictMode>
+    );
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Do it' }));
+
+    expect(action).toHaveBeenCalledExactlyOnceWith(TOKEN);
+    expect(window.location.search).toBe('');
+    expect(await screen.findByText('All done')).toBeInTheDocument();
+  });
+
+  it('keeps focus on the button, marked aria-disabled, while the action runs', async () => {
+    let finish: (value: { success: true }) => void = () => {};
+    const action = vi.fn().mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    renderPanel(action);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Do it' }));
+    const working = screen.getByRole('button', { name: 'Doing it…' });
+    await user.click(working);
+
+    expect(working).toHaveAttribute('aria-disabled', 'true');
+    expect(working).toHaveFocus();
+    expect(action).toHaveBeenCalledTimes(1);
+    finish({ success: true });
+    await screen.findByText('All done');
+  });
+
+  it('keeps focus on the retry button after a temporary failure', async () => {
+    renderPanel(
+      vi.fn().mockResolvedValue({
+        success: false,
+        code: 'unavailable',
+        error: ALERTS_FAILURE_MESSAGES.unavailable,
+      })
+    );
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Do it' }));
+    await screen.findByRole('alert');
+
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Do it' }));
+  });
+
+  it('does not wrap its alert in another live region', async () => {
+    renderPanel();
+    openAt('');
+    render(<TokenActionPanel copy={COPY} action={vi.fn()} />);
+
+    const alerts = await screen.findAllByRole('alert');
+
+    expect(alerts.length).toBeGreaterThan(0);
+    for (const alert of alerts) expect(alert.closest('[aria-live]')).toBeNull();
+  });
+
+  it('shows the action row after the heading so the button does not move when a message appears', async () => {
+    renderPanel(
+      vi.fn().mockResolvedValue({ success: false, code: 'unavailable', error: 'try again' })
+    );
+    const user = userEvent.setup();
+    const button = await screen.findByRole('button', { name: 'Do it' });
+    const before = button.parentElement?.previousElementSibling;
+
+    await user.click(button);
+    const alert = await screen.findByRole('alert');
+
+    expect(button.parentElement?.previousElementSibling).toBe(before);
+    expect(button.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('disables the button while the action runs', async () => {
     let finish: (value: { success: true }) => void = () => {};
     renderPanel(vi.fn().mockReturnValue(new Promise((resolve) => (finish = resolve))));
 
     await userEvent.setup().click(await screen.findByRole('button', { name: 'Do it' }));
 
-    expect(screen.getByRole('button', { name: 'Doing it…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Doing it…' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     finish({ success: true });
     expect(await screen.findByText('All done')).toBeInTheDocument();
   });

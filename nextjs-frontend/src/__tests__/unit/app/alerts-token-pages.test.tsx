@@ -6,6 +6,7 @@ vi.mock('@/app/actions/alerts-actions', () => ({
   unsubscribeFromAlertsAction: vi.fn(),
 }));
 
+import { siteConfig } from '@/config/site';
 import ConfirmAlertsPage, { metadata as confirmMetadata } from '@/app/(public)/alerts/confirm/page';
 import UnsubscribeAlertsPage, {
   metadata as unsubscribeMetadata,
@@ -45,7 +46,7 @@ describe('unsubscribe page', () => {
     render(<UnsubscribeAlertsPage />);
 
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Unsubscribe from Freejoy alerts' })
+      screen.getByRole('heading', { level: 1, name: `Unsubscribe from ${siteConfig.name} alerts` })
     ).toBeInTheDocument();
     expect(screen.getByText(/press the button/i)).toBeInTheDocument();
   });

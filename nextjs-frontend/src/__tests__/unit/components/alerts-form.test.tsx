@@ -24,7 +24,7 @@ const UNAVAILABLE = {
 
 function setup() {
   const user = userEvent.setup();
-  render(<AlertsForm categories={CATEGORIES} />);
+  render(<AlertsForm categories={CATEGORIES} live />);
   const form = {
     user,
     email: () => screen.getByLabelText(/email address/i),
@@ -43,6 +43,22 @@ function setup() {
 beforeEach(() => {
   mocks.subscribe.mockReset();
   mocks.subscribe.mockResolvedValue({ success: true });
+});
+
+describe('AlertsForm while alerts are not open', () => {
+  it('shows a plain notice instead of a form, and never calls the server', async () => {
+    render(<AlertsForm categories={CATEGORIES} live={false} />);
+
+    expect(screen.getByText(/alerts aren.t open yet/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Browse freebies' })).toHaveAttribute(
+      'href',
+      '/freebies'
+    );
+    expect(screen.queryByRole('button', { name: /send me free alerts/i })).toBeNull();
+    expect(screen.queryByLabelText(/email address/i)).toBeNull();
+    expect(screen.queryByText(/something went wrong/i)).toBeNull();
+    expect(mocks.subscribe).not.toHaveBeenCalled();
+  });
 });
 
 describe('AlertsForm validation', () => {
@@ -138,17 +154,48 @@ describe('AlertsForm submitting', () => {
     expect(panel.parentElement?.textContent).not.toMatch(/already (subscribed|on)|welcome back/i);
   });
 
-  it('disables the button and says it is sending while the request runs', async () => {
+  it('marks the button aria-disabled while the request runs, keeps focus on it and ignores a second press', async () => {
     let finish: (value: { success: true }) => void = () => {};
     mocks.subscribe.mockReturnValue(new Promise((resolve) => (finish = resolve)));
     const form = setup();
     await form.fillValid();
 
     await form.user.click(form.submit());
+    const sending = screen.getByRole('button', { name: 'Sending…' });
+    await form.user.click(sending);
 
-    expect(screen.getByRole('button', { name: 'Sending…' })).toBeDisabled();
+    expect(sending).toHaveAttribute('aria-disabled', 'true');
+    expect(sending).not.toBeDisabled();
+    expect(sending).toHaveFocus();
+    expect(mocks.subscribe).toHaveBeenCalledTimes(1);
     finish({ success: true });
     expect(await screen.findByText(INBOX_PANEL)).toBeInTheDocument();
+  });
+
+  it('keeps keyboard focus on the button after a failed submit', async () => {
+    mocks.subscribe.mockResolvedValueOnce(UNAVAILABLE);
+    const form = setup();
+    await form.fillValid();
+
+    await form.user.click(form.submit());
+    await screen.findByRole('alert');
+
+    expect(document.activeElement).toBe(form.submit());
+    expect(form.submit()).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('puts the failure alert below the button and outside the polite live region', async () => {
+    mocks.subscribe.mockResolvedValueOnce(UNAVAILABLE);
+    const form = setup();
+    await form.fillValid();
+
+    await form.user.click(form.submit());
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.closest('[aria-live]')).toBeNull();
+    expect(
+      form.submit().compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it('shows a curated error, keeps the answers and succeeds on retry', async () => {

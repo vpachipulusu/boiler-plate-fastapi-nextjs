@@ -126,20 +126,15 @@ describe('alerts page', () => {
     render(await AlertsPage());
   }
 
-  it('shows the promise heading, the form and one checkbox per category', async () => {
+  it('shows the promise heading and, until alerts are open, a plain notice and no form', async () => {
     await renderAlerts();
 
     expect(
       screen.getByRole('heading', { level: 1, name: 'Good things. Straight to you.' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Create your free alerts' })).toBeInTheDocument();
-    const group = screen.getByRole('group', { name: /interested in/i });
-    expect(within(group).getAllByRole('checkbox')).toHaveLength(6);
-  });
-
-  it('starts with an empty address: nothing is prefilled from the page address', async () => {
-    await renderAlerts();
-
-    expect(screen.getByLabelText(/email address/i)).toHaveValue('');
+    expect(screen.getByText(/alerts aren.t open yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /interested in/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /send me free alerts/i })).toBeNull();
+    expect(screen.queryByText(/something went wrong/i)).toBeNull();
   });
 });

@@ -55,7 +55,8 @@ export function TokenActionPanel({ copy, action }: TokenActionPanelProps) {
   }, []);
 
   const press = async () => {
-    if (!token.current) return;
+    // aria-disabled (not disabled) keeps focus on the button, so this guard stops a second press.
+    if (!token.current || phase.name === 'working') return;
     setPhase({ name: 'working' });
     let result: AlertsActionResult;
     try {
@@ -104,21 +105,14 @@ export function TokenActionPanel({ copy, action }: TokenActionPanelProps) {
           <>
             <h1 className="font-display text-3xl font-extrabold tracking-tight">{copy.heading}</h1>
             <p className="mt-3 text-muted-foreground">{copy.intro}</p>
-            <div aria-live="polite">
-              {message ? (
-                <p role="alert" className="mt-4 text-sm font-medium text-crit-foreground">
-                  {message}
-                </p>
-              ) : null}
-            </div>
-            <div className="mt-6 flex flex-wrap items-center gap-4">
+            <div className="mt-6 flex min-h-12 flex-wrap items-center gap-4">
               {phase.name === 'ready' || phase.name === 'working' || canRetry ? (
                 <Button
                   type="button"
                   variant="accent"
-                  disabled={phase.name === 'working'}
+                  aria-disabled={phase.name === 'working' || undefined}
                   onClick={press}
-                  className="h-12 rounded-pill px-7 text-base font-bold"
+                  className="h-12 rounded-pill px-7 text-base font-bold aria-disabled:opacity-50"
                 >
                   {phase.name === 'working' ? copy.working : copy.button}
                 </Button>
@@ -132,6 +126,11 @@ export function TokenActionPanel({ copy, action }: TokenActionPanelProps) {
                 </Link>
               ) : null}
             </div>
+            {message ? (
+              <p role="alert" className="mt-4 text-sm font-medium text-crit-foreground">
+                {message}
+              </p>
+            ) : null}
           </>
         )}
       </div>

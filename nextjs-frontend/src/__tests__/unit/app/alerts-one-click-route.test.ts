@@ -56,6 +56,31 @@ describe('one-click POST', () => {
 
     expect(mocks.unsubscribe).toHaveBeenCalledWith(null);
   });
+
+  it.each([
+    ['no body', ''],
+    ['the wrong value', 'List-Unsubscribe=Unsubscribe'],
+    ['an unrelated field', 'other=One-Click'],
+  ])('refuses %s with 400 and never reaches the backend', async (_name, body) => {
+    const response = await post('?token=tok', body);
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toBe('');
+    expect(mocks.unsubscribe).not.toHaveBeenCalled();
+  });
+
+  it('refuses a body that is not a form with 400', async () => {
+    const response = await POST(
+      new NextRequest(`${URL_BASE}?token=tok`, {
+        method: 'POST',
+        body: '{"List-Unsubscribe":"One-Click"}',
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mocks.unsubscribe).not.toHaveBeenCalled();
+  });
 });
 
 describe('one-click GET', () => {

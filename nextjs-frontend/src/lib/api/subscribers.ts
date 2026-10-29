@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { ALERTS_CONSENT_SOURCE } from '@/lib/alerts/consent';
 import { callBackend, type ApiResult } from './server';
 import {
   confirmAlertSubscription,
@@ -23,7 +24,7 @@ export function startAlertsSubscription(input: SubscribeInput): Promise<ApiResul
     (client) =>
       subscribeToAlerts({
         client,
-        body: { ...input, consent: true, consent_source: 'alerts_page' },
+        body: { ...input, consent: true, consent_source: ALERTS_CONSENT_SOURCE },
       }),
     PUBLIC
   );
