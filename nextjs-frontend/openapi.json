@@ -9270,6 +9270,133 @@
         }
       }
     },
+    "/v1/catalogue/offers/{offer_id}/click": {
+      "post": {
+        "tags": [
+          "catalogue"
+        ],
+        "summary": "Record an outbound click and return the destination",
+        "description": "Write one click event for a live offer and return its affiliate destination.",
+        "operationId": "record_click",
+        "parameters": [
+          {
+            "name": "offer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "title": "Offer Id"
+            }
+          },
+          {
+            "name": "X-Internal-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ClickRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClickResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The offer has ended",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiredOfferResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/subscriptions": {
       "get": {
         "tags": [
@@ -13097,6 +13224,70 @@
           "detail"
         ],
         "title": "ClaimStep"
+      },
+      "ClickData": {
+        "properties": {
+          "destination_url": {
+            "type": "string",
+            "title": "Destination Url",
+            "description": "Stored https destination; never logged"
+          }
+        },
+        "type": "object",
+        "required": [
+          "destination_url"
+        ],
+        "title": "ClickData"
+      },
+      "ClickRequest": {
+        "properties": {
+          "referrer_host": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 253
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referrer Host",
+            "description": "Host name of the referring page; anything else is dropped"
+          },
+          "user_agent_class": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserAgentClass"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Coarse device class; the raw user agent is never sent"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ClickRequest",
+        "description": "What the Next.js route may tell the backend about the click. Nothing else is accepted."
+      },
+      "ClickResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ClickData"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ClickResponse"
       },
       "CreateCategoryRequest": {
         "properties": {
@@ -17864,6 +18055,17 @@
           "data"
         ],
         "title": "UrlResponse"
+      },
+      "UserAgentClass": {
+        "type": "string",
+        "enum": [
+          "DESKTOP",
+          "MOBILE",
+          "TABLET",
+          "BOT",
+          "OTHER"
+        ],
+        "title": "UserAgentClass"
       },
       "UserDetailResponse": {
         "properties": {
