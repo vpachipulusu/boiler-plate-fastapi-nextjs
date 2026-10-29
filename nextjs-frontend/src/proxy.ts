@@ -43,13 +43,15 @@ function applyRateLimit(request: NextRequest, pathname: string): NextResponse | 
   const result = rateLimit(identifier, rateLimitConfig);
 
   if (!result.success) {
-    return NextResponse.json(
+    const refused = NextResponse.json(
       { error: result.message || 'Too many requests' },
       {
         status: 429,
-        headers: getRateLimitHeaders(result),
+        headers: { ...getRateLimitHeaders(result), 'Cache-Control': 'no-store' },
       }
     );
+    applySecurityHeaders(refused);
+    return refused;
   }
 
   return null;
