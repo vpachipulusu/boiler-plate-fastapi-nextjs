@@ -344,6 +344,74 @@ export type CancelResponse = {
 };
 
 /**
+ * CategoryData
+ */
+export type CategoryData = {
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Short Name
+     */
+    short_name: string;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Intro
+     */
+    intro: string;
+    /**
+     * Tint
+     */
+    tint: string;
+    /**
+     * Sort Order
+     */
+    sort_order: number;
+    /**
+     * Offer Count
+     *
+     * Live offers in this category
+     */
+    offer_count: number;
+};
+
+/**
+ * CategoryListResponse
+ */
+export type CategoryListResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    /**
+     * Data
+     */
+    data: Array<CategoryData>;
+};
+
+/**
+ * CategoryRef
+ */
+export type CategoryRef = {
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
  * ChangePlanRequest
  */
 export type ChangePlanRequest = {
@@ -377,6 +445,20 @@ export type CheckoutRequest = {
      * Cancel Url
      */
     cancel_url: string;
+};
+
+/**
+ * ClaimStep
+ */
+export type ClaimStep = {
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Detail
+     */
+    detail: string;
 };
 
 /**
@@ -527,6 +609,46 @@ export type ErrorResponse = {
      * Error
      */
     error: string;
+};
+
+/**
+ * ExpiredOfferData
+ */
+export type ExpiredOfferData = {
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Title
+     */
+    title: string;
+    category: CategoryRef;
+    /**
+     * Ended At
+     */
+    ended_at: string | null;
+};
+
+/**
+ * ExpiredOfferResponse
+ *
+ * The 410 body: the error envelope plus ``expired`` and just enough to render the page.
+ */
+export type ExpiredOfferResponse = {
+    /**
+     * Success
+     */
+    success?: false;
+    /**
+     * Error
+     */
+    error?: string;
+    /**
+     * Expired
+     */
+    expired?: true;
+    data: ExpiredOfferData;
 };
 
 /**
@@ -910,6 +1032,24 @@ export type IdentityResponse = {
 };
 
 /**
+ * ImageData
+ */
+export type ImageData = {
+    /**
+     * Tint
+     */
+    tint: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Alt
+     */
+    alt: string;
+};
+
+/**
  * InvoiceData
  */
 export type InvoiceData = {
@@ -990,6 +1130,24 @@ export type MarkAllReadResponse = {
  * MembershipRole
  */
 export type MembershipRole = 'OWNER' | 'ADMIN' | 'STAFF';
+
+/**
+ * MerchantData
+ */
+export type MerchantData = {
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Logo Url
+     */
+    logo_url: string | null;
+};
 
 /**
  * MigrationsStatus
@@ -1089,6 +1247,124 @@ export type NotificationResponse = {
      */
     success?: true;
     data: NotificationItem;
+};
+
+/**
+ * OfferData
+ */
+export type OfferData = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Slug
+     */
+    slug: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Summary
+     */
+    summary: string;
+    /**
+     * Description
+     */
+    description: Array<string>;
+    category: CategoryRef;
+    merchant: MerchantData;
+    /**
+     * Offer Type
+     */
+    offer_type: 'free_sample' | 'free_trial' | 'cashback' | 'voucher' | 'competition';
+    /**
+     * Featured
+     */
+    featured: boolean;
+    image: ImageData;
+    postage: PostageData;
+    /**
+     * Requires Card
+     */
+    requires_card: boolean;
+    /**
+     * Subscription Terms
+     */
+    subscription_terms: string | null;
+    /**
+     * Eligibility
+     */
+    eligibility: string;
+    /**
+     * Availability
+     */
+    availability: string;
+    /**
+     * Start At
+     */
+    start_at: string;
+    /**
+     * End At
+     */
+    end_at: string | null;
+    /**
+     * Last Verified At
+     */
+    last_verified_at: string | null;
+    /**
+     * Freshness
+     */
+    freshness: 'new_today' | 'just_added' | 'popular' | 'ends_soon' | 'limited' | null;
+    /**
+     * Steps
+     */
+    steps: Array<ClaimStep>;
+};
+
+/**
+ * OfferListData
+ */
+export type OfferListData = {
+    /**
+     * Items
+     */
+    items: Array<OfferData>;
+    /**
+     * Total
+     */
+    total: number;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Offset
+     */
+    offset: number;
+};
+
+/**
+ * OfferListResponse
+ */
+export type OfferListResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data: OfferListData;
+};
+
+/**
+ * OfferResponse
+ */
+export type OfferResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data: OfferData;
 };
 
 /**
@@ -1369,6 +1645,24 @@ export type PortalRequest = {
      * Return Url
      */
     return_url: string;
+};
+
+/**
+ * PostageData
+ */
+export type PostageData = {
+    /**
+     * Kind
+     */
+    kind: 'free' | 'cost' | 'check_terms';
+    /**
+     * Amount Minor
+     */
+    amount_minor: number | null;
+    /**
+     * Currency
+     */
+    currency: string | null;
 };
 
 /**
@@ -4763,6 +5057,203 @@ export type ReadPlanPricesResponses = {
 };
 
 export type ReadPlanPricesResponse = ReadPlanPricesResponses[keyof ReadPlanPricesResponses];
+
+export type ListOffersData = {
+    body?: never;
+    headers?: {
+        /**
+         * If-None-Match
+         *
+         * ETag from an earlier response
+         */
+        'if-none-match'?: string | null;
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+    };
+    path?: never;
+    query?: {
+        /**
+         * Q
+         *
+         * Matches title, summary or merchant
+         */
+        q?: string | null;
+        /**
+         * Category
+         *
+         * Category slug; unknown gives none
+         */
+        category?: string | null;
+        /**
+         * Type
+         */
+        type?: Array<'free_sample' | 'free_trial' | 'cashback' | 'voucher' | 'competition'> | null;
+        /**
+         * Postage
+         */
+        postage?: 'free' | null;
+        /**
+         * Sort
+         */
+        sort?: 'newest' | 'ending_soon' | 'a_z';
+        /**
+         * Featured
+         */
+        featured?: boolean | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/v1/catalogue/offers';
+};
+
+export type ListOffersErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded
+     */
+    429: ErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type ListOffersError = ListOffersErrors[keyof ListOffersErrors];
+
+export type ListOffersResponses = {
+    /**
+     * Successful Response
+     */
+    200: OfferListResponse;
+};
+
+export type ListOffersResponse = ListOffersResponses[keyof ListOffersResponses];
+
+export type ReadOfferData = {
+    body?: never;
+    headers?: {
+        /**
+         * If-None-Match
+         *
+         * ETag from an earlier response
+         */
+        'if-none-match'?: string | null;
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Slug
+         */
+        slug: string;
+    };
+    query?: never;
+    url: '/v1/catalogue/offers/{slug}';
+};
+
+export type ReadOfferErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Not published or unknown
+     */
+    404: ErrorResponse;
+    /**
+     * The offer has ended
+     */
+    410: ExpiredOfferResponse;
+    /**
+     * Invalid request
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded
+     */
+    429: ErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type ReadOfferError = ReadOfferErrors[keyof ReadOfferErrors];
+
+export type ReadOfferResponses = {
+    /**
+     * Successful Response
+     */
+    200: OfferResponse;
+};
+
+export type ReadOfferResponse = ReadOfferResponses[keyof ReadOfferResponses];
+
+export type ListCategoriesData = {
+    body?: never;
+    headers?: {
+        /**
+         * If-None-Match
+         *
+         * ETag from an earlier response
+         */
+        'if-none-match'?: string | null;
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/v1/catalogue/categories';
+};
+
+export type ListCategoriesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded
+     */
+    429: ErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type ListCategoriesError = ListCategoriesErrors[keyof ListCategoriesErrors];
+
+export type ListCategoriesResponses = {
+    /**
+     * Successful Response
+     */
+    200: CategoryListResponse;
+};
+
+export type ListCategoriesResponse = ListCategoriesResponses[keyof ListCategoriesResponses];
 
 export type AdminListSubscriptionsData = {
     body?: never;
