@@ -49,10 +49,15 @@ export default function PrivacyPage() {
         and an address that has unsubscribed would be kept on a list only so that it is not emailed
         again.
       </p>
+      <p>Alerts are a plan, not something running today.</p>
+      <h2>If you use an offer button</h2>
       <p>
-        When real offers go live, we plan to count how many times each offer&apos;s button is used.
-        The plan is to record which offer and when, without your IP address, a cookie identifier or
-        an account identifier. This is a plan, not something running today.
+        When you use an offer&apos;s button to go to a brand, Freejoy counts the click. The record
+        holds which offer, the time to the nearest minute, the name of the website you came from
+        (not the page) and a rough device type. It holds no IP address, no cookie identifier and no
+        account identifier, and the redirect sets no cookie. Click records are deleted after 13
+        months (395 days). The brand&apos;s website and the affiliate network that tracks the click
+        are separate and may use their own cookies.
       </p>
       <p>
         Details of who processes this data, how long it is kept and how to ask for it to be removed
@@ -69,7 +74,7 @@ export default function PrivacyPage() {
         items={[
           'Controller identity (legal name and address) and the data protection contact route',
           'Lawful basis for each purpose (consent for alerts, legitimate interests for site security)',
-          'Whether the planned outbound-click counts are personal data',
+          'Whether the outbound-click counts are personal data, and the 13-month (395 day) retention period for click records',
           'Retention periods for subscriber, confirmation-token, contact and sign-in history data',
           'Named processors (hosting, error monitoring, email sending) and any transfers outside the UK',
           'Right to object to direct marketing, minimum sign-up age and wording of data-subject rights',

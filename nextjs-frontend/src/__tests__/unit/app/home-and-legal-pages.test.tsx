@@ -144,27 +144,45 @@ describe('cookies page', () => {
 });
 
 describe('affiliate disclosure page', () => {
-  it('says plainly that nothing earns commission today', () => {
-    render(<AffiliatePage />);
-
-    expect(screen.getByText(/no commission can be earned/i)).toBeInTheDocument();
-  });
-
-  it('describes the redirect, paid-link marking and Ad label as planned, not live', () => {
+  it('is true whether or not a real offer is live: no "no outbound links" or "planned" wording', () => {
     const { container } = render(<AffiliatePage />);
 
-    expect(screen.getByText(/none of this is live yet/i)).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/no outbound links/i);
+    expect(container.textContent).not.toMatch(/planned/i);
+    expect(container.textContent).not.toMatch(/none of this is live/i);
+    expect(container.textContent).not.toMatch(/no commission can be earned/i);
+    expect(container.textContent).not.toMatch(/nothing on the site earns/i);
+  });
+
+  it('explains the /go/ redirect, the paid-link marking and the Ad label', () => {
+    const { container } = render(<AffiliatePage />);
+
+    expect(container.textContent).toContain('/go/');
     expect(container.textContent).toMatch(/marked as a paid link for search engines/i);
     expect(container.textContent).toMatch(/“Ad”/);
-    expect(container.textContent).toMatch(/pay Freejoy a commission/i);
+    expect(container.textContent).toMatch(/pays Freejoy a commission/i);
+    expect(container.textContent).toMatch(/paid by the brand, not by you/i);
     expect(container.textContent).not.toMatch(/rel=|sponsored nofollow/i);
   });
 
-  it('does not state affiliate links exist or hedge with "may earn"', () => {
+  it('states what a click records and what it does not', () => {
     const { container } = render(<AffiliatePage />);
 
-    expect(container.textContent).not.toMatch(/some links on freejoy are affiliate links/i);
+    expect(container.textContent).toMatch(/name of the website you came from \(not the page\)/i);
+    expect(container.textContent).toMatch(/rough device type/i);
+    expect(container.textContent).toMatch(
+      /does not keep your IP address, set a cookie or store any identifier/i
+    );
+    expect(container.textContent).toMatch(/not a count of people who claimed or bought/i);
+  });
+
+  it('stays a draft for legal review and does not hedge with "may earn"', () => {
+    const { container } = render(<AffiliatePage />);
+
+    expect(screen.getByText(DRAFT_BANNER)).toBeInTheDocument();
+    expect(container.textContent).toMatch(/Not yet reviewed/);
     expect(container.textContent).not.toMatch(/may earn/i);
+    expect(container.textContent).not.toMatch(/some links on freejoy are affiliate links/i);
     expect(container.textContent).not.toMatch(/never changes the terms/i);
   });
 });
@@ -235,6 +253,20 @@ describe('privacy notice', () => {
     expect(container.textContent).toMatch(/If alerts go live/);
     expect(container.textContent).toMatch(/not .* running today/i);
     expect(container.textContent).not.toMatch(/does not save any information|saves nothing/i);
+  });
+
+  it('describes the outbound click record as live behaviour, with its retention period', () => {
+    const { container } = render(<PrivacyPage />);
+
+    expect(screen.getByRole('heading', { name: 'If you use an offer button' })).toBeInTheDocument();
+    expect(container.textContent).toMatch(
+      /no IP address, no cookie identifier and no account identifier/i
+    );
+    expect(container.textContent).toMatch(/redirect sets no cookie/i);
+    expect(container.textContent).toMatch(/deleted after 13 months \(395 days\)/i);
+    expect(container.textContent).not.toMatch(
+      /outbound-click counts are planned|we plan to count/i
+    );
   });
 
   it('describes account data held when someone creates an account', () => {
