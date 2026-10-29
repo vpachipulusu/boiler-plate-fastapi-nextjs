@@ -20,12 +20,7 @@ import {
 } from '@/lib/catalogue';
 import { endedOfferState } from '@/lib/seo/indexing';
 import { buildBreadcrumbList } from '@/lib/seo/json-ld';
-import {
-  NOINDEX_FOLLOW_ROBOTS,
-  NOINDEX_ROBOTS,
-  offerRobots,
-  openGraphFor,
-} from '@/lib/seo/metadata';
+import { NOINDEX_FOLLOW_ROBOTS, offerRobots, openGraphFor } from '@/lib/seo/metadata';
 
 /**
  * Rendered per request. The offer read behind it is cached for a minute, so an offer that has just
@@ -39,7 +34,8 @@ interface OfferPageProps {
 }
 
 const NOT_FOUND_METADATA: Metadata = { title: 'Offer not found', robots: { index: false } };
-const UNAVAILABLE_METADATA: Metadata = { title: 'Freebie unavailable', robots: NOINDEX_ROBOTS };
+// Outage: no robots of its own, so the site default applies (a short outage must not de-index the page).
+const UNAVAILABLE_METADATA: Metadata = { title: 'Freebie unavailable' };
 
 export async function generateMetadata({ params }: OfferPageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -63,8 +59,6 @@ export async function generateMetadata({ params }: OfferPageProps): Promise<Meta
   }
 
   const { offer } = result;
-  // The page shows an error when its category cannot be read; it must not be indexed then.
-  if (!(await settle(getCategoryBySlug(offer.categorySlug))).ok) return UNAVAILABLE_METADATA;
   const path = `/freebies/${offer.slug}`;
   return {
     title: offer.title,

@@ -15,7 +15,7 @@ import {
 } from '@/lib/catalogue';
 import { isIndexableCategory, isRefinedQuery } from '@/lib/seo/indexing';
 import { buildBreadcrumbList } from '@/lib/seo/json-ld';
-import { NOINDEX_ROBOTS, listingRobots, openGraphFor } from '@/lib/seo/metadata';
+import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
 type Params = Promise<{ slug: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -32,21 +32,15 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const loaded = await settle(getCategoryBySlug(slug));
-  if (!loaded.ok) return { title: 'Freebies unavailable', robots: NOINDEX_ROBOTS };
+  // Outage: no robots of its own, so the site default applies (a short outage must not de-index the page).
+  if (!loaded.ok) return { title: 'Freebies unavailable' };
   const category = loaded.data;
-  // Thrown here as well as in the page. The root loading.tsx still streams the shell first, so an
-  // unknown slug renders the 404 page with HTTP 200 (verified on the production build; see
-  // docs/developer/freejoy-seo.md, follow-up 4).
+  // Thrown here as well as in the page. No loading.tsx sits above the public pages, so this answers 404.
   if (!category) notFound();
 
   const title = `${category.name} freebies in the UK`;
   const query = parseCatalogueParams((await searchParams) ?? {});
-  // The page also reads this (memoised); when that read fails the page shows an error and stays out of search.
-  const [source, everything] = await Promise.all([
-    getCatalogueSource(),
-    settle(searchOffers({ ...DEFAULT_QUERY, category: category.slug })),
-  ]);
-  const indexable = isIndexableCategory(category, source) && everything.ok;
+  const indexable = isIndexableCategory(category, await getCatalogueSource());
   return {
     title,
     description: category.description,

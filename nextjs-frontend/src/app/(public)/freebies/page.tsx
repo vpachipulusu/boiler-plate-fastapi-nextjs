@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { CatalogueHeader } from '@/components/catalogue/catalogue-header';
 import { CatalogueLayout } from '@/components/catalogue/catalogue-layout';
-import { getCatalogueSource, parseCatalogueParams, searchOffers, settle } from '@/lib/catalogue';
+import { getCatalogueSource, parseCatalogueParams } from '@/lib/catalogue';
 import { isCatalogueApiBacked, isRefinedQuery } from '@/lib/seo/indexing';
 import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
@@ -21,11 +21,10 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const query = parseCatalogueParams(await searchParams);
   const title = query.q === '' ? 'All freebies' : `Search: ${query.q}`;
-  // The same read as the results (memoised per request): a page that shows an error is never indexed.
-  const [source, results] = await Promise.all([getCatalogueSource(), settle(searchOffers(query))]);
   // Page 1 with no filter or search is the one indexable view, and only when API-backed. Every
-  // other view is noindex but followable; all canonicalise to /freebies.
-  const indexable = isCatalogueApiBacked(source) && results.ok;
+  // other view is noindex but followable; all canonicalise to /freebies. An outage does not change
+  // this: the page keeps its normal robots while it shows the error (see freejoy-seo.md).
+  const indexable = isCatalogueApiBacked(await getCatalogueSource());
   return {
     title,
     description: DESCRIPTION,

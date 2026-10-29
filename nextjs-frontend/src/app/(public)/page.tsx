@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { HomeHero } from '@/components/home/home-hero';
-import { HomeSections, HomeSectionsSkeleton, loadHomeData } from '@/components/home/home-sections';
+import { HomeSections, HomeSectionsSkeleton } from '@/components/home/home-sections';
 import { NewsletterBand } from '@/components/home/newsletter-band';
 import { TrustStrip } from '@/components/home/trust-strip';
 import { JsonLd } from '@/components/seo/json-ld';
@@ -21,9 +21,9 @@ const DESCRIPTION =
   'Browse UK freebies, samples, trials and offers, with terms, postage and card requirements set out on every listing.';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const [source, home] = await Promise.all([getCatalogueSource(), loadHomeData()]);
-  // Indexable only when API-backed, and never while the page is showing its error state.
-  const indexable = isCatalogueApiBacked(source) && home.ok;
+  // Indexable only when API-backed. An outage does not change this: the page keeps its normal robots
+  // while it shows the error (see freejoy-seo.md).
+  const indexable = isCatalogueApiBacked(await getCatalogueSource());
   return {
     title: TITLE,
     description: DESCRIPTION,
