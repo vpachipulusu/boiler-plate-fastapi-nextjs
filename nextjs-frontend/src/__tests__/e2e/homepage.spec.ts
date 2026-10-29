@@ -80,20 +80,29 @@ test.describe('Global Navigation', () => {
     }
   });
 
-  test('should be able to navigate to pricing page', async ({ page }) => {
+  test('should be able to navigate to pricing page when a pricing link exists', async ({
+    page,
+  }) => {
     await page.goto('/');
     await waitForPageReady(page);
 
     const pricingLink = page.getByRole('link', { name: /pricing/i });
-    const hasPricingLink = await pricingLink.isVisible().catch(() => false);
+    const hasPricingLink = await pricingLink
+      .first()
+      .isVisible()
+      .catch(() => false);
+    test.skip(!hasPricingLink, 'The Freejoy public site has no pricing link');
 
-    if (hasPricingLink) {
-      await pricingLink.first().click();
-      await expect(page).toHaveURL(/\/pricing/);
-    } else {
-      await page.goto('/pricing');
-      await expect(page).toHaveURL(/\/pricing/);
-    }
+    await pricingLink.first().click();
+    await expect(page).toHaveURL(/\/pricing/);
+  });
+
+  test('hero CTA "Explore freebies" leads to /freebies', async ({ page }) => {
+    await page.goto('/');
+    await waitForPageReady(page);
+
+    await page.getByRole('link', { name: 'Explore freebies' }).first().click();
+    await expect(page).toHaveURL(/\/freebies$/);
   });
 
   test('should be able to navigate to contact page', async ({ page }) => {

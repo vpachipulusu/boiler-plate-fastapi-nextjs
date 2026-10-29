@@ -41,12 +41,14 @@ export default async function ContactPage({
   const planLabel = selectedPlan && selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1);
 
   return (
-    <div className="min-h-screen px-4 py-12">
+    <div className="mx-auto max-w-content px-4 py-6 sm:px-6 lg:py-8">
       <div className="mx-auto max-w-5xl">
         {/* Header */}
-        <div className="mb-12 text-center">
-          <h1 className="mb-4 text-4xl tracking-tight">Contact Us</h1>
-          <p className="mx-auto max-w-2xl text-xl text-muted-foreground">
+        <div className="mb-8 rounded-editorial bg-secondary px-6 py-10 text-center sm:px-10 sm:py-12">
+          <h1 className="mb-4 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
+            Contact Us
+          </h1>
+          <p className="mx-auto max-w-2xl text-lg text-muted-foreground sm:text-xl">
             A support contact is coming soon. Messages cannot be sent from this page yet.
           </p>
           {selectedPlan && (
@@ -57,7 +59,7 @@ export default async function ContactPage({
         <div className="grid gap-8 md:grid-cols-3">
           {/* Contact Form */}
           <div className="md:col-span-2">
-            <Card>
+            <Card className="rounded-card">
               <CardHeader>
                 <CardTitle>Send us a message</CardTitle>
                 <CardDescription>
@@ -107,7 +109,13 @@ export default async function ContactPage({
                     </p>
                   </div>
 
-                  <Button type="button" disabled size="lg" variant="accent" className="w-full">
+                  <Button
+                    type="button"
+                    disabled
+                    size="lg"
+                    variant="accent"
+                    className="min-h-12 w-full rounded-pill font-bold"
+                  >
                     <Send className="mr-2 h-4 w-4" />
                     Send message
                   </Button>
@@ -122,7 +130,7 @@ export default async function ContactPage({
 
           {/* Support availability */}
           <div>
-            <Card>
+            <Card className="rounded-card bg-good text-good-foreground">
               <CardHeader>
                 <CardTitle className="text-lg">Support Contact</CardTitle>
               </CardHeader>
