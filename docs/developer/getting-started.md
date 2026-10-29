@@ -84,6 +84,8 @@ place. The rules:
   print a refusal, write nothing and exit with code 1. The `DATABASE_URL` host must also be `localhost`, `127.0.0.1` or
   `::1`: a remote host (even a `*_test` database), a unix socket, a `host=` query parameter, an empty or unparsable
   URL all refuse the same way. It never prints the URL, the host or the environment value.
+  The guard checks the host name in the URL, not where the port leads: an SSH tunnel or port-forward to `localhost`
+  passes.
 - **Obviously sample data.** Every offer has `publisher_notes = "SAMPLE DATA — not a real offer"`, merchant names end
   in `(Sample)`, merchants have no logo, and every website, source and affiliate destination is under
   `https://example.com/`. No real brand, logo or destination is used.
