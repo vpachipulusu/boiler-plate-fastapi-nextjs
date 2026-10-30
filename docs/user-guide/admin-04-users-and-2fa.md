@@ -2,11 +2,13 @@
 
 [Back to the guide index](README.md)
 
-**Users** in the sidebar lets an admin look people up. It is read-only today: you can find and view accounts, but the
-screens do not yet let you edit, suspend or delete them. (The two accounts in the screenshots, "E2E Admin" and "E2E
+**Users** in the sidebar lets an admin look people up, edit their profile details, and suspend or restore their
+access. Deleting accounts and granting or removing admin roles are not on these screens yet. (The two accounts in the screenshots, "E2E Admin" and "E2E
 Plain User" on `example.test` addresses, are test accounts that came with the test setup. They are not real people.)
 
-The list needs the `users.read` permission.
+Looking people up needs the `users.read` permission. Editing, suspending and restoring need `users.update`; without
+it the screen answers "You do not have permission to do that". Every change is recorded in the audit log (see
+[Admin 6](admin-06-audit-logs-seo-settings.md)).
 
 ## Step 1. Open the user list
 
@@ -21,7 +23,7 @@ The list needs the `users.read` permission.
 | **Role** | The admin role as a blue badge (for example **Super Admin**), or "User" for an ordinary account |
 | **Last sign-in** | The date, or **Never** |
 | **Joined** | The date the account was created |
-| **Actions** | A three-dot menu |
+| **Actions** | A three-dot menu: **View Details**, **Edit User**, **Suspend User** and **Restore Access** |
 
 ![The user list on a desktop screen](images/admin-users-d.png)
 
@@ -48,14 +50,15 @@ Phone:
 ## Step 3. Open a user's details
 
 1. Click the three dots in the **Actions** column, then **View Details**.
-2. The **User Details** page shows three panels:
+2. The **User Details** page has an **Edit user** button and **Back to Users**, and shows three panels:
    - **Basic Information**: **Email**, **Display Name**, **User ID**, **Email Verified**, **Two-factor** (**Enabled**
      or **Disabled**), **Last Login** and **Member Since**.
    - **Profile**: **Bio**, **Location**, **Website** and **Phone** (a dash when not filled in).
    - **Admin Access**: the **Admin Role** (or "None") and, for admins, the list of **Permissions**.
 3. **Back to Users** returns to the list.
 
-![The user menu](images/admin-users-row-menu-d.png)
+![The user menu (this picture predates the Edit User and Restore Access items; screen pending, see the end of this
+page)](images/admin-users-row-menu-d.png)
 
 ![A user's details on a desktop screen](images/admin-user-detail-d.png)
 
@@ -63,12 +66,44 @@ Phone:
 
 ![A user's details on a phone](images/admin-user-detail-m.png)
 
-## Things that look like buttons but do nothing yet
+## Step 4. Edit a user's profile
 
-The three-dot menu also shows **Edit User** and **Suspend User**. At the moment these two items **do not do
-anything** (the menu closes and nothing else happens). The backend can edit profile details, ban and unban, delete
-accounts and grant or remove admin roles, but there is no screen for it yet. Until there is, these actions are done
-through the backend by a developer.
+1. Click the three dots, then **Edit User** (or open **View Details** and click **Edit user**).
+2. The **Edit user** page shows the person's email and a form with **Display name**, **Bio**, **Location**, **Website**
+   and **Phone**. The email address, admin role and two-factor setting cannot be changed here.
+3. Change what you need and press **Save changes**. Leave a box empty to clear that value.
+4. A green "Changes saved." message and a "User updated" notice confirm it. If something is wrong, an
+   error says what: the website must start with `http://` or `https://`, the phone number may hold only digits,
+   spaces and `+ ( ) - .`, and each box has a length limit. A refusal ("You do not have permission to do that") appears
+   as **Could not save**.
+5. **Back to user details** returns to the details page.
+
+The audit log records which fields were changed, never their values.
+
+## Step 5. Suspend or restore a user
+
+1. Click the three dots, then **Suspend User**.
+2. A box asks "Suspend this user?". It names the person and says they will be signed out and cannot sign in until you
+   restore their access. You can type an optional **Reason** (up to 200 characters). It is kept in the audit log and is
+   not shown to the user.
+3. Press **Suspend user** to confirm, or **Cancel** to leave things as they are. On success the box closes and a notice
+   says the user was suspended.
+4. To undo it, choose **Restore Access** from the same menu and confirm. The person can sign in again.
+
+Some refusals are expected. You cannot suspend or restore your own account (the box shows "You cannot suspend or restore
+your own account."). Suspending or restoring an admin also needs the `admins.delete` permission and every permission
+that admin holds; without them the box shows "You do not have permission to do that". The list and details pages do not
+show whether someone is suspended, so **Restore Access** is always offered; restoring someone who is not suspended
+leaves their access as it is (an audit entry is still written).
+
+## Not on these screens yet
+
+The backend can also delete accounts and grant or remove admin roles, but there is no screen for either yet; a
+developer does those through the backend.
+
+*Screens pending: needs the Firebase test project (owner action).* The pictures of the row menu and the **User Details**
+page above were taken before **Edit User**, **Restore Access** and the **Edit user** button existed, and there are no
+pictures yet of the **Edit user** form or of the **Suspend this user?** box. They need a signed-in admin.
 
 ## Two-factor authentication (2FA)
 
