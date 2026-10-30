@@ -107,16 +107,19 @@ function matchesBlockedPath(path: string): boolean {
 }
 
 /**
- * Each decoded form is checked as it is and with its dot segments resolved, ignoring any query or fragment, so
+ * Each decoded form is checked as it is and with its dot segments resolved, whole and cut at any query or fragment, so
  * "/login%2f.." (which would resolve to "/") and "/%252561pi/x" (three layers of escapes) are both refused.
  */
 function isBlockedPath(pathname: string): boolean {
   const forms = decodedForms(pathname);
   if (forms === null) return true;
-  return forms.some((form) => {
-    const path = form.split(/[?#]/)[0].toLowerCase();
-    return matchesBlockedPath(path) || matchesBlockedPath(resolveDotSegments(path));
-  });
+  return forms.some((form) =>
+    // The whole form too: an escaped "?" or "#" must not hide a later "/.." that climbs into a blocked path.
+    [form, form.split(/[?#]/)[0]].some((candidate) => {
+      const path = candidate.toLowerCase();
+      return matchesBlockedPath(path) || matchesBlockedPath(resolveDotSegments(path));
+    })
+  );
 }
 
 function parseSafeRedirect(raw: unknown): string | null {

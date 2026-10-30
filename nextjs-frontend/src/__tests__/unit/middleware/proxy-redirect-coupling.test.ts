@@ -18,7 +18,7 @@ function routeHandlerFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) return routeHandlerFiles(path);
-    return /^route\.(ts|tsx|js)$/.test(entry.name) ? [path] : [];
+    return /^route\.(ts|tsx|js|jsx)$/.test(entry.name) ? [path] : [];
   });
 }
 

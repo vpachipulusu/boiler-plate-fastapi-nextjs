@@ -135,6 +135,9 @@ describe('resolveSafeRedirect: open-redirect corpus', () => {
     ['escaped slash after _next', '/_next%2f..'],
     ['triple-encoded slash pair', '/%25252F%25252Fevil.com'],
     ['a query that hides the sign-in page', '/login%3Fx'],
+    ['escaped question mark before a climb into api', '/x%3f/..%2f..%2fapi'],
+    ['escaped hash before a climb into api', '/x%23/..%2f..%2fapi'],
+    ['double-escaped question mark before a climb into api', '/x%253f/..%252f..%252fapi'],
   ])('refuses %s', (_name, raw) => {
     expect(resolveSafeRedirect(raw)).toBe(DEFAULT_SIGN_IN_REDIRECT);
   });
