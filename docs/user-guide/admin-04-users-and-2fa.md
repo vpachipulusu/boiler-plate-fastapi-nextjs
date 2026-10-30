@@ -79,12 +79,29 @@ Two-factor authentication adds a six-digit code from an authenticator app to sig
 - **Status only.** The Security page has a **Two-Factor Authentication** panel that says either "Two-factor
   authentication is enabled" or "Two-factor authentication is not enabled" (or "Two-factor status unavailable" if it
   cannot be read).
-- **Setting it up is switched off.** The page has no **Enable** button yet. The sign-in form has no box for the
-  six-digit code, but the system behind it refuses to sign in an account that has 2FA enabled unless a code is sent.
-  That means an account with 2FA switched on cannot sign in through the website today; the setup screen stays hidden
-  until the sign-in form asks for the code. (The backend can enrol and verify codes already.)
-- **Turning it off.** An account that does have 2FA enabled sees a **Disable** button. It asks for your password and a
-  six-digit code from your authenticator app ("Disable Two-Factor Authentication").
+- **Signing in with 2FA.** If an account has 2FA on, signing in has a second step. After the email and password (or
+  **Continue with Google** or **GitHub**) are accepted, the page shows **Two-factor authentication** with one box,
+  **Authenticator code**. Type the six-digit code from the authenticator app and press **Verify and sign in**. The code
+  changes every 30 seconds, so type the current one. The messages you may see:
+  - **That code did not work**: the code was wrong or had expired. The box is cleared; try the new code.
+  - **Enter the six-digit code**: the box did not hold six digits.
+  - **Too many attempts**: too many codes were tried. Wait a few minutes, then sign in again. Only five attempts are
+    allowed in 15 minutes.
+  - **Your sign-in may have timed out**: the first step is only valid for a few minutes. Press **Back to sign in** and
+    start again.
+  - **Sign-in is unavailable right now**: a problem on our side. Try again in a few minutes.
+
+  **Back to sign in** returns to the first step with the email still filled in. There are **no backup codes**: if you
+  cannot get a code, the page offers **Contact support**, but nothing in the screens can switch 2FA off for you (see
+  below).
+- **Setting it up is switched off.** The Security page has no **Enable** button, on purpose: with no backup codes, a
+  person who loses their phone would be locked out. To enable 2FA today a developer has to call the backend's two
+  set-up routes (enrol, then confirm with a code) with that person's own signed-in session. Ordinary users cannot do it
+  themselves yet, so in practice almost no account has 2FA on.
+- **Turning it off.** An account that does have 2FA enabled sees a **Disable 2FA** button. It asks for your password
+  (or a Google or GitHub sign-in) and a six-digit code from your authenticator app ("Disable Two-Factor
+  Authentication"). Someone who has lost their authenticator cannot use it, because it needs a code; a developer would
+  have to clear the setting in the database.
 - **For admins.** An admin can see whether another user has 2FA enabled on that user's **User Details** page. Admins
   cannot switch another person's 2FA on or off from the screens.
 
@@ -94,9 +111,10 @@ Phone:
 
 ![The Security page on a phone](images/security-m.png)
 
-*Screen pending: needs the Firebase test project (owner action).* There are no screenshots of the **Disable
-Two-Factor Authentication** dialog or of changing a password, because both need a real Firebase sign-in
-(they re-check your password) and an account with 2FA turned on.
+*Screen pending: needs the Firebase test project (owner action).* There are no screenshots of the sign-in code step
+(**Two-factor authentication**), the **Disable Two-Factor Authentication** dialog or changing a password, because each
+needs a real Firebase sign-in and an account with 2FA turned on. The sign-in screenshots elsewhere in this guide show
+the first step, which has not changed.
 
 The Security page also holds **Change Password**, **Login History**, **Export my data** and **Delete Account**. They
 are account features for the signed-in person and are not covered further in this guide. The word "Your App" at the top
