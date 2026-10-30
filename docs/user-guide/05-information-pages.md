@@ -33,9 +33,11 @@ Phone:
 
 ![The About page on a phone](images/legal-about-m.png)
 
-> **Wording that is out of date.** Parts of this draft still describe the site as a "design preview" and say the
-> alerts form "does not save anything yet". Where that disagrees with the rest of this guide (the alerts form does
-> work once it is switched on), follow the guide, and expect the About text to be corrected during legal review.
+> **Two paragraphs change with the site's settings.** "Keeping in touch" says you can sign up for email alerts when
+> alerts are switched on, and says alerts are not open yet when they are off. "How we intend to check offers" adds a
+> sentence calling the site a "design preview with sample listings" only while it shows sample listings, not real
+> offers. The screenshots above were taken before this wording was corrected, so those two paragraphs read
+> differently in them. The page is still a draft and its text still needs legal review.
 
 ## Step 3. Contact
 
