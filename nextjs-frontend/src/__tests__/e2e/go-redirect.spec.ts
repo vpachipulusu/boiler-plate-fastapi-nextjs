@@ -7,6 +7,7 @@ import { test, expect } from '@playwright/test';
  *   GO_E2E_LIVE_OFFER_ID   a published offer with an active affiliate link on an allowed host
  *   GO_E2E_ENDED_OFFER_ID  an offer that was public and has ended (EXPIRED or past end_at)
  *   GO_E2E_DRAFT_OFFER_ID  optional: a draft or archived offer
+ *   GO_E2E_LIVE_OFFER_SLUG optional: the slug of the live offer, to click through from its real page
  * With `python -m commands.seed_catalogue` the sample offers use the `sample` provider
  * (`https://example.com/go/<slug>`), which the backend follows only when ENVIRONMENT is local or test.
  * See docs/developer/freejoy-affiliate.md for the commands.
@@ -15,6 +16,7 @@ import { test, expect } from '@playwright/test';
 const LIVE = process.env.GO_E2E_LIVE_OFFER_ID;
 const ENDED = process.env.GO_E2E_ENDED_OFFER_ID;
 const DRAFT = process.env.GO_E2E_DRAFT_OFFER_ID;
+const LIVE_SLUG = process.env.GO_E2E_LIVE_OFFER_SLUG;
 const HOSTILE_QUERY = '?url=https://evil.example&to=//evil.example&redirect=javascript:alert(1)';
 
 test.describe('/go/[offerId]', () => {
@@ -74,6 +76,33 @@ test.describe('/go/[offerId]', () => {
     );
 
     expect(status).toBe(204);
+  });
+
+  test('the real offer page renders a /go/ call to action that redirects to the stored destination', async ({
+    page,
+    context,
+    baseURL,
+  }) => {
+    test.skip(!LIVE_SLUG, 'GO_E2E_LIVE_OFFER_SLUG is not set');
+    const origin = new URL(baseURL ?? 'http://localhost:3000').origin;
+    const destination = await page.request
+      .get(`/go/${LIVE}`, { maxRedirects: 0 })
+      .then((response) => new URL(response.headers()['location']));
+    await page.route(`${destination.origin}/**`, (route) =>
+      route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Provider</h1>' })
+    );
+
+    await page.goto(`/freebies/${LIVE_SLUG}`);
+    const cta = page.locator(`a[href="/go/${LIVE}"]`);
+    await expect(cta).toHaveCount(1);
+    await expect(cta).toHaveAttribute('rel', 'sponsored nofollow noopener');
+    await expect(page.getByText('Ad', { exact: true })).toBeVisible();
+    await expect(page.getByText(/coming soon|demo offer/i)).toHaveCount(0);
+    await cta.click();
+    await page.waitForURL(`${destination.origin}/**`);
+
+    expect(new URL(page.url()).origin).toBe(destination.origin);
+    expect(await context.cookies(origin)).toEqual([]);
   });
 
   test('answers a draft or archived offer exactly like an unknown one', async ({ request }) => {
