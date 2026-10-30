@@ -141,6 +141,18 @@ the admin publish, unpublish and expire actions (FREEJ-22); nothing calls it yet
   badge or wording** (`offer.demo` is false; pages ask `getCatalogueSource()`).
 - "Last checked" and freshness labels come only from the offer's `lastVerifiedAt` and `freshness`. There
   are no visitor counts, testimonials, scarcity cues or verification claims.
+- A demo offer never says "Last checked": the trust panel calls its date a "Sample date" and says Freejoy has
+  not checked the offer.
+- `displayFreshness()` (`src/lib/catalogue/freshness.ts`) decides which freshness label a card may show. "Popular",
+  "Ends soon" and "Limited" are editor-set claims with no evidence behind them, so only a demo fixture shows
+  them; a real (API) offer shows "New today" and "Just added" only. To show one on a real offer, add a
+  documented rule there first (checklist C1, C2) and a test.
+- Buttons and chips do not call a sample or a trial "free" ("Request this sample", "Start the trial", chips
+  "SAMPLE" and "TRIAL"). `ctaConditions()` in `offer-format.ts` renders the postage (samples) or the card
+  requirement (trials) in a line right after the button, from the offer's own fields.
+- Site-wide copy (announcement bar, tagline, hero, trust strip) makes no zero-cost, "daily" or quality claim.
+  `public-copy.test.tsx` pins this. Why each line reads as it does: `docs/compliance/uk-affiliate-checklist.md`
+  section I.3.
 - No offer has a destination yet (the `/go/[id]` redirect is Phase 3). The offer CTA therefore opens a
   dialog: "Demo offer" for fixtures, "Claim link coming soon" for real offers. No element on any page has
   an external `href`.
