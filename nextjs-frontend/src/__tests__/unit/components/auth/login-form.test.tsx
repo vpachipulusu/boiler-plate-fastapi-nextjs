@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { siteConfig } from '@/config/site';
 import { getFirebaseErrorMessage } from '@/lib/utils/firebase-errors';
 
 const mocks = vi.hoisted(() => ({
@@ -74,7 +75,7 @@ describe('LoginForm', () => {
     await fillAndSubmit(user);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      /could not reach your app.*check your connection/i
+      new RegExp(`could not reach ${siteConfig.name}.*check your connection`, 'i')
     );
   });
 
@@ -156,7 +157,7 @@ describe('LoginForm', () => {
 
     await fillAndSubmit(user);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/could not reach your app/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(new RegExp(`could not reach ${siteConfig.name}`, 'i'));
   });
 
   it('clears the alert on the next submit', async () => {
@@ -196,7 +197,7 @@ describe('LoginForm', () => {
     await fillAndSubmit(user);
 
     const alert = await screen.findByRole('alert');
-    expect(alert).not.toHaveTextContent(/reach your app|connection/i);
+    expect(alert).not.toHaveTextContent(new RegExp(`reach ${siteConfig.name}|connection`, 'i'));
     expect(alert).toHaveTextContent(/try again/i);
   });
 

@@ -49,9 +49,9 @@ const REVENUE = {
 
 describe('formatMinorUnits', () => {
   it.each([
-    [123456, 'USD', '$1,234.56'],
+    [123456, 'USD', 'US$1,234.56'],
     [123456, 'GBP', '£1,234.56'],
-    [1234, 'JPY', '¥1,234'],
+    [1234, 'JPY', 'JP¥1,234'],
   ])('formats %s %s as %s', (amount, currency, expected) => {
     expect(formatMinorUnits(amount, currency)).toBe(expected);
   });

@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => ({ pathname: '/admin' }));
 vi.mock('next/navigation', () => ({ usePathname: () => mocks.pathname }));
+vi.mock('@/config/site', () => ({ siteConfig: { name: 'Acme Shop' } }));
 
 import { AdminSidebar } from '@/components/admin/admin-sidebar';
 import { ADMIN_NAV_ITEMS } from '@/components/admin/admin-nav-items';
@@ -54,8 +55,9 @@ describe('AdminSidebar', () => {
     }
   });
 
-  it('brand link returns to the admin home', () => {
+  it('brand link shows the configured brand (siteConfig) and returns to the admin home', () => {
     render(<AdminSidebar />);
-    expect(screen.getByRole('link', { name: 'Your App' })).toHaveAttribute('href', '/admin');
+    expect(screen.getByRole('link', { name: 'Acme Shop' })).toHaveAttribute('href', '/admin');
+    expect(screen.queryByText('Your App')).toBeNull();
   });
 });

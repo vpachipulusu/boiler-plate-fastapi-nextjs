@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 
+import { siteConfig } from '@/config/site';
+
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/components/auth/login-form', () => ({
   LoginForm: () => <form data-testid="login-form" />,
@@ -71,7 +73,7 @@ describe('auth layout', () => {
     );
 
     const phoneBrand = container.querySelector('main a[href="/"]') as HTMLElement;
-    expect(phoneBrand).toHaveTextContent('Your App');
+    expect(phoneBrand).toHaveTextContent(siteConfig.name);
     expect(phoneBrand.className).toMatch(/min-\[760px\]:hidden/);
     expect(phoneBrand.className).toMatch(/min-h-11/);
   });

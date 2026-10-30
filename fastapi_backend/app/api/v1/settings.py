@@ -70,9 +70,9 @@ async def read_currency(
         str | None, Header(description="ETag from an earlier response")
     ] = None,
 ) -> Response:
-    """The platform currency code (upper case, e.g. ``USD``).
+    """The platform currency code (upper case, e.g. ``GBP``).
 
-    Answers ``USD`` when the setting is missing or not a supported code. Sends
+    Answers ``GBP`` when the setting is missing or not a supported code. Sends
     ``Cache-Control: private, max-age=60`` and an ``ETag``.
     """
     currency = await service.currency()

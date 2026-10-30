@@ -47,5 +47,5 @@ def test_missing_or_invalid_key_fails_closed(key):
 
 def test_uri_encodes_user_label():
     uri = provisioning_uri("TEST", "ada+test@example.com")
-    assert "Your%20App%3Aada%2Btest%40example.com" in uri
+    assert "Freejoy%3Aada%2Btest%40example.com" in uri
     assert "algorithm=SHA1" in uri and "digits=6" in uri and "period=30" in uri

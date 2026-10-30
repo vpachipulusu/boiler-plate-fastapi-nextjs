@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { siteConfig } from '@/config/site';
 import { getFirebaseErrorMessage } from '@/lib/utils/firebase-errors';
 
 const mocks = vi.hoisted(() => ({
@@ -63,7 +64,7 @@ describe('SignupForm', () => {
 
     await fill(user);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/could not reach your app/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(new RegExp(`could not reach ${siteConfig.name}`, 'i'));
   });
 
   it('shows a loading label and submits once', async () => {

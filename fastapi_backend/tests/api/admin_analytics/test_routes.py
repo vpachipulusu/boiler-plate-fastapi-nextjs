@@ -117,7 +117,7 @@ async def test_revenue_comes_from_organisation_billing_with_one_read_per_price(
     assert data["mrr_minor"] == 3 * 2900 + 2000
     assert data["arr_minor"] == data["mrr_minor"] * 12
     assert data["billed_organizations"] == 4 and data["complete"] is True
-    assert data["currency"] == "USD"
+    assert data["currency"] == "GBP"
     assert data["by_plan"] == [{"plan": "pro", "organizations": 4, "mrr_minor": 10700}]
     assert data["organizations_by_status"] == {
         "active": 3,
@@ -179,7 +179,7 @@ async def test_revenue_counts_only_billed_orgs_across_plans_and_active_grants(
 async def test_revenue_leaves_out_a_price_in_another_currency(client, engine, prices):
     await seed_user(engine, "boss", "super_admin", ["*"])
     await seed_org(engine, **paying())
-    prices.currencies["price_pro_m"] = "EUR"  # the platform currency defaults to USD
+    prices.currencies["price_pro_m"] = "EUR"  # the platform currency defaults to GBP
 
     result = await client.get(f"{BASE}/revenue", headers=as_user("boss"))
 
@@ -194,14 +194,14 @@ async def test_revenue_uses_the_platform_currency_setting(client, engine):
         await connection.execute(
             text(
                 "INSERT INTO app_settings (id, key, value, category) "
-                "VALUES (:id, 'currency', CAST('\"gbp\"' AS jsonb), 'general')"
+                "VALUES (:id, 'currency', CAST('\"usd\"' AS jsonb), 'general')"
             ),
             {"id": new_id()},
         )
 
     result = await client.get(f"{BASE}/revenue", headers=as_user("boss"))
 
-    assert result.json()["data"]["currency"] == "GBP"
+    assert result.json()["data"]["currency"] == "USD"
 
 
 async def test_system_stats_count_platform_tables(client, engine):

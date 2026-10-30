@@ -36,7 +36,7 @@ def generate_secret() -> str:
     return base64.b32encode(secrets.token_bytes(20)).decode("ascii")
 
 
-def provisioning_uri(secret: str, email: str, issuer: str = "Your App") -> str:
+def provisioning_uri(secret: str, email: str, issuer: str = "Freejoy") -> str:
     label = quote(f"{issuer}:{email}", safe="")
     query = urlencode(
         {

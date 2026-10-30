@@ -4,6 +4,9 @@
  * Kept free of server-only imports so client components can use it;
  * `@/config/subscriptions` re-exports it for server code.
  */
+/** The platform currency when none is configured or the lookup fails: a UK product, so pounds. */
+export const DEFAULT_CURRENCY_CODE = 'GBP';
+
 export const CURRENCIES = [
   { code: 'USD', symbol: '$', name: 'US Dollar' },
   { code: 'EUR', symbol: '€', name: 'Euro' },

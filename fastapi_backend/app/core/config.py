@@ -13,7 +13,7 @@ EMAIL_PROVIDERS = frozenset({"", "brevo", "fake"})
 
 class Settings(BaseSettings):
     # Application
-    APP_NAME: str = "Your App API"
+    APP_NAME: str = "Freejoy API"
     APP_VERSION: str = "0.1.0"
     LOG_LEVEL: str = "INFO"
 

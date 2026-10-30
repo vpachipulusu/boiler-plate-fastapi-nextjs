@@ -1,3 +1,4 @@
+import { siteConfig } from '@/config/site';
 import { isServiceUnavailableResult, type AuthFailureResult } from '@/lib/auth/auth-error-messages';
 import { getFirebaseErrorMessage } from '@/lib/utils/firebase-errors';
 
@@ -59,7 +60,7 @@ const CREDENTIALS_MESSAGE: Record<AuthFlow, string> = {
 
 export const NETWORK_ERROR: AuthFormError = {
   kind: 'network',
-  title: 'We could not reach Your App',
+  title: `We could not reach ${siteConfig.name}`,
   message: 'Check your connection and try again.',
 };
 

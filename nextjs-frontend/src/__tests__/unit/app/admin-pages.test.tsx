@@ -334,7 +334,7 @@ describe('admin subscriptions page', () => {
     vi.clearAllMocks();
     mocks.fetchAdminRevenue.mockResolvedValue({
       success: true,
-      data: { currency: 'USD', mrr_minor: 23000, complete: true },
+      data: { currency: 'GBP', mrr_minor: 23000, complete: true },
     });
     mocks.fetchAdminSubscriptions.mockImplementation(async (q: Query) => byQuery(q));
   });
@@ -344,7 +344,7 @@ describe('admin subscriptions page', () => {
 
     expect(markup).toContain('Newest paid organisations');
     expect(markup.indexOf('Org e1')).toBeLessThan(markup.indexOf('Org p1'));
-    expect(markup).toContain('$230.00');
+    expect(markup).toContain('£230.00');
     expect(markup).toContain('4 canceled (all time)');
     expect(mocks.fetchAdminSubscriptions).toHaveBeenCalledWith({
       status: 'active',
@@ -415,7 +415,7 @@ describe('admin subscriptions page', () => {
       expect(markup).toContain(`aria-label="${label}"`);
     }
     expect(markup).toMatch(/aria-label="Total active"[^]*?>5<\/p>/);
-    expect(markup).toContain('$230.00');
+    expect(markup).toContain('£230.00');
     expect(markup).toContain('data-sync-panel');
   });
 
@@ -425,14 +425,14 @@ describe('admin subscriptions page', () => {
     const markup = html(await AdminSubscriptionsPage());
 
     expect(markup).toMatch(/aria-label="MRR"[^]*?Revenue unavailable/);
-    expect(markup).not.toMatch(/aria-label="MRR"[^]*?\$\d/);
+    expect(markup).not.toMatch(/aria-label="MRR"[^]*?£\d/);
     expect(markup).toMatch(/aria-label="Total active"[^]*?>5<\/p>/);
   });
 
   it('says so when some paying organisations could not be priced', async () => {
     mocks.fetchAdminRevenue.mockResolvedValue({
       success: true,
-      data: { currency: 'USD', mrr_minor: 100, complete: false },
+      data: { currency: 'GBP', mrr_minor: 100, complete: false },
     });
 
     expect(html(await AdminSubscriptionsPage())).toContain('MRR is a minimum');

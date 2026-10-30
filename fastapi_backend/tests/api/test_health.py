@@ -114,7 +114,7 @@ async def test_ready_is_503_not_500_when_the_connection_fails(
 def test_openapi_identifies_yourapp() -> None:
     schema = app.openapi()
 
-    assert schema["info"]["title"] == "Your App API"
+    assert schema["info"]["title"] == "Freejoy API"
     assert schema["paths"]["/health"]["get"]["operationId"] == "health-health_check"
 
 
@@ -216,7 +216,7 @@ async def test_docs_are_not_served_in_production(
 
     assert response.status_code == 404
     # Schema generation (commands.generate_openapi_schema) must keep working.
-    assert prod_app.openapi()["info"]["title"] == "Your App API"
+    assert prod_app.openapi()["info"]["title"] == "Freejoy API"
 
 
 async def test_custom_openapi_url_is_ignored_in_production(

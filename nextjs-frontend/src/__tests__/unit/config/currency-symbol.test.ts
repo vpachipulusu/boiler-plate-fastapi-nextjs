@@ -1,5 +1,5 @@
 // @vitest-environment node
-/** getCurrencySymbol reads the backend currency and falls back to '$' on any failure. */
+/** getCurrencySymbol reads the backend currency and falls back to the default (pound) on any failure. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ fetchPlatformCurrency: vi.fn(), logError: vi.fn() }));
@@ -25,16 +25,16 @@ describe('getCurrencySymbol', () => {
     );
   });
 
-  it('falls back to $ for an unknown code', async () => {
+  it('falls back to £ for an unknown code', async () => {
     mocks.fetchPlatformCurrency.mockResolvedValue('ZZZ');
-    await expect(getCurrencySymbol()).resolves.toBe('$');
+    await expect(getCurrencySymbol()).resolves.toBe('£');
   });
 
-  it('logs and falls back to $ on a backend error, then recovers', async () => {
+  it('logs and falls back to £ on a backend error, then recovers', async () => {
     mocks.fetchPlatformCurrency
       .mockRejectedValueOnce(new Error('down'))
       .mockResolvedValueOnce('EUR');
-    await expect(getCurrencySymbol()).resolves.toBe('$');
+    await expect(getCurrencySymbol()).resolves.toBe('£');
     expect(mocks.logError).toHaveBeenCalledTimes(1);
     await expect(getCurrencySymbol()).resolves.toBe(
       CURRENCIES.find((c) => c.code === 'EUR')!.symbol

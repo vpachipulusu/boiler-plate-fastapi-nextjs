@@ -1,7 +1,7 @@
 import { fetchPlanPrices, type PlanPrices } from '@/lib/api/plan-prices';
 import { fetchPlatformCurrency } from '@/lib/api/settings';
 import { logger } from '@/lib/logger';
-import { CURRENCIES } from './currencies';
+import { CURRENCIES, DEFAULT_CURRENCY_CODE } from './currencies';
 
 export const SUBSCRIPTION_TIERS = {
   FREE: 'free',
@@ -107,16 +107,19 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
 
 export { CURRENCIES };
 
+const DEFAULT_CURRENCY_SYMBOL =
+  CURRENCIES.find((c) => c.code === DEFAULT_CURRENCY_CODE)?.symbol ?? '£';
+
 /**
  * Currency symbol of the platform currency, read from the backend. Any failure is logged and answered with
- * '$'. The read is cached in `fetchPlatformCurrency`.
+ * the symbol of the default currency (GBP). The read is cached in `fetchPlatformCurrency`.
  */
 export async function getCurrencySymbol(): Promise<string> {
   try {
     const code = await fetchPlatformCurrency();
-    return CURRENCIES.find((c) => c.code === code)?.symbol ?? '$';
+    return CURRENCIES.find((c) => c.code === code)?.symbol ?? DEFAULT_CURRENCY_SYMBOL;
   } catch (error) {
     logger.error('Failed to fetch currency symbol:', error);
-    return '$';
+    return DEFAULT_CURRENCY_SYMBOL;
   }
 }

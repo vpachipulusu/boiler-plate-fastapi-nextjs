@@ -77,7 +77,7 @@ async def test_unset_currency_falls_back_to_the_frontend_default() -> None:
     response = await fetch_currency(FakeSettings())
 
     assert response.status_code == 200
-    assert response.json()["data"] == {"currency": "USD"}
+    assert response.json()["data"] == {"currency": "GBP"}
 
 
 @pytest.mark.parametrize(
@@ -89,7 +89,7 @@ async def test_unknown_or_malformed_value_falls_back_to_the_default(
     response = await fetch_currency(FakeSettings(currency=stored))
 
     assert response.status_code == 200
-    assert response.json()["data"] == {"currency": "USD"}
+    assert response.json()["data"] == {"currency": "GBP"}
 
 
 async def test_only_the_currency_setting_is_read() -> None:

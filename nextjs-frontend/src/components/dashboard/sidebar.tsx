@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { siteConfig } from '@/config/site';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS, activeNavHref } from './nav-items';
 
@@ -23,7 +24,7 @@ export function Sidebar({ children }: { children?: ReactNode }) {
         href="/dashboard"
         className="flex min-h-11 items-center rounded-md px-3 font-display text-xl font-semibold"
       >
-        Your App
+        {siteConfig.name}
       </Link>
       {children}
       <nav aria-label="Main">
