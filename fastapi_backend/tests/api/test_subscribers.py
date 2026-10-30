@@ -514,3 +514,11 @@ async def test_the_delivery_wiring_opens_no_session_when_the_send_succeeds() -> 
     )
 
     assert sessions.opened == 0
+
+
+async def test_the_asgi_helper_shows_an_app_error_raised_before_any_response() -> None:
+    async def broken(scope: Any, receive: Any, send: Any) -> None:
+        raise ValueError("failed early")
+
+    with pytest.raises(ValueError, match="failed early"):
+        await post_json_returning_at_response(broken, "/x", {}, {})

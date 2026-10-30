@@ -118,18 +118,25 @@ class SubscriberService:
         subscriber_id = await self._store.insert_pending(
             {"email": request.email, **values}
         )
+        changes: dict[str, Any] = {}
         if subscriber_id is None:
-            subscriber_id = await self._reopen(request.email, values, now)
-            if subscriber_id is None:
+            reopened = await self._reopen(request.email, values, now)
+            if reopened is None:
                 await self._session.rollback()
                 return None
+            subscriber_id, changes = reopened
         confirm_token = self._tokens.issue(
             TokenPurpose.CONFIRM, subscriber_id, now + CONFIRM_TOKEN_TTL
         )
         token_hash = token_digest(confirm_token)
+        # One write: a re-opened row's new choices and its new token travel together.
         await self._store.update(
             subscriber_id,
-            {"confirmation_token_hash": token_hash, "confirmation_sent_at": now},
+            {
+                **changes,
+                "confirmation_token_hash": token_hash,
+                "confirmation_sent_at": now,
+            },
         )
         unsubscribe_token = self._tokens.issue(
             TokenPurpose.UNSUBSCRIBE, subscriber_id, None
@@ -146,8 +153,8 @@ class SubscriberService:
 
     async def _reopen(
         self, email: str, values: dict[str, Any], now: datetime
-    ) -> str | None:
-        """The address already has a row: its id when a new confirmation may go out, else None.
+    ) -> tuple[str, dict[str, Any]] | None:
+        """The address already has a row: (its id, the changes to write) when a new confirmation may go out.
 
         Only a PENDING row is re-opened. A CONFIRMED subscriber is never changed, and an UNSUBSCRIBED
         address is never re-opened by an anonymous submission (anyone can type it): bringing it back is an
@@ -167,8 +174,7 @@ class SubscriberService:
             if now - existing.consent_at >= PENDING_RETENTION
             else {"categories": values["categories"], "frequency": values["frequency"]}
         )
-        await self._store.update(existing.id, changes)
-        return existing.id
+        return existing.id, changes
 
     async def confirm(self, token: str) -> None:
         """PENDING to CONFIRMED and onto the provider's list. Raises ``InvalidToken``."""

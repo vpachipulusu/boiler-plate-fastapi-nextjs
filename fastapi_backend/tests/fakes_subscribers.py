@@ -256,6 +256,8 @@ async def post_json_returning_at_response(
     await asyncio.wait({task, done}, timeout=5, return_when=asyncio.FIRST_COMPLETED)
     done.cancel()
     if not response_complete.is_set():
+        if task.done():
+            task.result()  # the app failed before answering: show that error
         task.cancel()
         raise AssertionError("the response was not completed before the provider call")
     return status[0], task

@@ -563,3 +563,57 @@ async def test_a_token_older_than_the_stored_send_time_allows_is_rejected() -> N
 
     with pytest.raises(InvalidToken):
         await harness.service.confirm(token)
+
+
+async def test_a_pending_row_past_retention_whose_send_fails_keeps_a_fresh_consent_but_no_token() -> (
+    None
+):
+    harness = await subscribed()
+    harness.clock.advance(PENDING_RETENTION)
+    harness.provider.error = EmailProviderError("send", 500)
+
+    await harness.subscribe(make_request(EMAIL))
+
+    (row,) = harness.store.rows.values()
+    assert row.consent_at == harness.clock.now
+    assert row.confirmation_token_hash is None
+    assert row.confirmation_sent_at is None
+
+
+async def test_when_the_background_task_never_runs_the_throttle_holds_for_the_hour() -> (
+    None
+):
+    harness = Harness()
+    first = await harness.service.subscribe(
+        make_request(EMAIL)
+    )  # committed, never delivered
+    assert first is not None
+    harness.clock.advance(RESEND_INTERVAL - timedelta(seconds=1))
+
+    inside = await harness.service.subscribe(make_request(EMAIL))
+    harness.clock.advance(timedelta(seconds=1))
+    after = await harness.service.subscribe(make_request(EMAIL))
+
+    assert inside is None
+    assert after is not None
+    assert after.token_hash != first.token_hash
+    assert harness.provider.sent == []
+
+
+async def test_a_resend_is_written_in_one_update() -> None:
+    harness = await subscribed()
+    harness.clock.advance(RESEND_INTERVAL)
+    writes: list[dict[str, object]] = []
+    original = harness.store.update
+
+    async def recording(subscriber_id: str, values: dict[str, object]) -> None:
+        writes.append(values)
+        await original(subscriber_id, values)
+
+    harness.store.update = recording  # type: ignore[method-assign]
+
+    await harness.subscribe(make_request(EMAIL, categories=("pets",)))
+
+    assert len(writes) == 1
+    assert {"categories", "frequency", "confirmation_token_hash"} <= set(writes[0])
+    assert "consent_at" not in writes[0]
