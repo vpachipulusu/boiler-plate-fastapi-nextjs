@@ -45,6 +45,15 @@ beforeEach(() => {
   mocks.subscribe.mockResolvedValue({ success: true });
 });
 
+describe('AlertsForm keyboard focus', () => {
+  it('uses no ring for the focus of the hidden checkbox and radio inputs', () => {
+    render(<AlertsForm categories={CATEGORIES} live />);
+    const card = screen.getByLabelText('Weekly round-up').closest('label')!;
+
+    expect(card.className).not.toMatch(/(^|[\s:])ring(-|\s|$)/);
+  });
+});
+
 describe('AlertsForm promises', () => {
   it('says how to stop, and makes no "no spam", "anytime" or sold-lists claim', () => {
     const { container } = render(<AlertsForm categories={CATEGORIES} live />);

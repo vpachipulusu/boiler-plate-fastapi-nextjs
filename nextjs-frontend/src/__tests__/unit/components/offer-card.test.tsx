@@ -19,6 +19,15 @@ describe('OfferCard', () => {
     expect(screen.getByRole('img', { name: offer.image.alt })).toBeInTheDocument();
   });
 
+  it('leaves the keyboard focus to the card: no ring, and the stretched title link draws no outline of its own', () => {
+    const { container } = render(<OfferCard offer={offer} merchant={merchant} />);
+
+    expect(container.querySelector('article')!.className).not.toMatch(/(^|[\s:])ring(-|\s|$)/);
+    expect(screen.getByRole('link', { name: offer.title }).className).toContain(
+      'focus-visible:outline-none'
+    );
+  });
+
   it('shows the demo badge on fixture offers and never links off-site', () => {
     const { container } = render(<OfferCard offer={offer} merchant={merchant} />);
 

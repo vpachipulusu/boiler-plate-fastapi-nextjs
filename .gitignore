@@ -22,6 +22,8 @@ playwright/.cache/
 # Separate e2e builds: test Firebase project, Sentry off
 .next-e2e/
 .next-e2e-dev/
+# Any other alternate dist dir (NEXT_DIST_DIR), for example a throwaway build check
+.next-*/
 nextjs-frontend/out/
 nextjs-frontend/build/
 next-env.d.ts

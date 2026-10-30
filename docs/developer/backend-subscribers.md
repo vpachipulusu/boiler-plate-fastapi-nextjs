@@ -237,8 +237,10 @@ uv run uvicorn app.main:app --port 8000
   and a raw ASGI call that returns as soon as the response is complete; `httpx.ASGITransport` waits for background
   tasks, so ordinary client calls see the email in the fake outbox once they return.
 - Frontend: Vitest for the action, form states, pages, route handler and proxy header.
-  `src/__tests__/e2e/alerts-optin.spec.ts` runs the journey in a browser when `E2E_EMAIL_OUTBOX` points at the
-  same outbox file the backend writes (it skips otherwise); it polls the outbox because the email is written after the response. See [local-e2e.md](local-e2e.md).
+  `src/__tests__/e2e/alerts-lifecycle.spec.ts` (FREEJ-27) runs the journey in a browser when `E2E_EMAIL_OUTBOX` points at the
+  same outbox file the backend writes (it skips otherwise); it polls the outbox because the email is written after the response,
+  and it also checks that a repeat submission gets the same answer, sends nothing and never reopens an unsubscribed address.
+  See [local-e2e.md](local-e2e.md).
 
 ## Owner follow-ups
 

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { buttonVariants } from '@/components/ui/button';
 import { badgeVariants } from '@/components/ui/badge';
 
-/** 44px touch targets and one navy focus ring defined in globals.css. */
+/** 44px touch targets and one focus outline (the theme --ring token) defined in globals.css. */
 
 const read = (rel: string) => readFileSync(resolve(__dirname, '../../..', rel), 'utf8');
 

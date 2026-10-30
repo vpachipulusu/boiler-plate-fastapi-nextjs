@@ -14,7 +14,7 @@ export const FormErrorSummary = forwardRef<HTMLDivElement, { message: string | n
         tabIndex={-1}
         role="group"
         aria-labelledby={headingId}
-        className="flex items-start gap-2 rounded-lg border border-destructive/50 p-4 text-sm text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex items-start gap-2 rounded-lg border border-destructive/50 p-4 text-sm text-destructive"
       >
         <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
         <div>
