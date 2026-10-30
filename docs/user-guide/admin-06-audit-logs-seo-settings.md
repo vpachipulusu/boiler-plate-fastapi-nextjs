@@ -12,8 +12,8 @@ Reading it needs the `audit.read` permission (a Super Admin has it).
 ### Step 1. Open the log
 
 1. Click **Audit Logs** (under **More** on a phone).
-2. The page says "Track all administrative actions and system events", then a card **Recent Activity** with a line
-   such as "Showing 10 of 10 entries (newest first, up to 100)".
+2. The page says "Track all administrative actions and system events", then a **Filters** card (see Step 2) and a
+   card **Recent Activity** with a line such as "Showing 1 to 10 of 10 entries (newest first)".
 3. The table has these columns:
 
 | Column | What it shows |
@@ -33,7 +33,39 @@ Phone:
 In the screenshot, the ten lines are the real record of the two test offers created while writing this guide (create,
 verify, publish, expire and archive for each), made by the test admin account from the local computer.
 
-### Step 2. What is recorded, and what is not
+### Step 2. Filter and page through the log
+
+The **Filters** card narrows the list. Every filter you add must match (an entry has to fit all of them).
+
+| Control | What it does |
+| --- | --- |
+| **Action** | Only entries with exactly this action, for example `admin.offers.update` |
+| **User ID** | Only entries made by this admin (their id, as shown in the **User ID** column) |
+| **Organisation ID** | Only entries about this organisation |
+| **From date** and **To date** (grouped as **Date range**) | Only entries on or between these days. Dates are in UTC and each includes the whole day. The pickers will not let the range run backwards |
+| **Entries per page** | 25, 50 (the default) or 100 |
+
+1. Fill in one or more controls and press **Apply filters**. The list reloads from the first page.
+2. Press **Reset filters** to clear everything and go back to the plain newest-first list.
+3. The line above the table says which entries you are looking at, for example "Showing 51 to 100 of 250 entries
+   (newest first)". If nothing matches, the page says "No entries match these filters" with a **Reset filters** button.
+4. When there is more than one page, **Previous** and **Next** appear under the table with "Page 2 of 5". They keep
+   your filters. On a phone the page count sits on its own line above the two buttons. After you press **Apply
+   filters**, **Previous**, **Next** or **Reset filters**, keyboard focus moves to the **Recent Activity** heading, so a
+   screen reader or keyboard user lands on the new results instead of being sent back to the top or losing their place
+   when a button (such as **Next** on the last page) goes away.
+   If a page past the end has no entries, the page says "No entries on this page" and offers **Back to first page**,
+   which keeps your filters.
+5. The address of the page holds the filters, so you can bookmark it or send the link to another admin (who needs
+   the audit-log permission to open it).
+
+If a value cannot be used (an action that is not written like `admin.offers.update`, an id with spaces, a date that
+does not exist, or a "To" date before the "From" date) it is ignored and a red note under the controls says which
+one. The unusable value is not put back in the box; the box is marked as having a problem for screen readers and the
+note is read out when the page reloads. If you only left boxes empty, or the address held the default page size, the
+page quietly tidies the address (for example to `?action=admin.offers.update`) and no note is shown.
+
+### Step 3. What is recorded, and what is not
 
 - **Recorded**: creating, editing and every status change of an offer ("verify", "publish", "unpublish", "expire",
   "archive"), affiliate link changes, category and merchant changes (create, edit, enable/disable, activate/deactivate),
@@ -45,9 +77,14 @@ verify, publish, expire and archive for each), made by the test admin account fr
 
 ### Limits of the screen
 
-The page shows the **newest 100 entries only** and has no search, filters, date range or "next page" buttons yet. The
-backend can filter by user, action, organisation and date, but older entries cannot be reached from this screen
-today. Ask a developer to query the backend if you need an older record.
+- You can page back through about the newest **10,000 entries** of any search (the cap is on where a page starts, so
+  the last page can reach a little past 10,000). When there are more, the page count shows a plus sign, such as
+  "Page 1 of 201+". Beyond that, the page tells you to
+  narrow the filters or the date range (for example pick a month) to reach older entries.
+- You can filter by action, user, organisation and date. There is no free-text search, no filter by resource or by
+  IP address, and no way to pick an action from a list: type it exactly.
+- The screenshots below still show the earlier version of the page without the **Filters** card. **Screenshot refresh
+  pending**: it needs the signed-in test admin account.
 
 ## Part B. SEO
 

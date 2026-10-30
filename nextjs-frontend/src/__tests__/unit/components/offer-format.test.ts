@@ -21,7 +21,7 @@ describe('ctaConditions', () => {
 
   it('states the postage next to a sample button', () => {
     expect(ctaConditions({ ...base, offerType: 'free_sample', postage: { kind: 'free' } })).toBe(
-      'Postage: free.'
+      'Postage: Free.'
     );
     expect(
       ctaConditions({
@@ -32,7 +32,7 @@ describe('ctaConditions', () => {
     ).toBe('Postage: £2.99.');
     expect(
       ctaConditions({ ...base, offerType: 'free_sample', postage: { kind: 'check_terms' } })
-    ).toBe("Postage: check the brand's terms.");
+    ).toBe("Postage: Check the brand's terms.");
   });
 
   it('states the card requirement next to a trial button, and nothing when no card is needed', () => {

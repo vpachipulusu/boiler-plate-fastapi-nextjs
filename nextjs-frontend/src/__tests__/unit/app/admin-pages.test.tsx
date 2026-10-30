@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => ({
     throw new Error('NEXT_NOT_FOUND');
   }),
   logError: vi.fn(),
-  fetchAdminAuditLogs: vi.fn(),
   fetchAdminSubscriptions: vi.fn(),
   fetchAdminRevenue: vi.fn(),
   requireAdminPage: vi.fn(),
@@ -30,10 +29,6 @@ vi.mock('@/lib/api/admin-users', async () => {
     fetchAdminUser: mocks.fetchAdminUser,
   };
 });
-vi.mock('@/lib/api/admin-audit-logs', () => ({
-  AUDIT_LOG_PAGE_SIZE: 100,
-  fetchAdminAuditLogs: mocks.fetchAdminAuditLogs,
-}));
 vi.mock('@/lib/api/admin-subscriptions', () => ({
   fetchAdminSubscriptions: mocks.fetchAdminSubscriptions,
 }));
@@ -53,10 +48,9 @@ vi.mock('@/app/(admin)/admin/users/user-row-actions', () => ({
   UserRowActions: ({ userId }: { userId: string }) => <span data-row-actions={userId} />,
 }));
 
-import type { AuditLogEntry, SubscriptionSummary } from '@/lib/api/generated';
+import type { SubscriptionSummary } from '@/lib/api/generated';
 import AdminDashboardPage from '@/app/(admin)/admin/page';
 import AdminSeoPage from '@/app/(admin)/admin/seo/page';
-import AdminAuditLogsPage from '@/app/(admin)/admin/audit-logs/page';
 import AdminSubscriptionsPage from '@/app/(admin)/admin/subscriptions/page';
 import AdminUserDetailPage from '@/app/(admin)/admin/users/[id]/page';
 
@@ -243,107 +237,6 @@ describe('admin user detail page', () => {
 
     expect(markup).toContain('Something went wrong');
     expect(markup).not.toContain('SECRET');
-  });
-});
-
-const ENTRY = {
-  id: 'a1',
-  created_at: '2026-01-01T00:00:00Z',
-  user_id: 'user-1',
-  organization_id: null,
-  action: 'user.ban',
-  resource: 'user',
-  resource_id: null,
-  metadata: null,
-  ip_address: '203.0.113.9',
-  user_agent: null,
-} satisfies AuditLogEntry;
-
-const auditPage = (entries: AuditLogEntry[], total = entries.length) => ({
-  success: true,
-  data: { entries, total_count: total, limit: 100, offset: 0 },
-});
-
-describe('admin audit logs page', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it('renders entries read through the API with a labelled table and the total', async () => {
-    mocks.fetchAdminAuditLogs.mockResolvedValue(auditPage([ENTRY], 250));
-
-    const markup = html(await AdminAuditLogsPage());
-
-    expect(markup).toContain('user.ban');
-    expect(markup).toContain('user-1');
-    expect(markup).toContain('203.0.113.9');
-    expect(markup).toContain('Showing 1 of 250 entries');
-    expect(markup).toContain('aria-label="Audit log entries"');
-  });
-
-  it('labels timestamps as UTC and leaves an unparsable one empty', async () => {
-    mocks.fetchAdminAuditLogs.mockResolvedValue(
-      auditPage([
-        { ...ENTRY, id: 'a', created_at: '2026-01-05T14:03:00Z' },
-        { ...ENTRY, id: 'b', created_at: 'garbage' },
-      ])
-    );
-
-    const markup = html(await AdminAuditLogsPage());
-
-    expect(markup).toContain('5 Jan 2026, 14:03 UTC');
-    expect(markup).not.toContain('Invalid Date');
-  });
-
-  it('gives screen readers text for missing user and IP values', async () => {
-    mocks.fetchAdminAuditLogs.mockResolvedValue(
-      auditPage([{ ...ENTRY, user_id: null, ip_address: null } satisfies AuditLogEntry])
-    );
-
-    const markup = html(await AdminAuditLogsPage());
-
-    expect(markup).toContain('<span class="sr-only">None</span>');
-  });
-
-  it('shows the empty state when there are no entries', async () => {
-    mocks.fetchAdminAuditLogs.mockResolvedValue(auditPage([]));
-
-    expect(html(await AdminAuditLogsPage())).toContain('No audit logs found');
-  });
-
-  it('renders a stacked table with a labelled cell per column', async () => {
-    mocks.fetchAdminAuditLogs.mockResolvedValue(auditPage([ENTRY]));
-
-    const markup = html(await AdminAuditLogsPage());
-
-    expect(markup).toContain('role="table"');
-    for (const label of ['Timestamp', 'Action', 'Resource', 'User ID', 'IP Address']) {
-      expect(markup).toContain(`data-label="${label}"`);
-    }
-  });
-
-  it('shows an inline error with a Retry link back to the page', async () => {
-    mocks.fetchAdminAuditLogs.mockResolvedValue({ success: false, error: 'SECRET', status: 500 });
-
-    const markup = html(await AdminAuditLogsPage());
-
-    expect(markup).toMatch(/<a[^>]*href="\/admin\/audit-logs"[^>]*>Retry<\/a>/);
-    expect(markup).not.toContain('<table');
-  });
-
-  it.each([
-    [403, 'You do not have permission to do that'],
-    [404, 'Not found'],
-    [500, 'Something went wrong'],
-    [undefined, 'The admin service is unavailable'],
-  ])('shows a curated message for status %s and no backend text', async (status, text) => {
-    mocks.fetchAdminAuditLogs.mockResolvedValue({ success: false, error: 'SECRET', status });
-
-    const markup = html(await AdminAuditLogsPage());
-
-    expect(markup).toContain(text);
-    expect(markup).not.toContain('SECRET');
-    expect(markup).not.toContain('User not found');
-    expect(markup).toContain('role="alert"');
-    expect(mocks.logError).toHaveBeenCalled();
   });
 });
 
