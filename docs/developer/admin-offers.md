@@ -1,0 +1,146 @@
+# Admin offers UI
+
+The admin screens for the Freejoy catalogue: the freebies list, the offer editor with its publish workflow, and the
+categories and merchants pages. They are server-rendered pages and server actions in `nextjs-frontend/` that call
+the admin catalogue API ([backend-admin-catalogue.md](backend-admin-catalogue.md)) through wrappers in
+`src/lib/api/`. The browser never calls FastAPI, and nothing here decides who may do what: the API checks the
+admin's own permission on every call and writes the audit log.
+
+## Routes
+
+| Route | What it is | API permission it needs |
+| --- | --- | --- |
+| `/admin/offers` | Stats strip, status chips, search, category filter, offers table with a row menu | `offers.read` (row actions: `offers.publish`) |
+| `/admin/offers/new` | Offer form; creates a **draft** | `offers.read` to open, `offers.write` to save |
+| `/admin/offers/[id]` | Offer form, status actions, affiliate links (read only), card preview | `offers.read`; `offers.write` to save; `offers.publish` for the status actions |
+| `/admin/categories`, `/new`, `/[id]` | Table, add form, edit form, enable and disable | `offers.read`; `categories.write` for changes |
+| `/admin/merchants`, `/new`, `/[id]` | Table, add form, edit form, activate and deactivate | `offers.read`; `merchants.write` for changes |
+
+The nav (`src/components/admin/admin-nav-items.ts`) lists Freebies, Categories and Merchants straight after
+Dashboard. On phones the tab bar shows the first three items (Dashboard, Freebies, Categories); the rest sit behind
+More. An admin without a permission still sees the pages; the API answers 403 and the page shows "You do not have
+permission to do that". The permission names are the backend's closed `ADMIN_PERMISSIONS`; the frontend holds no copy
+of them.
+
+## The list (`/admin/offers`)
+
+* **URL parameters** (`offers-query.ts`): `q` (at most 100 characters), `status` (`published`, `draft`, `expired`,
+  `archived`), `category` (an id), `page`. The search and category select are a plain GET form (no script needed),
+  like `/admin/users`. The status chips are links; the current one carries `aria-current="page"`. Archived is a fifth
+  chip next to the four in the design so an archived offer can be found; the offers there cannot be edited.
+* **Stats strip** (`offers-stats.tsx`): Total, Published, Drafts, Expired, Archived. Each number is the
+  `total_count` of a one-row list request to the API (one per status plus one unfiltered; `fetchOfferStatusCounts`).
+  Nothing is estimated or cached: if any of the five requests fails the strip shows an error and no numbers. The
+  design's "Needs review" card has no matching API count and is not shown.
+* **Table** (`offers-table.tsx`): Offer (title links to the editor, merchant and type underneath), Category,
+  Status (`StatusPill`: good = Published, neutral = Draft, warn = Expired, info = Archived), Verified
+  (`formatAdminDate`, or "Not verified"), Edit and a row menu. Below 640px each row stacks and cells name their
+  column. Category and merchant names come from the two pick lists (see below).
+* **Row menu** (`offer-row-actions.tsx`): Edit, then the steps the status allows: Mark verified, Publish or
+  Unpublish, Expire, Archive. The allowed set (`offer-status.ts`) mirrors the backend status table and is only a hint;
+  a stale menu gets a 409 from the API and a toast. **Archive asks for confirmation** because there is no way back
+  in the admin.
+
+## The publish workflow
+
+1. **Add freebie** creates a `DRAFT` (the API never creates anything else).
+2. **Mark verified** sets "last checked" to now (`offers.publish`). Publishing does not do this for you
+   (see [backend-admin-catalogue.md](backend-admin-catalogue.md#publish-rules)).
+3. **Publish** needs: the category enabled, the merchant active, a source URL or an active affiliate link, no past
+   end date, and a verification. If a rule fails the toast lists the unmet rules in fixed wording
+   (`admin-catalogue-errors.ts`), for example "This offer cannot be published yet: it has not been verified."
+4. **Unpublish** returns it to draft; **Expire** marks a published offer ended; **Archive** is terminal.
+
+**Preview.** A draft has no public page, so the editor shows a card preview drawn from the form as it is typed
+(`offer-preview-card.tsx`), labelled "Not public". The link to the live page (`/freebies/<slug>`) appears only when the
+status is `PUBLISHED`; it opens in a new tab. Status actions use the last **saved** version, so save before publishing.
+
+**Public pages refresh.** Every status action, a save of a published offer, and every category or merchant change
+calls `revalidateCatalogue(paths)` (`src/lib/catalogue/revalidate.ts`, from FREEJ-21) with `/freebies` and the
+offer's own path, plus `revalidatePath` for the admin pages. A failure of that refresh is logged and does not turn a
+successful write into an error.
+
+## Server actions
+
+`src/app/actions/admin/offer-actions.ts`, `category-actions.ts`, `merchant-actions.ts`. Each action:
+
+1. runs `asAdmin` (`src/lib/api/admin-catalogue-action.ts`), which calls `requireAdminSession`
+   (`src/lib/api/admin-guard.ts`): a verified session cookie and a confirmed admin, exactly as the `/admin` layout
+   decides. Anything else returns the curated refusal and **no API call is made**. The proxy cannot do this check;
+   every admin page and action does it on the server.
+2. validates its input with the same Zod schema the form uses (`src/lib/admin-catalogue/*-schema.ts`, mirrored from
+   the API's Pydantic models) and answers with per-field messages (`fieldErrors`) when it fails;
+3. checks ids against `^[A-Za-z0-9_-]{1,128}$` before they reach a URL path;
+4. calls the wrapper (`admin-offers.ts`, `admin-categories.ts`, `admin-merchants.ts`) and maps a failure to a
+   curated message. The result is `{ success: true, data }` or `{ success: false, error, fieldErrors? }`; a taken or
+   invalid slug also arrives as a `slug` field error.
+
+On the client, `settleAction` (`src/lib/admin-catalogue/settle-action.ts`) turns a call that throws (network drop,
+mid-request deploy) into the same curated failure, so a form or toast always answers.
+
+**Errors never carry backend text.** `callBackend` now also returns the backend's stable `code` (an optional
+`code` on the failure result, added for this story); `catalogueErrorMessage` picks the wording from the code
+(`slug_taken`, `illegal_transition`, `publish_blocked`, `invalid_url`, ...), then from the status. A refused publish
+names its unmet rules only from a fixed table. Unknown codes are ignored. Unexpected failures (5xx, unreachable) are
+logged with status and code only.
+
+## Forms and accessibility
+
+Forms use react-hook-form with `zodResolver`. Every control has a visible label (`Field`,
+`_components/form-field.tsx`); hints and errors are tied to the control with `aria-describedby`, errors are
+`role="alert"` and the control gets `aria-invalid`. After a failed submit the first invalid field takes focus (a
+server `fieldErrors` entry is set on its field first); a failure that belongs to no field fills a summary that takes
+focus; a successful save focuses a "Changes saved." status message. Selects are native `<select>` elements, controls
+are at least 44px tall, and the layout is checked at 320, 390 and 1440 px (no horizontal scroll). Dates are entered
+in UTC (to the second, so an edit never rounds a stored time) and labelled so.
+
+## Pick lists and limits
+
+`_lib/pick-lists.ts` loads categories and merchants once per request (`React.cache`) for the offer form and the
+list's names and filter. The API caps a page at 100 rows, so the lists are the first 100; the categories and
+merchants pages show a "Showing the first N of M" note if a catalogue ever outgrows that. Disabled categories and
+inactive merchants are shown with a suffix so a publish refusal is not a surprise.
+
+Not in this UI (use the API): creating or toggling **affiliate links** (the editor lists them read only),
+unarchiving, and optimistic concurrency on edits (a save is last-write-wins, as the API documents).
+
+## Tests
+
+* Unit (Vitest): `src/__tests__/unit/lib/admin-catalogue/` (schemas, status table), `unit/api/admin-catalogue-wrappers.test.ts`
+  (URLs, bodies, views, counts), `unit/api/admin-guard-errors.test.ts` (the admin gate and message mapping),
+  `unit/actions/admin-catalogue-actions.test.ts` (authorisation failures for every action, validation, refresh),
+  `unit/app/admin-offers-list.test.tsx`, `admin-offers-actions-ui.test.tsx`, `admin-offers-form.test.tsx`.
+* Backend: `fastapi_backend/tests/test_e2e_identity_server.py` (the journey server's guards).
+* Playwright: `src/__tests__/e2e/admin-offers.spec.ts` (Journey 4 and layout checks).
+
+## Journey 4 (Playwright)
+
+Draft, verify, publish, see it on `/freebies/<slug>` and in the search, unpublish, see it gone, archive. It needs a
+seeded backend and an admin session; E2E is not part of the `CI gate`, so run it before opening a PR that changes
+these screens and record the result.
+
+**With the Firebase test project** (the normal way, see [local-e2e.md](local-e2e.md)): set `TEST_ADMIN_EMAIL` as for
+`admin.spec.ts`, point the app at a seeded backend and run
+
+```bash
+export E2E_LIVE_CATALOGUE=1 BACKEND_API_URL=http://127.0.0.1:<port> BACKEND_INTERNAL_KEY=<same key>
+npm run test:e2e:local -- src/__tests__/e2e/admin-offers.spec.ts
+```
+
+**Without Firebase** (a private test database, no sign-in anywhere): start the backend with the test-only identity
+server, which serves the real app but accepts exactly two random session values and seeds a matching admin and
+non-admin user:
+
+```bash
+cd fastapi_backend
+export ENVIRONMENT=test DATABASE_URL=postgresql+asyncpg://postgres:<pw>@localhost:<port>/<your_test_db>
+export BACKEND_INTERNAL_KEY=<32+ random chars> E2E_ADMIN_SESSION_COOKIE=<24+ random chars> E2E_PLAIN_SESSION_COOKIE=<24+ random chars>
+uv run alembic upgrade head && uv run python -m commands.seed_catalogue
+uv run python -m tests.e2e_identity_server --port 8171
+```
+
+It refuses to start unless `ENVIRONMENT` is `local` or `test`, the database host is loopback, the database name ends
+in `_test` and both values are long and different; it binds to 127.0.0.1; it lives under `tests/` and is never part of the application image. Then
+build and start the app on a production build (never `next dev`) with `BACKEND_API_URL`, `BACKEND_INTERNAL_KEY` and
+the same two cookie values, and run Playwright with `E2E_LIVE_CATALOGUE=1 E2E_ADMIN_SESSION_COOKIE=...
+E2E_PLAIN_SESSION_COOKIE=...`. The spec puts the value in the `session` cookie.

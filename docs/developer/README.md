@@ -36,6 +36,7 @@ Start here, then follow the links. Root-level overview: [`../../README.md`](../.
 | [backend-audit-logs.md](backend-audit-logs.md) | Audit log model and admin API |
 | [backend-admin-users.md](backend-admin-users.md) | Admin user management |
 | [backend-admin-catalogue.md](backend-admin-catalogue.md) | Admin offers, categories, merchants and affiliate links: permissions, publish rules, status table |
+| [admin-offers.md](admin-offers.md) | The admin freebies UI: list, offer editor, publish workflow, categories and merchants, server actions, tests, Journey 4 |
 | [admin-settings.md](admin-settings.md) | The admin settings area (general, theme, feature flags) |
 
 ## Stripe Billing module
