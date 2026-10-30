@@ -302,7 +302,7 @@ async def test_publish_is_blocked_until_verified_and_has_a_destination(
     still_blocked = await client.post(f"{url}/publish", headers=headers)
     link = await client.post(
         f"{url}/links",
-        json={"provider": "awin", "destination_url": "https://track.example.com/c?x=1"},
+        json={"provider": "awin", "destination_url": "https://www.awin1.com/c?x=1"},
         headers=headers,
     )
     published = await client.post(f"{url}/publish", headers=headers)
@@ -431,7 +431,7 @@ async def test_verify_records_the_note_in_the_audit_row_and_stamps_the_time(
 async def test_links_are_audited_without_the_destination_url(client, engine, editor):
     headers, *_ = editor
     data = await make_offer(client, editor)
-    secret_url = "https://track.example.com/c?aff=ABC123-PRIVATE"
+    secret_url = "https://www.awin1.com/c?aff=ABC123-PRIVATE"
 
     created = await client.post(
         f"{OFFERS}/{data['id']}/links",
@@ -455,7 +455,7 @@ async def test_links_are_audited_without_the_destination_url(client, engine, edi
     assert updated.json()["data"]["active"] is False and missing.status_code == 404
     assert len(audits) == 2
     assert all("ABC123" not in entry and "t-9" not in entry for entry in audits)
-    assert "track.example.com" in audits[0]
+    assert "www.awin1.com" in audits[0]
 
 
 async def test_last_active_link_of_a_published_offer_cannot_be_deactivated(
@@ -466,7 +466,7 @@ async def test_last_active_link_of_a_published_offer_cannot_be_deactivated(
     url = f"{OFFERS}/{data['id']}"
     link = await client.post(
         f"{url}/links",
-        json={"provider": "awin", "destination_url": "https://track.example.com/c"},
+        json={"provider": "awin", "destination_url": "https://www.awin1.com/c"},
         headers=headers,
     )
     await client.post(f"{url}/verify", headers=headers)
@@ -492,3 +492,35 @@ async def test_responses_carry_no_user_data_and_are_not_cacheable(
 
     assert "editor@example.com" not in detail.text
     assert detail.headers["Cache-Control"] == "no-store"
+
+
+async def test_a_link_must_use_a_host_its_provider_may_use(client, engine, editor):
+    headers, *_ = editor
+    data = await make_offer(client, editor)
+    path = f"{OFFERS}/{data['id']}/links"
+
+    wrong_host = await client.post(
+        path,
+        json={"provider": "awin", "destination_url": "https://www.tradedoubler.com/c"},
+        headers=headers,
+    )
+    unknown = await client.post(
+        path,
+        json={"provider": "mystery", "destination_url": "https://www.awin1.com/c"},
+        headers=headers,
+    )
+    off_site = await client.post(
+        path,
+        json={"provider": "direct", "destination_url": "https://evil.example/c"},
+        headers=headers,
+    )
+
+    assert wrong_host.status_code == 422
+    assert wrong_host.json()["code"] == "destination_not_allowed"
+    assert (
+        wrong_host.json()["error"]
+        == "Destination host is not allowed for this provider"
+    )
+    assert unknown.json()["code"] == "unknown_provider"
+    assert off_site.json()["code"] == "destination_not_allowed"
+    assert await rows(engine, "SELECT id FROM affiliate_links") == []

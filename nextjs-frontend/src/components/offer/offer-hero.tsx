@@ -37,7 +37,11 @@ export function OfferHero({ offer, merchant, category, ended }: OfferHeroProps) 
         {ended ? (
           <OfferEndedPanel categorySlug={category.slug} />
         ) : (
-          <OfferCta offerType={offer.offerType} demo={offer.demo} />
+          <OfferCta
+            offerType={offer.offerType}
+            demo={offer.demo}
+            offerId={offer.demo ? null : offer.id}
+          />
         )}
       </div>
     </section>

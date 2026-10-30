@@ -6,6 +6,7 @@ merchant that is already in that state is a no-op that stages no audit row. Deac
 not unpublish the merchant's offers: the public read API must hide them.
 """
 
+import logging
 from collections.abc import Mapping
 from typing import Any, Protocol
 
@@ -27,9 +28,11 @@ from app.services.admin_catalogue_errors import CatalogueNotFound, SlugTaken
 __all__ = ["AdminMerchantService"]
 
 EDITABLE_FIELDS = frozenset({"name", "website", "logo_url"})
-AUDITED_FIELDS = frozenset({"name"})
+# The website is audited because it decides where ``direct`` affiliate links may point.
+AUDITED_FIELDS = frozenset({"name", "website"})
 URL_FIELDS = ("website", "logo_url")
 RESOURCE = "merchants"
+logger = logging.getLogger("yourapp.admin_catalogue")
 
 
 class MerchantStore(Protocol):
@@ -44,6 +47,7 @@ class MerchantStore(Protocol):
     async def update(
         self, merchant_id: str, values: dict[str, Any]
     ) -> MerchantRecord: ...
+    async def active_direct_link_ids(self, merchant_id: str) -> list[str]: ...
 
 
 class AdminMerchantService:
@@ -86,6 +90,7 @@ class AdminMerchantService:
                 "name": created.name,
                 "slug": created.slug,
                 "active": created.active,
+                "website": created.website,
             },
         )
         await self.session.commit()
@@ -99,6 +104,8 @@ class AdminMerchantService:
         values = clean_urls(changes, URL_FIELDS)
         current = await self._locked(merchant_id)
         updated = await self.store.update(merchant_id, values)
+        if "website" in values and values["website"] != current.website:
+            await self._warn_about_direct_links(merchant_id)
         before, after = changed_values(current, values, AUDITED_FIELDS)
         await self.auditor.record(
             actor,
@@ -111,6 +118,16 @@ class AdminMerchantService:
         )
         await self.session.commit()
         return updated
+
+    async def _warn_about_direct_links(self, merchant_id: str) -> None:
+        """`direct` links follow the merchant website, so changing it moves where they may go. Ids only."""
+        link_ids = await self.store.active_direct_link_ids(merchant_id)
+        if link_ids:
+            logger.warning(
+                "merchant %s website changed; active direct affiliate links follow it: %s",
+                merchant_id,
+                ", ".join(link_ids),
+            )
 
     async def set_active(
         self, actor: AdminContext, merchant_id: str, active: bool

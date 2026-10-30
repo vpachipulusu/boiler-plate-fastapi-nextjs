@@ -614,6 +614,47 @@ export type ClaimStep = {
 };
 
 /**
+ * ClickData
+ */
+export type ClickData = {
+    /**
+     * Destination Url
+     *
+     * Stored https destination; never logged
+     */
+    destination_url: string;
+};
+
+/**
+ * ClickRequest
+ *
+ * What the Next.js route may tell the backend about the click. Nothing else is accepted.
+ */
+export type ClickRequest = {
+    /**
+     * Referrer Host
+     *
+     * Host name of the referring page; anything else is dropped
+     */
+    referrer_host?: string | null;
+    /**
+     * Coarse device class; the raw user agent is never sent
+     */
+    user_agent_class?: UserAgentClass | null;
+};
+
+/**
+ * ClickResponse
+ */
+export type ClickResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data: ClickData;
+};
+
+/**
  * ConfirmResponse
  */
 export type ConfirmResponse = {
@@ -3286,6 +3327,11 @@ export type UrlResponse = {
     success?: true;
     data: UrlData;
 };
+
+/**
+ * UserAgentClass
+ */
+export type UserAgentClass = 'DESKTOP' | 'MOBILE' | 'TABLET' | 'BOT' | 'OTHER';
 
 /**
  * UserDetailResponse
@@ -7608,6 +7654,65 @@ export type ListCategoriesResponses = {
 };
 
 export type ListCategoriesResponse = ListCategoriesResponses[keyof ListCategoriesResponses];
+
+export type RecordClickData = {
+    /**
+     * Body
+     */
+    body?: ClickRequest | null;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Offer Id
+         */
+        offer_id: string;
+    };
+    query?: never;
+    url: '/v1/catalogue/offers/{offer_id}/click';
+};
+
+export type RecordClickErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Not available
+     */
+    404: ErrorResponse;
+    /**
+     * The offer has ended
+     */
+    410: ExpiredOfferResponse;
+    /**
+     * Invalid request
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded
+     */
+    429: ErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type RecordClickError = RecordClickErrors[keyof RecordClickErrors];
+
+export type RecordClickResponses = {
+    /**
+     * Successful Response
+     */
+    200: ClickResponse;
+};
+
+export type RecordClickResponse = RecordClickResponses[keyof RecordClickResponses];
 
 export type SubscribeToAlertsData = {
     body: SubscribeBody;

@@ -20,6 +20,8 @@ from urllib.parse import urlsplit
 
 from sqlalchemy.exc import IntegrityError
 
+from app.core.affiliate_hosts import destination_allowed, is_known_provider
+from app.core.config import settings
 from app.core.permissions import AdminContext
 from app.models.platform.offer import OfferStatus
 from app.repositories.admin_offers import (
@@ -79,6 +81,7 @@ class OfferStore(Protocol):
     async def update(self, offer_id: str, values: dict[str, Any]) -> OfferRecord: ...
     async def category_enabled(self, category_id: str) -> bool | None: ...
     async def merchant_active(self, merchant_id: str) -> bool | None: ...
+    async def merchant_website(self, merchant_id: str) -> str | None: ...
     async def list_links(self, offer_id: str) -> list[AffiliateLinkRecord]: ...
     async def count_active_links(self, offer_id: str) -> int: ...
     async def get_link(
@@ -238,6 +241,9 @@ class AdminOfferService:
         offer = await self._locked(offer_id)
         require_editable(offer.status)
         values = {**data, "destination_url": https_url(data["destination_url"])}
+        await self._require_allowed_destination(
+            offer, values["provider"], values["destination_url"]
+        )
         link = await self.store.insert_link({**values, "offer_id": offer_id})
         await self.auditor.record(
             actor,
@@ -268,6 +274,14 @@ class AdminOfferService:
         if link is None:
             raise CatalogueNotFound("link")
         values = clean_urls(changes, ("destination_url",))
+        # Also when a switched-off link is switched on: it may predate the allowlist.
+        reactivating = values.get("active") is True and not link.active
+        if "provider" in values or "destination_url" in values or reactivating:
+            await self._require_allowed_destination(
+                offer,
+                values.get("provider", link.provider),
+                values.get("destination_url", link.destination_url),
+            )
         if values.get("active") is False and link.active:
             await self._require_destination_remains(offer)
         updated = await self.store.update_link(link_id, values)
@@ -288,6 +302,21 @@ class AdminOfferService:
         )
         await self.session.commit()
         return updated
+
+    async def _require_allowed_destination(
+        self, offer: OfferRecord, provider: str, destination_url: str
+    ) -> None:
+        """The provider must be known and the host one it may use (also checked when followed)."""
+        if not is_known_provider(provider):
+            raise InvalidInput("unknown_provider")
+        allowed = destination_allowed(
+            provider,
+            _host(destination_url),
+            merchant_website=await self.store.merchant_website(offer.merchant_id),
+            allow_sample=settings.relaxed_environment,
+        )
+        if not allowed:
+            raise InvalidInput("destination_not_allowed")
 
     async def _locked(self, offer_id: str) -> OfferRecord:
         offer = await self.store.get(offer_id, lock=True)

@@ -232,8 +232,36 @@ async def test_audit_rows_carry_no_secrets_or_user_emails(client, engine, editor
 
     dump = json.dumps([list(r) for r in await audit_rows(engine)], default=str)
 
-    assert "editor@example.com" not in dump and "a.example.com" not in dump
+    assert "editor@example.com" not in dump
     assert "X-Internal-Key" not in dump and support.KEY not in dump
+    # The merchant website is deliberately audited: it decides where `direct` links may point.
+    assert "https://a.example.com" in dump
+
+
+async def test_a_merchant_website_change_is_audited_with_the_old_and_new_value(
+    client, engine, editor
+):
+    created = await client.post(
+        MERCHANTS,
+        json={"name": "Acme", "website": "https://a.example.com"},
+        headers=editor,
+    )
+    merchant_id = created.json()["data"]["id"]
+
+    await client.patch(
+        f"{MERCHANTS}/{merchant_id}",
+        json={"website": "https://b.example.com"},
+        headers=editor,
+    )
+
+    updates = [
+        row
+        for row in await audit_rows(engine, "admin.merchants.update")
+        if row[3] == merchant_id
+    ]
+    (row,) = updates
+    dump = json.dumps(list(row), default=str)
+    assert "https://a.example.com" in dump and "https://b.example.com" in dump
 
 
 async def test_registry_is_closed_nobody_grants_a_catalogue_permission_they_lack(

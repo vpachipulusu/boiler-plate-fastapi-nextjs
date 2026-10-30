@@ -1,7 +1,6 @@
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, within } from '@testing-library/react';
 import type { EndedOffer, OfferLookup } from '@/lib/catalogue';
 import { CatalogueUnavailableError } from '@/lib/catalogue/errors';
 import type { Offer } from '@/lib/catalogue/types';
@@ -195,21 +194,16 @@ describe('once the catalogue is API-backed', () => {
     expect(alertsMetadata.robots).toEqual({ index: false });
   });
 
-  it('renders a real offer with no demo wording and an honest, coming-soon call to action', async () => {
-    const user = userEvent.setup();
+  it('renders a real offer with no demo wording and a call to action that links through /go/', async () => {
     render(await OfferPage(offerParams));
 
     // The related offers below are fixtures in this test; the offer's own hero must be clean.
     const hero = screen.getByRole('heading', { level: 1 }).closest('section') as HTMLElement;
-    expect(hero.textContent).not.toMatch(/demo|design preview|sample data/i);
-    const cta = screen.getByRole('button', { name: /^get this free sample, coming soon$/i });
-    expect(cta).toHaveTextContent('Coming soon');
-
-    await user.click(cta);
-
-    expect(
-      await screen.findByRole('dialog', { name: 'Claim link coming soon' })
-    ).toBeInTheDocument();
+    expect(hero.textContent).not.toMatch(/demo|design preview|sample data|coming soon/i);
+    const cta = within(hero).getByRole('link', { name: /^get this free sample$/i });
+    expect(cta).toHaveAttribute('href', `/go/${FIXTURE_LIVE.id}`);
+    expect(cta).toHaveAttribute('rel', 'sponsored nofollow noopener');
+    expect(within(hero).queryByRole('button')).toBeNull();
   });
 });
 

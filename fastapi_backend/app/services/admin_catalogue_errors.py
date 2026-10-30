@@ -28,7 +28,8 @@ class InvalidInput(CatalogueError):
     """A value the schema cannot judge on its own is unacceptable (422).
 
     ``code`` is one of ``invalid_url``, ``invalid_slug``, ``invalid_postage``,
-    ``invalid_window``, ``unknown_category`` or ``unknown_merchant``.
+    ``invalid_window``, ``unknown_category``, ``unknown_merchant``, ``unknown_provider`` or
+    ``destination_not_allowed``.
     """
 
     def __init__(self, code: str) -> None:
