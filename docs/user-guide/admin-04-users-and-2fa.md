@@ -85,15 +85,18 @@ Two-factor authentication adds a six-digit code from an authenticator app to sig
   changes every 30 seconds, so type the current one. The messages you may see:
   - **That code did not work**: the code was wrong or had expired. The box is cleared; try the new code.
   - **Enter the six-digit code**: the box did not hold six digits.
-  - **Too many attempts**: too many codes were tried. Wait a few minutes, then sign in again. Only five attempts are
-    allowed in 15 minutes.
-  - **Your sign-in may have timed out**: the first step is only valid for a few minutes. Press **Back to sign in** and
-    start again.
+  - **Too many attempts**: after a few wrong codes (at most four in 15 minutes) sign-in is blocked; wait 15 minutes.
+  - **Your sign-in timed out**: the first step is only valid for about five minutes. The page returns to the sign-in
+    form with this message; sign in again.
   - **Sign-in is unavailable right now**: a problem on our side. Try again in a few minutes.
 
-  **Back to sign in** returns to the first step with the email still filled in. There are **no backup codes**: if you
+  **Back to sign in** returns to the first step with the email still filled in (the password is cleared) and signs the
+  browser out of the half-finished sign-in. There are **no backup codes**: if you
   cannot get a code, the page offers **Contact support**, but nothing in the screens can switch 2FA off for you (see
   below).
+- **Changing your password signs you out.** For an account with 2FA on, changing the password on the Security page
+  ends the session, because the new session needs a code too. You are sent to the sign-in page and sign in with the
+  new password and a code.
 - **Setting it up is switched off.** The Security page has no **Enable** button, on purpose: with no backup codes, a
   person who loses their phone would be locked out. To enable 2FA today a developer has to call the backend's two
   set-up routes (enrol, then confirm with a code) with that person's own signed-in session. Ordinary users cannot do it

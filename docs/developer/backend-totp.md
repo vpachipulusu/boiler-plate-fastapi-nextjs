@@ -25,8 +25,9 @@ current session cookie, which already passed the check.
 **Rate limits.** The route keeps the `AUTH_POLICY` limits (client IP, then verified email: 5 per 15 minutes each) and
 adds `TOTP_SIGNIN_POLICY` (5 per 15 minutes, keyed by user id) for every request that carries a code. It is counted
 before the code is checked, so a guess costs budget even when it is right; a request without a code spends none of it.
-It fails closed (503) when Redis is down. Over the limit the answer is 429 with `Retry-After`. Because the first,
-code-less request of a two-step sign-in also counts against `AUTH_POLICY`, a 2FA sign-in uses two of the five hits under each of those keys.
+It fails closed (503) when Redis is down. Over the limit the answer is 429 with `Retry-After`. Every request to
+`POST /v1/auth/session`, the first step and each code attempt, also counts once against the IP and email limits, so at
+most four codes can be tried per window.
 
 **Fresh sign-in.** The ID token must still have been issued by a sign-in within the last five minutes
 (`REAUTH_MAX_AGE_SECONDS`). Someone who takes longer to type the code gets a plain 401 without a `code`.
@@ -43,10 +44,21 @@ answers to typed flags on the action result:
 | 401 `totp_invalid`, or a code that is not six digits | `totpInvalid: true`        | "That code did not work", field cleared                               |
 | 429                                                  | `rateLimited: true`        | "Too many attempts", wait a few minutes                               |
 | 5xx, unreachable, backend not configured             | `serviceUnavailable: true` | "Sign-in is unavailable right now"                                    |
-| other 401                                            | none (generic)             | "Your sign-in may have timed out", go back                            |
+| other 401                                            | none (generic)             | Closes the code step, signs the browser out of Firebase, and shows "Your sign-in timed out. Sign in again." on the first step |
 
-A code that is not exactly six digits is refused in the action without calling the backend, so a typo does not spend
-the per-user code budget. The code and ID token are never logged; the action logs only the status and the stable `code`.
+The form checks that the code is six digits before it calls the action, and the action checks again: a non-six-digit
+code that bypasses the form is refused without calling the backend, so a typo never spends the per-user code budget
+(`totpCodeSchema` in `src/lib/utils/validation.ts` is the one rule). The code and ID token are never logged. For
+two-factor refusals the action logs only the status and the stable `code`; the generic failure path also logs the
+backend's error text.
+
+Leaving the code step without signing in (Back, a sign-in too old to finish, the page going away) signs the Firebase
+client out of the browser, so an abandoned sign-in leaves no refresh token behind. Once the first sign-in is too old
+(five minutes) every retry would fail and still count against the sign-in limit, so the step closes instead of retrying.
+
+Changing a password signs a 2FA user out: `restoreSessionWithNewPassword` (`src/lib/firebase/reauth.ts`) signs in again
+with the new password and calls `verifyTokenAction(idToken)` without a code, gets `totpRequired` and returns false, so
+the Security page signs the person out and sends them to `/login`, where they sign in with a code.
 The code step also serves Google and GitHub sign-in (`LoginPanel` hands over the ID token from either). The sign-up page
 has no code step: a 2FA account that starts a provider sign-in there is told to sign in on the login page.
 
