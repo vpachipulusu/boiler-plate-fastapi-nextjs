@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { logger } from '@/lib/logger';
 import { offerFormSchema } from '@/lib/admin-catalogue/offer-schema';
 import {
   isOfferAction,
@@ -30,10 +31,9 @@ import { ADMIN_REQUEST_FAILED_MESSAGE } from '@/lib/api/admin-errors';
  */
 
 export type OfferSavedData = { id: string; slug: string; status: OfferStatus };
-export type OfferActionData = OfferSavedData & { lastVerifiedAt: string | null };
+export type OfferActionData = OfferSavedData;
 
 const ADMIN_OFFERS_PATH = '/admin/offers';
-const MAX_NOTE_LENGTH = 500;
 
 function refreshAdminPages(offerId: string): void {
   revalidatePath(ADMIN_OFFERS_PATH);
@@ -52,6 +52,11 @@ export async function createOfferAction(
     if (!result.success)
       return failed(result, OFFER_NOT_FOUND_MESSAGE, 'Admin create offer failed');
 
+    // The id goes straight into the browser's router.push: only a plain id is ever handed back.
+    if (!resourceIdSchema.safeParse(result.data.id).success) {
+      logger.error('Admin create offer: the API returned an unusable id');
+      return { success: false, error: ADMIN_REQUEST_FAILED_MESSAGE };
+    }
     revalidatePath(ADMIN_OFFERS_PATH);
     const { id, slug, status } = result.data;
     return { success: true, data: { id, slug, status: status as OfferStatus } };
@@ -81,28 +86,20 @@ export async function updateOfferAction(
 /** Publish, unpublish, expire, archive or verify. Every one can change what visitors see, so all refresh it. */
 export async function offerLifecycleAction(
   offerId: string,
-  action: OfferAction,
-  note?: string
+  action: OfferAction
 ): Promise<CatalogueActionResult<OfferActionData>> {
   return asAdmin(async () => {
     if (!resourceIdSchema.safeParse(offerId).success) return notFound(OFFER_NOT_FOUND_MESSAGE);
     if (!isOfferAction(action)) return { success: false, error: ADMIN_REQUEST_FAILED_MESSAGE };
 
-    const result = await runAdminOfferAction(
-      offerId,
-      action,
-      typeof note === 'string' ? note.trim().slice(0, MAX_NOTE_LENGTH) : undefined
-    );
+    const result = await runAdminOfferAction(offerId, action);
     if (!result.success) {
       return failed(result, OFFER_NOT_FOUND_MESSAGE, `Admin offer ${action} failed`);
     }
 
     refreshAdminPages(offerId);
     refreshPublicCatalogue(result.data.slug);
-    const { id, slug, status, last_verified_at: lastVerifiedAt } = result.data;
-    return {
-      success: true,
-      data: { id, slug, status: status as OfferStatus, lastVerifiedAt },
-    };
+    const { id, slug, status } = result.data;
+    return { success: true, data: { id, slug, status: status as OfferStatus } };
   });
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useRef, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { setCategoryEnabledAction } from '@/app/actions/admin/category-actions';
 import { setMerchantActiveAction } from '@/app/actions/admin/merchant-actions';
@@ -31,36 +31,50 @@ export function StateToggleButton({ kind, id, name, on }: StateToggleButtonProps
   const [isPending, startTransition] = useTransition();
   const words = WORDS[kind];
   const next = !on;
+  const busy = useRef(false);
 
   function toggle(): void {
+    if (busy.current) return;
+    busy.current = true;
     startTransition(async () => {
-      const result = await settleAction<{ success: boolean; error?: string }>(() =>
-        kind === 'category' ? setCategoryEnabledAction(id, next) : setMerchantActiveAction(id, next)
-      );
-      if (result.success) {
-        toast({ title: `${name} ${words.done[next ? 'on' : 'off']}` });
-      } else {
-        toast({
-          variant: 'destructive',
-          title: `Could not change ${name}`,
-          description: result.error,
-        });
+      try {
+        const result = await settleAction<{ success: boolean; error?: string }>(() =>
+          kind === 'category'
+            ? setCategoryEnabledAction(id, next)
+            : setMerchantActiveAction(id, next)
+        );
+        if (result.success) {
+          toast({ title: `${name} ${words.done[next ? 'on' : 'off']}` });
+        } else {
+          toast({
+            variant: 'destructive',
+            title: `Could not change ${name}`,
+            description: result.error,
+          });
+        }
+        router.refresh();
+      } finally {
+        busy.current = false;
       }
-      router.refresh();
     });
   }
 
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      className="min-h-11"
-      disabled={isPending}
-      onClick={toggle}
-    >
-      {on ? words.on : words.off}
-      <span className="sr-only"> {name}</span>
-    </Button>
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="min-h-11 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+        aria-disabled={isPending || undefined}
+        onClick={toggle}
+      >
+        {on ? words.on : words.off}
+        <span className="sr-only"> {name}</span>
+      </Button>
+      <span role="status" className="sr-only">
+        {isPending ? `Updating ${name}` : ''}
+      </span>
+    </>
   );
 }

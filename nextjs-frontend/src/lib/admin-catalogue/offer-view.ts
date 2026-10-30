@@ -1,5 +1,5 @@
 import { minorToPounds, type OfferFormValues } from './offer-schema';
-import type { OfferStatus } from './offer-status';
+import type { OfferRowStatus } from './offer-status';
 
 /**
  * Browser-facing shapes of admin offers, in the camelCase the admin UI uses. They carry only what the pages
@@ -13,7 +13,7 @@ export interface OfferRowView {
   categoryId: string;
   merchantId: string;
   offerType: string;
-  status: OfferStatus;
+  status: OfferRowStatus;
   featured: boolean;
   endAt: string | null;
   lastVerifiedAt: string | null;

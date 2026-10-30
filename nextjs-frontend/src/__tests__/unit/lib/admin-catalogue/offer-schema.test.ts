@@ -21,6 +21,7 @@ import {
   isOfferStatus,
   publicOfferPath,
   OFFER_STATUS_VARIANTS,
+  OFFER_STATUS_ICONS,
 } from '@/lib/admin-catalogue/offer-status';
 
 function valid(overrides: Partial<OfferFormValues> = {}): OfferFormValues {
@@ -66,6 +67,20 @@ describe('offerFormSchema', () => {
     const issue = firstIssue(valid(overrides as Partial<OfferFormValues>));
     expect(issue?.path[0]).toBe(path);
     expect(issue?.message).toBe(message);
+  });
+
+  it.each([
+    'https://user:pass@example.com/x',
+    'https://example.com:8443/x',
+    'https://:secret@example.com',
+  ])('rejects the source URL %s (user info or an unusual port)', (sourceUrl) => {
+    expect(firstIssue(valid({ sourceUrl }))?.path[0]).toBe('sourceUrl');
+  });
+
+  it('accepts https URLs with no user info, on the default port or 443', () => {
+    for (const sourceUrl of ['https://example.com/x?y=1', 'https://example.com:443/x']) {
+      expect(offerFormSchema.safeParse(valid({ sourceUrl })).success).toBe(true);
+    }
   });
 
   it('accepts blank optional fields and a clean slug', () => {
@@ -229,6 +244,9 @@ describe('offer status helpers', () => {
     ]);
     expect(availableOfferActions('EXPIRED')).toEqual(['verify', 'publish', 'archive']);
     expect(availableOfferActions('ARCHIVED')).toEqual([]);
+    expect(availableOfferActions('UNKNOWN')).toEqual([]);
+    expect(OFFER_STATUS_ICONS.DRAFT).toBeDefined();
+    expect(OFFER_STATUS_ICONS.PUBLISHED).toBeUndefined();
   });
 
   it('tints statuses good, neutral, warn and info', () => {
@@ -237,6 +255,7 @@ describe('offer status helpers', () => {
       DRAFT: 'neutral',
       EXPIRED: 'warn',
       ARCHIVED: 'info',
+      UNKNOWN: 'neutral',
     });
   });
 

@@ -1,17 +1,22 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createOfferAction, updateOfferAction } from '@/app/actions/admin/offer-actions';
-import { Button } from '@/components/ui/button';
 import { offerFormSchema, type OfferFormValues } from '@/lib/admin-catalogue/offer-schema';
 import { settleAction } from '@/lib/admin-catalogue/settle-action';
-import type { OfferStatus } from '@/lib/admin-catalogue/offer-status';
+import type { OfferRowStatus } from '@/lib/admin-catalogue/offer-status';
 import { useToast } from '@/hooks/use-toast';
-import { FormErrorSummary } from '../../_components/form-error-summary';
-import { useServerFormErrors } from '../../_components/use-form-submit';
+import { useReportFormDirty } from '../../_components/dirty-form-context';
+import { FormFooter } from '../../_components/form-footer';
+import {
+  useSavedMessage,
+  useServerFormErrors,
+  useSubmitOnce,
+} from '../../_components/use-server-form-errors';
+import { useUnsavedChanges } from '../../_components/use-unsaved-changes';
 import {
   BasicsFields,
   ClassificationFields,
@@ -26,7 +31,7 @@ import { StepsField } from './offer-steps-field';
 type OfferFormProps = {
   mode: 'create' | 'edit';
   offerId?: string;
-  status?: OfferStatus;
+  status?: OfferRowStatus;
   initialValues: OfferFormValues;
   categories: PickOption[];
   merchants: PickOption[];
@@ -47,7 +52,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  * Create or edit an offer. Validation runs in the browser with the same Zod schema the server action uses
  * (react-hook-form + Zod), then the action validates again and the API once more. The first invalid field
  * takes focus; a failure that belongs to no field fills a summary that takes focus; a successful save is
- * announced and focused.
+ * announced and focused. While edits are unsaved the page warns before it is closed, and the status buttons next
+ * to the form wait (they act on the saved version).
  */
 export function OfferForm({
   mode,
@@ -68,20 +74,14 @@ export function OfferForm({
     form.setError,
     form.setFocus
   );
-  const [saved, setSaved] = useState(false);
-  const savedRef = useRef<HTMLParagraphElement>(null);
-
-  useEffect(() => {
-    if (saved) savedRef.current?.focus();
-  }, [saved]);
-
-  // An edit after a save makes "Changes saved." stale.
-  // An edit after a save makes "Changes saved." stale, so it is shown only while the form is clean.
-  const showSaved = saved && !form.formState.isDirty;
+  const dirty = form.formState.isDirty;
+  const { showSaved, savedRef, markSaved, clearSaved } = useSavedMessage(dirty);
+  const submitOnce = useSubmitOnce();
+  useUnsavedChanges(dirty);
 
   async function onSubmit(values: OfferFormValues): Promise<void> {
     clearFormError();
-    setSaved(false);
+    clearSaved();
     const outcome = await settleAction(() =>
       mode === 'create' || !offerId ? createOfferAction(values) : updateOfferAction(offerId, values)
     );
@@ -95,16 +95,20 @@ export function OfferForm({
       return;
     }
     form.reset(values);
-    setSaved(true);
+    markSaved();
     router.refresh();
   }
 
   const submitting = form.formState.isSubmitting;
-  const slug = status ? form.getValues('slug') : undefined;
+  useReportFormDirty(dirty);
+  const slug = status ? initialValues.slug : undefined;
 
   return (
     <form
-      onSubmit={form.handleSubmit(onSubmit)}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submitOnce(() => form.handleSubmit(onSubmit)(event));
+      }}
       noValidate
       aria-label={mode === 'create' ? 'New offer' : 'Edit offer'}
       className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]"
@@ -129,22 +133,16 @@ export function OfferForm({
           <ScheduleFields form={form} />
         </Section>
 
-        <FormErrorSummary ref={summaryRef} message={formError} />
-        {showSaved ? (
-          <p
-            ref={savedRef}
-            tabIndex={-1}
-            role="status"
-            className="rounded-lg border border-good-foreground/40 bg-good p-3 text-sm font-medium text-good-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Changes saved.
-          </p>
-        ) : null}
-        {readOnly ? null : (
-          <Button type="submit" disabled={submitting}>
-            {submitting ? 'Saving…' : mode === 'create' ? 'Create draft' : 'Save changes'}
-          </Button>
-        )}
+        <FormFooter
+          error={formError}
+          summaryRef={summaryRef}
+          showSaved={showSaved}
+          savedRef={savedRef}
+          dirty={dirty}
+          submitting={submitting}
+          submitLabel={mode === 'create' ? 'Create draft' : 'Save changes'}
+          readOnly={readOnly}
+        />
       </fieldset>
 
       <div className="lg:sticky lg:top-24 lg:self-start">

@@ -4,23 +4,18 @@ import Link from 'next/link';
 import { useWatch, type Control } from 'react-hook-form';
 import { ExternalLink } from 'lucide-react';
 import { OfferArt } from '@/components/catalogue/offer-art';
-import { StatusPill } from '@/components/ui/status-pill';
 import { offerTypeLabel } from '@/lib/admin-catalogue/offer-labels';
 import { poundsToMinor, type OfferFormValues } from '@/lib/admin-catalogue/offer-schema';
-import {
-  OFFER_STATUS_LABELS,
-  OFFER_STATUS_VARIANTS,
-  publicOfferPath,
-  type OfferStatus,
-} from '@/lib/admin-catalogue/offer-status';
+import { publicOfferPath, type OfferRowStatus } from '@/lib/admin-catalogue/offer-status';
 import type { Tint } from '@/lib/catalogue/types';
 import type { PickOption } from './offer-form-fields';
+import { OfferStatusPill } from './offer-status-pill';
 
 type OfferPreviewCardProps = {
   control: Control<OfferFormValues>;
   merchants: PickOption[];
   /** Absent while creating: nothing exists to link to yet. */
-  status?: OfferStatus;
+  status?: OfferRowStatus;
   slug?: string;
 };
 
@@ -49,11 +44,7 @@ export function OfferPreviewCard({ control, merchants, status, slug }: OfferPrev
         <h2 id="offer-preview-heading" className="text-sm font-semibold">
           Card preview
         </h2>
-        {status ? (
-          <StatusPill variant={OFFER_STATUS_VARIANTS[status]}>
-            {OFFER_STATUS_LABELS[status]}
-          </StatusPill>
-        ) : null}
+        {status ? <OfferStatusPill status={status} /> : null}
       </div>
       <OfferArt
         image={{
@@ -79,7 +70,7 @@ export function OfferPreviewCard({ control, merchants, status, slug }: OfferPrev
         <Link
           href={publicPath}
           target="_blank"
-          rel="noopener"
+          rel="noopener noreferrer"
           className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-accent-ink underline underline-offset-4"
         >
           View the live page

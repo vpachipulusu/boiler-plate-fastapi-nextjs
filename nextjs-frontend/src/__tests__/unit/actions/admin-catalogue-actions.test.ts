@@ -295,10 +295,9 @@ describe('offer actions', () => {
           id: 'o1',
           slug: 'free-coffee',
           status: 'PUBLISHED',
-          lastVerifiedAt: '2026-01-02T00:00:00Z',
         },
       });
-      expect(mocks.runAdminOfferAction).toHaveBeenCalledWith('o1', action, undefined);
+      expect(mocks.runAdminOfferAction).toHaveBeenCalledWith('o1', action);
       expect(mocks.revalidatePath).toHaveBeenCalledWith('/admin/offers');
       expect(mocks.revalidateCatalogue).toHaveBeenCalledWith([
         '/freebies',
@@ -313,20 +312,13 @@ describe('offer actions', () => {
     expect(mocks.runAdminOfferAction).not.toHaveBeenCalled();
   });
 
-  it('ignores a verify note that is not a string', async () => {
-    mocks.runAdminOfferAction.mockResolvedValue(ok(OFFER));
-    await expect(offerLifecycleAction('o1', 'verify', { evil: 1 } as never)).resolves.toMatchObject(
-      {
-        success: true,
-      }
-    );
-    expect(mocks.runAdminOfferAction.mock.calls[0][2]).toBeUndefined();
-  });
+  it('does not hand a malformed id from the API back to the browser router', async () => {
+    mocks.createAdminOffer.mockResolvedValue(ok({ ...OFFER, id: '../../admin' }));
 
-  it('trims and caps the verify note', async () => {
-    mocks.runAdminOfferAction.mockResolvedValue(ok(OFFER));
-    await offerLifecycleAction('o1', 'verify', `  ${'n'.repeat(600)}  `);
-    expect(mocks.runAdminOfferAction.mock.calls[0][2]).toBe('n'.repeat(500));
+    const result = await createOfferAction(offerInput);
+
+    expect(result).toEqual({ success: false, error: 'Something went wrong. Please try again.' });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
   it('lists the unmet publish rules and refreshes nothing when publish is blocked', async () => {

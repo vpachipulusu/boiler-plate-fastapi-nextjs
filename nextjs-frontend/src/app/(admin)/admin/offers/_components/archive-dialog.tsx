@@ -1,5 +1,6 @@
 'use client';
 
+import type { RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -15,16 +16,30 @@ type ArchiveDialogProps = {
   onOpenChange: (open: boolean) => void;
   offerTitle: string;
   onConfirm: () => void;
+  /** Where focus goes when the dialog closes: the control that started the archive. */
+  returnFocusTo: RefObject<HTMLElement | null>;
 };
 
 /**
  * Archiving is the one lifecycle step with no way back in the admin (there is no unarchive route), so it asks
- * first. The dialog traps focus and returns it to the control that opened it.
+ * first. The dialog traps focus. It was opened from a menu item or a button that may be gone by the time it
+ * closes, so focus is returned to the stable control named by `returnFocusTo`.
  */
-export function ArchiveDialog({ open, onOpenChange, offerTitle, onConfirm }: ArchiveDialogProps) {
+export function ArchiveDialog({
+  open,
+  onOpenChange,
+  offerTitle,
+  onConfirm,
+  returnFocusTo,
+}: ArchiveDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          returnFocusTo.current?.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Archive this offer?</DialogTitle>
           <DialogDescription>

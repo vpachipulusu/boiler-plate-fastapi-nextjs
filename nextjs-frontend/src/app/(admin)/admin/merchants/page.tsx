@@ -17,6 +17,7 @@ import { logCatalogueFailure } from '@/lib/api/admin-catalogue-log';
 import { EmptyCell } from '../_components/empty-cell';
 import { formatAdminDate } from '../_components/format-admin-date';
 import { InlineError } from '../_components/inline-error';
+import { requireAdminPage } from '../_lib/require-admin-page';
 import { StateToggleButton } from '../_components/state-toggle-button';
 
 export const metadata = { title: 'Merchants' };
@@ -24,6 +25,7 @@ export const metadata = { title: 'Merchants' };
 const MERCHANTS_PATH = '/admin/merchants';
 
 export default async function AdminMerchantsPage() {
+  await requireAdminPage();
   const result = await fetchAdminMerchants();
   if (!result.success) logCatalogueFailure('Admin merchants page: list failed', result);
 
@@ -78,7 +80,7 @@ function MerchantsTable({
       <h2 id="merchants-heading" className="mb-3 text-lg font-semibold">
         All merchants ({total})
       </h2>
-      <Table stacked>
+      <Table stacked aria-labelledby="merchants-heading">
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>

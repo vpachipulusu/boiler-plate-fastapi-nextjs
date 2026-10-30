@@ -188,17 +188,14 @@ describe('admin catalogue wrappers', () => {
       expect(new URL(request.url).pathname).toBe(path);
     });
 
-    it('sends the verify note only when there is one', async () => {
+    it('sends an empty body with verify (the UI does not use the optional note)', async () => {
       fetchMock.mockResolvedValue(jsonResponse({ success: true, data: OFFER_OUT }));
-      await runAdminOfferAction('o1', 'verify', 'checked the terms');
-      expect(await fetchMock.mock.calls[0][0].json()).toEqual({ note: 'checked the terms' });
       await runAdminOfferAction('o1', 'verify');
-      expect(await fetchMock.mock.calls[1][0].json()).toEqual({});
+      expect(await fetchMock.mock.calls[0][0].json()).toEqual({});
     });
 
-    it('counts offers per status from the list totals without inventing numbers', async () => {
+    it('counts offers per status from the list totals, summing the total, without inventing numbers', async () => {
       const totals: Record<string, number> = {
-        '': 10,
         DRAFT: 3,
         PUBLISHED: 4,
         EXPIRED: 2,
@@ -206,6 +203,7 @@ describe('admin catalogue wrappers', () => {
       };
       fetchMock.mockImplementation(async (request) => {
         const status = new URL(request.url).searchParams.get('status') ?? '';
+        expect(status).not.toBe('');
         return jsonResponse({
           success: true,
           data: { offers: [], total_count: totals[status], limit: 1, offset: 0 },
@@ -218,7 +216,7 @@ describe('admin catalogue wrappers', () => {
         success: true,
         data: { TOTAL: 10, DRAFT: 3, PUBLISHED: 4, EXPIRED: 2, ARCHIVED: 1 },
       });
-      expect(fetchMock).toHaveBeenCalledTimes(5);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
     });
 
     it('fails the whole count read when one call fails', async () => {
@@ -252,9 +250,9 @@ describe('admin catalogue wrappers', () => {
       expect(JSON.stringify(detail)).not.toContain('secret-track');
     });
 
-    it('reads an unknown status as a draft, the safest reading', () => {
+    it('keeps an unknown status as UNKNOWN instead of guessing a draft', () => {
       expect(toOfferRow({ ...OFFER_SUMMARY, status: 'SOMETHING_NEW' } as never).status).toBe(
-        'DRAFT'
+        'UNKNOWN'
       );
     });
   });

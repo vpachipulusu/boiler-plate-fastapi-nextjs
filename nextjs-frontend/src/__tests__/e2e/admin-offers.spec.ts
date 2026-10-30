@@ -23,6 +23,9 @@ import {
  *     non-admin), the session values a backend started with fastapi_backend/tests/e2e_identity_server.py accepts.
  *     See docs/developer/admin-offers.md ("Journey 4").
  *
+ * Each run leaves one ARCHIVED offer titled "Journey Four Sample <timestamp>" behind (the journey ends by
+ * archiving it, which cannot be undone in the admin), so use a throwaway database.
+ *
  * Without the flag, or without an admin session, the whole file skips.
  */
 
@@ -34,6 +37,10 @@ test.skip(
   process.env.E2E_LIVE_CATALOGUE !== '1' || !HAS_ADMIN_SESSION,
   'Needs E2E_LIVE_CATALOGUE=1, a seeded backend and an admin session (see the header of this file)'
 );
+
+// Names from commands/seed_catalogue.py (both are created by the seed command).
+const SEEDED_CATEGORY = 'Food & drink';
+const SEEDED_MERCHANT = 'Good Beans (Sample)';
 
 const WIDTHS = [320, 390, 1440] as const;
 const ADMIN_PAGES = [
@@ -73,8 +80,8 @@ test.describe('Journey 4: draft, verify, publish, see it live, unpublish', () =>
 
     await page.getByLabel(/^Title/).fill(title);
     await page.getByLabel(/^Summary/).fill('A sample created by the admin journey test.');
-    await page.getByLabel(/^Category/).selectOption({ index: 1 });
-    await page.getByLabel(/^Merchant/).selectOption({ index: 1 });
+    await page.getByLabel(/^Category/).selectOption({ label: SEEDED_CATEGORY });
+    await page.getByLabel(/^Merchant/).selectOption({ label: SEEDED_MERCHANT });
     await page.getByLabel(/^Picture label/).fill('journey');
     await page.getByLabel(/^Picture description/).fill('A plain test illustration');
     await page.getByLabel(/^Who can claim/).fill('Anyone in the UK.');
@@ -96,8 +103,8 @@ test.describe('Journey 4: draft, verify, publish, see it live, unpublish', () =>
     await waitForPageReady(page);
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();
     await expect(
-      page.getByRole('heading', { level: 1 }).locator('..').getByText('Draft')
-    ).toBeVisible();
+      page.getByRole('group', { name: 'Offer title and status' }).getByTestId('offer-status')
+    ).toHaveText('Draft');
     slug = await page.getByLabel(/^Slug/).inputValue();
     expect(slug).toMatch(/^journey-four-sample-\d+$/);
     // A draft has no public page, only the in-admin preview card.
@@ -144,13 +151,13 @@ test.describe('Journey 4: draft, verify, publish, see it live, unpublish', () =>
   }) => {
     await page.goto(`/admin/offers?q=${encodeURIComponent(title)}`);
     await waitForPageReady(page);
-    const row = page.getByRole('row', { name: new RegExp(title) });
-    await expect(row.getByText('Published')).toBeVisible();
+    const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: title }) });
+    await expect(row.getByTestId('offer-status')).toHaveText('Published');
 
     await row.getByRole('button', { name: `Open menu for ${title}` }).click();
     await page.getByRole('menuitem', { name: 'Unpublish' }).click();
     await expectToast(page, 'Offer unpublished and back to draft');
-    await expect(row.getByText('Draft')).toBeVisible();
+    await expect(row.getByTestId('offer-status')).toHaveText('Draft');
 
     const gone = await page.request.get(`/freebies/${slug}`);
     expect(gone.status()).toBe(404);
@@ -161,7 +168,7 @@ test.describe('Journey 4: draft, verify, publish, see it live, unpublish', () =>
   test('archives it after a confirmation, leaving no way to edit it', async ({ page }) => {
     await page.goto(`/admin/offers?q=${encodeURIComponent(title)}`);
     await waitForPageReady(page);
-    const row = page.getByRole('row', { name: new RegExp(title) });
+    const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: title }) });
 
     await row.getByRole('button', { name: `Open menu for ${title}` }).click();
     await page.getByRole('menuitem', { name: 'Archive' }).click();
@@ -169,7 +176,7 @@ test.describe('Journey 4: draft, verify, publish, see it live, unpublish', () =>
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: 'Archive offer' }).click();
     await expectToast(page, 'Offer archived');
-    await expect(row.getByText('Archived')).toBeVisible();
+    await expect(row.getByTestId('offer-status')).toHaveText('Archived');
 
     await page.goto(offerPath);
     await waitForPageReady(page);
@@ -202,7 +209,7 @@ test.describe('Admin catalogue pages', () => {
     await expect(page).toHaveURL(/status=published/);
     await expect(page.getByRole('link', { name: 'Published', exact: true })).toHaveAttribute(
       'aria-current',
-      'page'
+      'true'
     );
   });
 
@@ -238,10 +245,8 @@ test.describe('Admin catalogue pages', () => {
             ),
           ]
             .filter((el) => el.offsetParent !== null)
-            .filter(
-              (el) => !(el instanceof HTMLInputElement) || !['checkbox', 'hidden'].includes(el.type)
-            )
-            .filter((el) => !el.closest('p, li > span, td > div > span'))
+            // The only exemption: a checkbox is a small box inside a 44px-tall label, which is the target.
+            .filter((el) => !el.matches('input[type="checkbox"], input[type="hidden"]'))
             .map((el) => ({
               tag: el.tagName,
               name: el.textContent?.trim().slice(0, 30),

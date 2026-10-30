@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { emptyOfferFormValues } from '@/lib/admin-catalogue/offer-schema';
 import { InlineError } from '../../_components/inline-error';
-import { loadCategoryOptions, loadMerchantOptions } from '../../_lib/pick-lists';
+import { loadCategoryOptions, loadMerchantOptions, TRUNCATED_NOTICE } from '../../_lib/pick-lists';
+import { requireAdminPage } from '../../_lib/require-admin-page';
+
 import { OfferForm } from '../_components/offer-form';
 
 export const metadata = { title: 'Add freebie' };
@@ -10,6 +12,7 @@ export const metadata = { title: 'Add freebie' };
 const NEW_OFFER_PATH = '/admin/offers/new';
 
 export default async function NewOfferPage() {
+  await requireAdminPage();
   const [categories, merchants] = await Promise.all([loadCategoryOptions(), loadMerchantOptions()]);
 
   return (
@@ -46,12 +49,17 @@ export default async function NewOfferPage() {
           must be added first.
         </p>
       ) : (
-        <OfferForm
-          mode="create"
-          initialValues={emptyOfferFormValues()}
-          categories={categories.options}
-          merchants={merchants.options}
-        />
+        <>
+          {categories.truncated || merchants.truncated ? (
+            <p className="text-sm text-muted-foreground">{TRUNCATED_NOTICE}</p>
+          ) : null}
+          <OfferForm
+            mode="create"
+            initialValues={emptyOfferFormValues()}
+            categories={categories.options}
+            merchants={merchants.options}
+          />
+        </>
       )}
     </div>
   );

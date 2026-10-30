@@ -4,6 +4,7 @@ import {
   isOfferStatus,
   OFFER_STATUSES,
   type OfferAction,
+  type OfferRowStatus,
   type OfferStatus,
 } from '@/lib/admin-catalogue/offer-status';
 import type {
@@ -11,6 +12,7 @@ import type {
   OfferLinkView,
   OfferRowView,
 } from '@/lib/admin-catalogue/offer-view';
+import { ADMIN_OFFERS_PAGE_SIZE } from '@/lib/admin-catalogue/paging';
 import { callBackend, type ApiResult } from './server';
 import {
   adminArchiveOffer,
@@ -35,7 +37,7 @@ import {
  * admin's permission on every call (`offers.read`, `offers.write`, `offers.publish`) and writes the audit log.
  */
 
-export const ADMIN_OFFERS_PAGE_SIZE = 25;
+export { ADMIN_OFFERS_PAGE_SIZE };
 const MAX_SEARCH_LENGTH = 100;
 const COUNT_ONLY_LIMIT = 1;
 
@@ -75,8 +77,8 @@ export function patchAdminOffer(offerId: string, body: UpdateOfferRequest) {
   return callBackend((client) => adminUpdateOffer({ client, path: { offer_id: offerId }, body }));
 }
 
-/** The lifecycle calls. `verify` may carry a note that goes to the audit trail only. */
-export function runAdminOfferAction(offerId: string, action: OfferAction, note?: string) {
+/** The lifecycle calls. (The API's optional verify note is not used by this UI.) */
+export function runAdminOfferAction(offerId: string, action: OfferAction) {
   const path = { offer_id: offerId };
   return callBackend((client) => {
     switch (action) {
@@ -89,7 +91,7 @@ export function runAdminOfferAction(offerId: string, action: OfferAction, note?:
       case 'archive':
         return adminArchiveOffer({ client, path });
       case 'verify':
-        return adminVerifyOffer({ client, path, body: note ? { note } : {} });
+        return adminVerifyOffer({ client, path, body: {} });
     }
   });
 }
@@ -97,26 +99,27 @@ export function runAdminOfferAction(offerId: string, action: OfferAction, note?:
 export type OfferStatusCounts = Record<OfferStatus | 'TOTAL', number>;
 
 /**
- * Offer counts for the stats strip, read from the list endpoint's `total_count` (a one-row page per status plus
- * one without a filter). Nothing is estimated: if any call fails the whole read fails and the strip says so.
+ * Offer counts for the stats strip, read from the list endpoint's `total_count` (a one-row page per status). The
+ * total is the sum of the four statuses, so the strip is always consistent with itself. Nothing is estimated: if
+ * any call fails the whole read fails and the strip says so.
  */
 export async function fetchOfferStatusCounts(): Promise<ApiResult<OfferStatusCounts>> {
-  const [total, ...byStatus] = await Promise.all([
-    fetchAdminOffers({ limit: COUNT_ONLY_LIMIT }),
-    ...OFFER_STATUSES.map((status) => fetchAdminOffers({ status, limit: COUNT_ONLY_LIMIT })),
-  ]);
-  if (!total.success) return total;
-  const counts: Partial<OfferStatusCounts> = { TOTAL: total.data.total_count };
-  for (const [index, result] of byStatus.entries()) {
+  const results = await Promise.all(
+    OFFER_STATUSES.map((status) => fetchAdminOffers({ status, limit: COUNT_ONLY_LIMIT }))
+  );
+  const counts: Partial<OfferStatusCounts> = {};
+  let total = 0;
+  for (const [index, result] of results.entries()) {
     if (!result.success) return result;
     counts[OFFER_STATUSES[index]] = result.data.total_count;
+    total += result.data.total_count;
   }
-  return { success: true, data: counts as OfferStatusCounts };
+  return { success: true, data: { ...(counts as Record<OfferStatus, number>), TOTAL: total } };
 }
 
-/** An unknown status from a newer API is shown as a draft, the safest reading (nothing is public). */
-function readStatus(value: string): OfferStatus {
-  return isOfferStatus(value) ? value : 'DRAFT';
+/** A status this UI does not know is kept as UNKNOWN: shown plainly and never offered an action. */
+function readStatus(value: string): OfferRowStatus {
+  return isOfferStatus(value) ? value : 'UNKNOWN';
 }
 
 export function toOfferRow(offer: OfferSummaryOut): OfferRowView {

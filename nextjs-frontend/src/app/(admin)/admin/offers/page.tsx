@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { NativeSelect } from '../_components/native-select';
 import { TableSkeleton } from '../_components/table-skeleton';
 import { loadCategoryOptions } from '../_lib/pick-lists';
+import { requireAdminPage } from '../_lib/require-admin-page';
 import { OffersResults } from './offers-results';
 import { OFFERS_COLUMNS } from './offers-table';
 import { OfferStatsSkeleton, OfferStatsStrip } from './offers-stats';
@@ -24,7 +25,10 @@ const CHIP_BASE =
   'inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold transition-colors hover:bg-secondary';
 const CHIP_CURRENT = 'border-accent-ink bg-good text-good-foreground';
 
+export const metadata = { title: 'Freebies' };
+
 export default async function AdminOffersPage({ searchParams }: { searchParams: SearchParams }) {
+  await requireAdminPage();
   const query = parseOffersQuery(await searchParams);
   const categories = await loadCategoryOptions();
   const chips = [
@@ -60,7 +64,7 @@ export default async function AdminOffersPage({ searchParams }: { searchParams: 
                 <Link
                   key={label}
                   href={offersHref({ ...query, status, page: 1 })}
-                  aria-current={current ? 'page' : undefined}
+                  aria-current={current ? 'true' : undefined}
                   className={cn(CHIP_BASE, current && CHIP_CURRENT)}
                 >
                   {label}
@@ -120,9 +124,15 @@ export default async function AdminOffersPage({ searchParams }: { searchParams: 
               </Button>
             </div>
           </form>
-          {categories.ok ? null : (
+          {categories.ok ? (
+            categories.truncated ? (
+              <p className="text-sm text-muted-foreground">
+                The category filter lists only the first 100 categories.
+              </p>
+            ) : null
+          ) : (
             <p role="alert" className="text-sm text-destructive">
-              The category filter could not be loaded. {categories.message}
+              The category filter could not be loaded.
             </p>
           )}
         </CardContent>

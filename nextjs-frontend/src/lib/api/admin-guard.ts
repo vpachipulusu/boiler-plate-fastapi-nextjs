@@ -7,32 +7,51 @@ import { resolveAdminAccess } from './admin-access';
 import { ADMIN_FORBIDDEN_MESSAGE, ADMIN_UNAVAILABLE_MESSAGE } from './admin-errors';
 
 /**
- * The server-action gate for admin writes: the caller must hold a verified session AND be an admin before
- * anything else runs. It mirrors the /admin layout (the proxy cannot do this, it has no Node.js), and it is a
- * second line of defence: the backend still authorises every call with the admin's own permission, so a missing
- * `offers.publish` or `categories.write` is refused there with a 403.
+ * The server-side admin gate for admin writes and for the catalogue pages: the caller must hold a verified session
+ * AND be an admin before anything else runs. It mirrors the /admin layout (the proxy cannot do this, it has no
+ * Node.js). The layout and its pages render in parallel, so a page cannot rely on the layout's redirect to keep
+ * it from fetching: each page asks again (`requireAdminPage`). The backend still authorises every call with the
+ * admin's own permission, so a missing `offers.publish` or `categories.write` is refused there with a 403.
  *
- * Fails closed: only a confirmed admin passes. The result carries a curated message, never backend text.
+ * Fails closed: only a confirmed admin passes. The result carries a curated message, never backend text, and a
+ * `reason` so a page can redirect exactly as the layout does.
  */
 
-export type AdminGateResult = { ok: true } | { ok: false; error: string };
+export type AdminGateDenial =
+  /** No usable session: the layout sends the visitor to /login. */
+  | 'no-session'
+  /** A session whose email is not verified: /verify-email. */
+  | 'unverified'
+  /** A session the backend rejected: the layout clears the cookie. */
+  | 'rejected'
+  /** A signed-in user who is not an admin: /dashboard. */
+  | 'not-admin'
+  /** The session or admin check could not be completed: an error page, never a redirect. */
+  | 'unavailable';
 
-const DENIED: AdminGateResult = { ok: false, error: ADMIN_FORBIDDEN_MESSAGE };
+export type AdminGateResult = { ok: true } | { ok: false; error: string; reason: AdminGateDenial };
+
+function denied(reason: AdminGateDenial): AdminGateResult {
+  const error = reason === 'unavailable' ? ADMIN_UNAVAILABLE_MESSAGE : ADMIN_FORBIDDEN_MESSAGE;
+  return { ok: false, error, reason };
+}
 
 export async function requireAdminSession(): Promise<AdminGateResult> {
   try {
     await verifyVerifiedSessionCookie();
   } catch (error) {
-    if (isSessionVerificationError(error) || isEmailNotVerifiedError(error)) return DENIED;
-    logger.error('Admin action: session check failed');
-    return { ok: false, error: ADMIN_UNAVAILABLE_MESSAGE };
+    if (isEmailNotVerifiedError(error)) return denied('unverified');
+    if (isSessionVerificationError(error)) return denied('no-session');
+    logger.error('Admin gate: session check failed');
+    return denied('unavailable');
   }
 
   const access = await resolveAdminAccess();
   if (access.status === 'admin') return { ok: true };
+  if (access.status === 'session-rejected') return denied('rejected');
   if (access.status === 'error') {
-    logger.error('Admin action: admin check failed');
-    return { ok: false, error: ADMIN_UNAVAILABLE_MESSAGE };
+    logger.error('Admin gate: admin check failed');
+    return denied('unavailable');
   }
-  return DENIED;
+  return denied('not-admin');
 }

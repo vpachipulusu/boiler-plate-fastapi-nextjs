@@ -1,22 +1,33 @@
+import { Pencil, type LucideIcon } from 'lucide-react';
 import type { StatusPillVariant } from '@/components/ui/status-pill';
 
 /** Offer lifecycle states as the admin catalogue API reports them. */
 export const OFFER_STATUSES = ['DRAFT', 'PUBLISHED', 'EXPIRED', 'ARCHIVED'] as const;
 export type OfferStatus = (typeof OFFER_STATUSES)[number];
 
-export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
+/** A status the API sent that this UI does not know (a newer API): shown neutral, never acted on. */
+export type OfferRowStatus = OfferStatus | 'UNKNOWN';
+
+export const OFFER_STATUS_LABELS: Record<OfferRowStatus, string> = {
   DRAFT: 'Draft',
   PUBLISHED: 'Published',
   EXPIRED: 'Expired',
   ARCHIVED: 'Archived',
+  UNKNOWN: 'Unknown',
 };
 
 /** Pill tints: good = Published, neutral = Draft, warn = Expired, info = Archived. */
-export const OFFER_STATUS_VARIANTS: Record<OfferStatus, StatusPillVariant> = {
+export const OFFER_STATUS_VARIANTS: Record<OfferRowStatus, StatusPillVariant> = {
   DRAFT: 'neutral',
   PUBLISHED: 'good',
   EXPIRED: 'warn',
   ARCHIVED: 'info',
+  UNKNOWN: 'neutral',
+};
+
+/** Only a draft overrides the pill's default icon (a pencil: not live yet, still being written). */
+export const OFFER_STATUS_ICONS: Partial<Record<OfferRowStatus, LucideIcon>> = {
+  DRAFT: Pencil,
 };
 
 export const OFFER_ACTIONS = ['publish', 'unpublish', 'expire', 'archive', 'verify'] as const;
@@ -35,14 +46,15 @@ export const OFFER_ACTION_LABELS: Record<OfferAction, string> = {
  * (`TRANSITIONS` in `app/services/offer_lifecycle.py`, documented in backend-admin-catalogue.md) and is a UI
  * hint only: the API refuses anything else with 409 `illegal_transition`, so a stale menu is harmless.
  */
-const ACTIONS_BY_STATUS: Record<OfferStatus, readonly OfferAction[]> = {
+const ACTIONS_BY_STATUS: Record<OfferRowStatus, readonly OfferAction[]> = {
   DRAFT: ['verify', 'publish', 'archive'],
   PUBLISHED: ['verify', 'unpublish', 'expire', 'archive'],
   EXPIRED: ['verify', 'publish', 'archive'],
   ARCHIVED: [],
+  UNKNOWN: [],
 };
 
-export function availableOfferActions(status: OfferStatus): readonly OfferAction[] {
+export function availableOfferActions(status: OfferRowStatus): readonly OfferAction[] {
   return ACTIONS_BY_STATUS[status];
 }
 
@@ -55,6 +67,6 @@ export function isOfferAction(value: unknown): value is OfferAction {
 }
 
 /** The public page exists only for a published offer; every other status is a 404 or an "ended" page. */
-export function publicOfferPath(status: OfferStatus, slug: string): string | null {
+export function publicOfferPath(status: OfferRowStatus, slug: string): string | null {
   return status === 'PUBLISHED' ? `/freebies/${slug}` : null;
 }

@@ -5,8 +5,8 @@ import type { ApiResult } from './server';
 
 type FailedResult = Extract<ApiResult<unknown>, { success: false }>;
 
-/** Answers the admin can fix or expects (denied, missing, refused by a rule, invalid): not worth an error log. */
-const EXPECTED_STATUSES: readonly number[] = [401, 403, 404, 409, 422];
+/** Answers the admin can fix or expects (denied, missing, refused by a rule, invalid, rate limited): not worth an error log. */
+const EXPECTED_STATUSES: readonly number[] = [401, 403, 404, 409, 422, 429];
 
 /**
  * Logs a failed admin catalogue call that nobody could have expected (5xx, unreachable). It records the

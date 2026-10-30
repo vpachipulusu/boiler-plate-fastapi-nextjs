@@ -9,6 +9,7 @@ import { OffersTable, type OfferTableRow } from './offers-table';
 import { offersHref, OFFERS_PATH, type OffersQuery } from './offers-query';
 
 const UNKNOWN_NAME = 'Unknown';
+const BEYOND_LIST_NAME = 'Not in the first 100';
 
 function emptyMessage({ q, status, category, page }: OffersQuery): string {
   if (page > 1) return 'No offers on this page';
@@ -48,13 +49,17 @@ export async function OffersResults({ query }: { query: OffersQuery }) {
 
   const categoryNames = optionNames(categories);
   const merchantNames = optionNames(merchants);
+  // A name missing from a full list is not "unknown": it is one of the rows past the 100 the lists load.
+  const missingCategory = categories.ok && categories.truncated ? BEYOND_LIST_NAME : UNKNOWN_NAME;
+  const missingMerchant = merchants.ok && merchants.truncated ? BEYOND_LIST_NAME : UNKNOWN_NAME;
   const rows: OfferTableRow[] = result.data.offers.map((offer) => ({
     ...toOfferRow(offer),
-    categoryName: categoryNames.get(offer.category_id) ?? UNKNOWN_NAME,
-    merchantName: merchantNames.get(offer.merchant_id) ?? UNKNOWN_NAME,
+    categoryName: categoryNames.get(offer.category_id) ?? missingCategory,
+    merchantName: merchantNames.get(offer.merchant_id) ?? missingMerchant,
   }));
   const total = result.data.total_count;
   const hasNext = query.page * ADMIN_OFFERS_PAGE_SIZE < total;
+  const pageCount = Math.max(Math.ceil(total / ADMIN_OFFERS_PAGE_SIZE), query.page);
   const filtered = Boolean(query.q || query.status || query.category);
 
   return (
@@ -82,7 +87,7 @@ export async function OffersResults({ query }: { query: OffersQuery }) {
         </>
       )}
       {(query.page > 1 || hasNext) && (
-        <nav aria-label="Pagination" className="flex justify-between pt-4">
+        <nav aria-label="Pagination" className="flex items-center justify-between gap-3 pt-4">
           {query.page > 1 ? (
             <Button variant="outline" asChild>
               <Link href={offersHref({ ...query, page: query.page - 1 })}>Previous</Link>
@@ -90,10 +95,15 @@ export async function OffersResults({ query }: { query: OffersQuery }) {
           ) : (
             <span />
           )}
-          {hasNext && (
+          <span className="text-sm text-muted-foreground">
+            Page {query.page} of {pageCount}
+          </span>
+          {hasNext ? (
             <Button variant="outline" asChild>
               <Link href={offersHref({ ...query, page: query.page + 1 })}>Next</Link>
             </Button>
+          ) : (
+            <span />
           )}
         </nav>
       )}

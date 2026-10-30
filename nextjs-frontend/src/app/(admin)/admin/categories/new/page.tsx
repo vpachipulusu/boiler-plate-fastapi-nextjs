@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { emptyCategoryFormValues } from '@/lib/admin-catalogue/category-schema';
+import { requireAdminPage } from '../../_lib/require-admin-page';
 import { CategoryForm } from '../category-form';
 
 export const metadata = { title: 'Add category' };
 
-export default function NewCategoryPage() {
+export default async function NewCategoryPage() {
+  await requireAdminPage();
   return (
     <div className="space-y-6">
       <div>

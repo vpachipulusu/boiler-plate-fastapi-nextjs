@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { emptyMerchantFormValues } from '@/lib/admin-catalogue/merchant-schema';
+import { requireAdminPage } from '../../_lib/require-admin-page';
 import { MerchantForm } from '../merchant-form';
 
 export const metadata = { title: 'Add merchant' };
 
-export default function NewMerchantPage() {
+export default async function NewMerchantPage() {
+  await requireAdminPage();
   return (
     <div className="space-y-6">
       <div>

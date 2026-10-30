@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { MoreHorizontal, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,14 +29,17 @@ type OfferRowActionsProps = {
 
 /**
  * The row menu: Edit, then the lifecycle steps the offer's status allows (Publish or Unpublish, Mark verified,
- * Expire, Archive). The list is a hint: the API refuses anything the status table does not allow.
+ * Expire, Archive). The list is a hint: the API refuses anything the status table does not allow. While a step
+ * runs the trigger is aria-disabled (it keeps focus) and a polite status says so.
  */
 export function OfferRowActions({ offerId, offerTitle, status }: OfferRowActionsProps) {
   const { run, isPending } = useOfferAction();
   const [confirmingArchive, setConfirmingArchive] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const actions = availableOfferActions(status);
 
   function choose(action: OfferAction): void {
+    if (isPending) return;
     if (action === 'archive') {
       setConfirmingArchive(true);
       return;
@@ -48,7 +51,12 @@ export function OfferRowActions({ offerId, offerTitle, status }: OfferRowActions
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="size-11 p-0 hover:bg-accent" disabled={isPending}>
+          <Button
+            ref={triggerRef}
+            variant="ghost"
+            className="size-11 p-0 hover:bg-accent aria-disabled:opacity-50"
+            aria-disabled={isPending || undefined}
+          >
             <span className="sr-only">Open menu for {offerTitle}</span>
             <MoreHorizontal aria-hidden="true" className="h-4 w-4" />
           </Button>
@@ -78,11 +86,15 @@ export function OfferRowActions({ offerId, offerTitle, status }: OfferRowActions
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+      <span role="status" className="sr-only">
+        {isPending ? `Updating ${offerTitle}` : ''}
+      </span>
       <ArchiveDialog
         open={confirmingArchive}
         onOpenChange={setConfirmingArchive}
         offerTitle={offerTitle}
         onConfirm={() => run(offerId, 'archive', offerTitle)}
+        returnFocusTo={triggerRef}
       />
     </>
   );

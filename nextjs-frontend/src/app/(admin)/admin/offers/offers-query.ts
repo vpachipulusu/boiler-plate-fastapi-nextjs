@@ -1,3 +1,4 @@
+import { ADMIN_OFFERS_PAGE_SIZE, MAX_OFFSET } from '@/lib/admin-catalogue/paging';
 import { OFFER_STATUSES, type OfferStatus } from '@/lib/admin-catalogue/offer-status';
 
 /** The list page's URL parameters: parsing, and the links that carry them (chips, pagination, retry). */
@@ -6,7 +7,7 @@ export const OFFERS_PATH = '/admin/offers';
 export const MAX_QUERY_LENGTH = 100;
 
 /** The API refuses an offset past 1,000,000, so a later page is the last one that can exist. */
-const MAX_PAGE = Math.floor(1_000_000 / 25) + 1;
+const MAX_PAGE = Math.floor(MAX_OFFSET / ADMIN_OFFERS_PAGE_SIZE) + 1;
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
 export type OffersQuery = {

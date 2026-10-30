@@ -53,3 +53,7 @@ export const loadMerchantOptions = cache(async (): Promise<PickListResult> => {
 export function optionNames(list: PickListResult): Map<string, string> {
   return new Map(list.ok ? list.options.map((option) => [option.id, option.name]) : []);
 }
+
+/** The wording of the notice shown when a list holds only the first page of rows. */
+export const TRUNCATED_NOTICE =
+  'Only the first 100 are listed here, so others cannot be chosen on this page.';

@@ -17,6 +17,7 @@ type FailedResult = Extract<ApiResult<unknown>, { success: false }>;
 export const OFFER_NOT_FOUND_MESSAGE = 'That offer no longer exists. Go back to the list.';
 export const CATEGORY_NOT_FOUND_MESSAGE = 'That category no longer exists. Go back to the list.';
 export const MERCHANT_NOT_FOUND_MESSAGE = 'That merchant no longer exists. Go back to the list.';
+export const RATE_LIMITED_MESSAGE = 'Too many requests. Wait a minute and try again.';
 export const INVALID_INPUT_MESSAGE = 'Some values were rejected. Check the form and try again.';
 export const INVALID_FORM_MESSAGE = 'Check the highlighted fields and try again.';
 
@@ -66,6 +67,7 @@ export function catalogueErrorMessage(result: FailedResult, notFoundMessage: str
   if (result.code !== undefined && CODE_MESSAGES[result.code] !== undefined) {
     return CODE_MESSAGES[result.code];
   }
+  if (result.status === 429) return RATE_LIMITED_MESSAGE;
   if (result.status === 422) return INVALID_INPUT_MESSAGE;
   if (result.status === 409) return ADMIN_REQUEST_FAILED_MESSAGE;
   return baseAdminErrorMessage(result, notFoundMessage);

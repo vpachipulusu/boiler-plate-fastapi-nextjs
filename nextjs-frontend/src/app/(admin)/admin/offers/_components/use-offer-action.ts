@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useRef, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { offerLifecycleAction } from '@/app/actions/admin/offer-actions';
 import type { OfferAction } from '@/lib/admin-catalogue/offer-status';
@@ -26,22 +26,34 @@ const FAILURE_TITLES: Record<OfferAction, string> = {
 /**
  * Runs an offer lifecycle action through its server action and reports the outcome in a toast (an announced,
  * dismissible message). The action refreshes the admin pages and the public catalogue; `router.refresh()` makes
- * the current page pick the change up straight away.
+ * the current page pick the change up straight away. Only one action runs at a time: a second request while one
+ * is in flight is ignored (the controls are aria-disabled, which keeps focus, so the guard is here as well).
  */
 export function useOfferAction() {
   const router = useRouter();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
+  const busy = useRef(false);
 
   function run(offerId: string, action: OfferAction, offerTitle: string): void {
+    if (busy.current) return;
+    busy.current = true;
     startTransition(async () => {
-      const result = await settleAction(() => offerLifecycleAction(offerId, action));
-      if (result.success) {
-        toast({ title: SUCCESS_TITLES[action], description: offerTitle });
-      } else {
-        toast({ variant: 'destructive', title: FAILURE_TITLES[action], description: result.error });
+      try {
+        const result = await settleAction(() => offerLifecycleAction(offerId, action));
+        if (result.success) {
+          toast({ title: SUCCESS_TITLES[action], description: offerTitle });
+        } else {
+          toast({
+            variant: 'destructive',
+            title: FAILURE_TITLES[action],
+            description: result.error,
+          });
+        }
+        router.refresh();
+      } finally {
+        busy.current = false;
       }
-      router.refresh();
     });
   }
 

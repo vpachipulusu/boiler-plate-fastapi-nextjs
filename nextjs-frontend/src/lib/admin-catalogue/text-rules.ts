@@ -37,12 +37,18 @@ export function isParagraphText(value: string): boolean {
 
 export const MAX_URL_LENGTH = 2048;
 
-/** A basic client-side check: an https URL with a host. The API applies the full rule set. */
+/** A client-side check: an https URL with a host, no user info and no unusual port. The API applies the full rule set. */
 export function isHttpsUrl(value: string): boolean {
   if (value.length > MAX_URL_LENGTH) return false;
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && url.hostname !== '';
+    return (
+      url.protocol === 'https:' &&
+      url.hostname !== '' &&
+      url.username === '' &&
+      url.password === '' &&
+      (url.port === '' || url.port === '443')
+    );
   } catch {
     return false;
   }

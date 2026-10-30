@@ -30,6 +30,10 @@ vi.mock('next/navigation', () => ({
 
 import { OfferRowActions } from '@/app/(admin)/admin/offers/_components/offer-row-actions';
 import { OfferLifecycleButtons } from '@/app/(admin)/admin/offers/_components/offer-lifecycle-buttons';
+import {
+  DirtyFormProvider,
+  useReportFormDirty,
+} from '@/app/(admin)/admin/_components/dirty-form-context';
 import { StateToggleButton } from '@/app/(admin)/admin/_components/state-toggle-button';
 
 const ok = { success: true as const, data: {} };
@@ -209,5 +213,145 @@ describe('StateToggleButton', () => {
         description: 'You do not have permission to do that',
       })
     );
+  });
+});
+
+/** A promise the test settles by hand, to hold an action in flight. */
+function deferred<T>() {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((done) => (resolve = done));
+  return { promise, resolve };
+}
+
+describe('while an action is in flight', () => {
+  it('the row menu runs the action once, keeps focus on its trigger and announces the wait', async () => {
+    const pending = deferred<typeof ok>();
+    mocks.offerLifecycleAction.mockReturnValue(pending.promise);
+    const user = userEvent.setup();
+    render(<OfferRowActions offerId="o1" offerTitle="Free coffee" status="DRAFT" />);
+
+    const trigger = screen.getByRole('button', { name: 'Open menu for Free coffee' });
+    await openMenu(user, 'Free coffee');
+    await user.click(screen.getByRole('menuitem', { name: 'Publish' }));
+
+    await waitFor(() => expect(trigger).toHaveAttribute('aria-disabled', 'true'));
+    expect(trigger).not.toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('Updating Free coffee');
+
+    // A second choice while the first is pending does nothing.
+    await user.click(trigger);
+    const menu = screen.queryByRole('menu');
+    if (menu) await user.click(within(menu).getByRole('menuitem', { name: 'Mark verified' }));
+    expect(mocks.offerLifecycleAction).toHaveBeenCalledTimes(1);
+
+    pending.resolve(ok);
+    await waitFor(() => expect(trigger).not.toHaveAttribute('aria-disabled'));
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  it('returns focus to the row trigger after the archive confirmation', async () => {
+    const user = userEvent.setup();
+    render(<OfferRowActions offerId="o1" offerTitle="Free coffee" status="PUBLISHED" />);
+    const trigger = screen.getByRole('button', { name: 'Open menu for Free coffee' });
+
+    await openMenu(user, 'Free coffee');
+    await user.click(screen.getByRole('menuitem', { name: 'Archive' }));
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Archive offer' })
+    );
+
+    await waitFor(() => expect(mocks.offerLifecycleAction).toHaveBeenCalledWith('o1', 'archive'));
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it('the lifecycle buttons run once, stay focused and say what they are doing', async () => {
+    const pending = deferred<typeof ok>();
+    mocks.offerLifecycleAction.mockReturnValue(pending.promise);
+    const user = userEvent.setup();
+    render(<OfferLifecycleButtons offerId="o1" offerTitle="Free coffee" status="DRAFT" />);
+
+    const publish = screen.getByRole('button', { name: 'Publish' });
+    await user.dblClick(publish);
+
+    expect(mocks.offerLifecycleAction).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveAttribute('aria-disabled', 'true');
+    expect(publish).not.toBeDisabled();
+    expect(publish).toHaveFocus();
+    expect(screen.getByRole('status')).toHaveTextContent('Updating Free coffee');
+    await user.click(screen.getByRole('button', { name: 'Mark verified' }));
+    expect(mocks.offerLifecycleAction).toHaveBeenCalledTimes(1);
+
+    pending.resolve(ok);
+    await waitFor(() => expect(publish).not.toHaveAttribute('aria-disabled'));
+  });
+
+  it('the lifecycle buttons return focus to Archive after the confirmation', async () => {
+    const user = userEvent.setup();
+    render(<OfferLifecycleButtons offerId="o1" offerTitle="Free coffee" status="PUBLISHED" />);
+    const archive = screen.getByRole('button', { name: 'Archive' });
+
+    await user.click(archive);
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Archive offer' })
+    );
+
+    await waitFor(() => expect(mocks.offerLifecycleAction).toHaveBeenCalledWith('o1', 'archive'));
+    await waitFor(() => expect(archive).toHaveFocus());
+  });
+
+  it('the category toggle runs once and keeps focus', async () => {
+    const pending = deferred<typeof ok>();
+    mocks.setCategoryEnabledAction.mockReturnValue(pending.promise);
+    const user = userEvent.setup();
+    render(<StateToggleButton kind="category" id="c1" name="Beauty" on />);
+
+    const button = screen.getByRole('button', { name: 'Disable Beauty' });
+    await user.dblClick(button);
+
+    expect(mocks.setCategoryEnabledAction).toHaveBeenCalledTimes(1);
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).not.toBeDisabled();
+    expect(button).toHaveFocus();
+    expect(screen.getByRole('status')).toHaveTextContent('Updating Beauty');
+
+    pending.resolve(ok);
+    await waitFor(() => expect(button).not.toHaveAttribute('aria-disabled'));
+  });
+});
+
+describe('beside a form with unsaved changes', () => {
+  function Editor({ dirty }: { dirty: boolean }) {
+    function Reporter() {
+      useReportFormDirty(dirty);
+      return null;
+    }
+    return (
+      <DirtyFormProvider>
+        <Reporter />
+        <OfferLifecycleButtons offerId="o1" offerTitle="Free coffee" status="DRAFT" />
+      </DirtyFormProvider>
+    );
+  }
+
+  it('waits, says why, and runs nothing', async () => {
+    const user = userEvent.setup();
+    render(<Editor dirty />);
+
+    const publish = screen.getByRole('button', { name: 'Publish' });
+    expect(publish).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('status')).toHaveTextContent('Save or discard your changes first');
+    await user.click(publish);
+    expect(mocks.offerLifecycleAction).not.toHaveBeenCalled();
+  });
+
+  it('works as usual when the form is clean', async () => {
+    const user = userEvent.setup();
+    render(<Editor dirty={false} />);
+
+    const publish = screen.getByRole('button', { name: 'Publish' });
+    expect(publish).not.toHaveAttribute('aria-disabled');
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    await user.click(publish);
+    await waitFor(() => expect(mocks.offerLifecycleAction).toHaveBeenCalledWith('o1', 'publish'));
   });
 });

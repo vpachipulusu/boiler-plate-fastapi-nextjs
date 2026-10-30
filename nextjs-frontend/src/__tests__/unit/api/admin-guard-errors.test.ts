@@ -31,6 +31,7 @@ import {
   INVALID_INPUT_MESSAGE,
   OFFER_NOT_FOUND_MESSAGE,
   publishBlockedReasons,
+  RATE_LIMITED_MESSAGE,
 } from '@/lib/api/admin-catalogue-errors';
 
 const SECRET = 'SECRET postgres://user:pw@host/db sk_live_abc';
@@ -46,31 +47,34 @@ describe('requireAdminSession', () => {
     await expect(requireAdminSession()).resolves.toEqual({ ok: true });
   });
 
-  it.each(['not-admin', 'session-rejected'])(
-    'refuses %s with the curated message',
-    async (status) => {
-      mocks.resolveAdminAccess.mockResolvedValue({ status });
-      await expect(requireAdminSession()).resolves.toEqual({
-        ok: false,
-        error: ADMIN_FORBIDDEN_MESSAGE,
-      });
-    }
-  );
+  it.each([
+    ['not-admin', 'not-admin'],
+    ['session-rejected', 'rejected'],
+  ])('refuses %s with the curated message and the reason %s', async (status, reason) => {
+    mocks.resolveAdminAccess.mockResolvedValue({ status });
+    await expect(requireAdminSession()).resolves.toEqual({
+      ok: false,
+      error: ADMIN_FORBIDDEN_MESSAGE,
+      reason,
+    });
+  });
 
   it('refuses without a valid session and never asks the admin check', async () => {
     mocks.verify.mockRejectedValue(Object.assign(new Error('x'), { code: INVALID_SESSION_CODE }));
     await expect(requireAdminSession()).resolves.toEqual({
       ok: false,
       error: ADMIN_FORBIDDEN_MESSAGE,
+      reason: 'no-session',
     });
     expect(mocks.resolveAdminAccess).not.toHaveBeenCalled();
   });
 
-  it('refuses an unverified email address', async () => {
+  it('refuses an unverified email address, with its own reason', async () => {
     mocks.verify.mockRejectedValue(new EmailNotVerifiedError());
     await expect(requireAdminSession()).resolves.toEqual({
       ok: false,
       error: ADMIN_FORBIDDEN_MESSAGE,
+      reason: 'unverified',
     });
     expect(mocks.resolveAdminAccess).not.toHaveBeenCalled();
   });
@@ -80,12 +84,14 @@ describe('requireAdminSession', () => {
     await expect(requireAdminSession()).resolves.toEqual({
       ok: false,
       error: ADMIN_UNAVAILABLE_MESSAGE,
+      reason: 'unavailable',
     });
     mocks.verify.mockResolvedValue({ uid: 'u1' });
     mocks.resolveAdminAccess.mockResolvedValue({ status: 'error', message: SECRET });
     await expect(requireAdminSession()).resolves.toEqual({
       ok: false,
       error: ADMIN_UNAVAILABLE_MESSAGE,
+      reason: 'unavailable',
     });
     expect(JSON.stringify(mocks.logError.mock.calls)).not.toContain('SECRET');
   });
@@ -137,6 +143,7 @@ describe('catalogueErrorMessage', () => {
     expect(catalogueErrorMessage(fail(401), 'x')).toBe(ADMIN_FORBIDDEN_MESSAGE);
     expect(catalogueErrorMessage(fail(404, 'not_found'), 'Gone.')).toBe('Gone.');
     expect(catalogueErrorMessage(fail(422), 'x')).toBe(INVALID_INPUT_MESSAGE);
+    expect(catalogueErrorMessage(fail(429), 'x')).toBe(RATE_LIMITED_MESSAGE);
     expect(catalogueErrorMessage(fail(409), 'x')).toBe(ADMIN_REQUEST_FAILED_MESSAGE);
     expect(catalogueErrorMessage(fail(500), 'x')).toBe(ADMIN_REQUEST_FAILED_MESSAGE);
     expect(catalogueErrorMessage({ success: false, error: SECRET }, 'x')).toBe(

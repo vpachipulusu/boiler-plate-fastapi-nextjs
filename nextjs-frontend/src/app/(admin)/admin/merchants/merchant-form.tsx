@@ -1,18 +1,21 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createMerchantAction, updateMerchantAction } from '@/app/actions/admin/merchant-actions';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { merchantFormSchema, type MerchantFormValues } from '@/lib/admin-catalogue/merchant-schema';
 import { settleAction } from '@/lib/admin-catalogue/settle-action';
 import { useToast } from '@/hooks/use-toast';
 import { Field } from '../_components/form-field';
-import { FormErrorSummary } from '../_components/form-error-summary';
-import { useServerFormErrors } from '../_components/use-form-submit';
+import { FormFooter } from '../_components/form-footer';
+import {
+  useSavedMessage,
+  useServerFormErrors,
+  useSubmitOnce,
+} from '../_components/use-server-form-errors';
+import { useUnsavedChanges } from '../_components/use-unsaved-changes';
 
 type MerchantFormProps = {
   mode: 'create' | 'edit';
@@ -34,20 +37,14 @@ export function MerchantForm({ mode, merchantId, initialValues }: MerchantFormPr
     form.setError,
     form.setFocus
   );
-  const [saved, setSaved] = useState(false);
-  const savedRef = useRef<HTMLParagraphElement>(null);
-
-  useEffect(() => {
-    if (saved) savedRef.current?.focus();
-  }, [saved]);
-
-  // An edit after a save makes "Changes saved." stale.
-  // An edit after a save makes "Changes saved." stale, so it is shown only while the form is clean.
-  const showSaved = saved && !form.formState.isDirty;
+  const dirty = form.formState.isDirty;
+  const { showSaved, savedRef, markSaved, clearSaved } = useSavedMessage(dirty);
+  const submitOnce = useSubmitOnce();
+  useUnsavedChanges(dirty);
 
   async function onSubmit(values: MerchantFormValues): Promise<void> {
     clearFormError();
-    setSaved(false);
+    clearSaved();
     const outcome = await settleAction(() =>
       mode === 'create' || !merchantId
         ? createMerchantAction(values)
@@ -63,13 +60,16 @@ export function MerchantForm({ mode, merchantId, initialValues }: MerchantFormPr
       return;
     }
     form.reset(values);
-    setSaved(true);
+    markSaved();
     router.refresh();
   }
 
   return (
     <form
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submitOnce(() => handleSubmit(onSubmit)(event));
+      }}
       noValidate
       aria-label={mode === 'create' ? 'New merchant' : 'Edit merchant'}
       className="max-w-2xl space-y-5"
@@ -148,20 +148,15 @@ export function MerchantForm({ mode, merchantId, initialValues }: MerchantFormPr
         </label>
       ) : null}
 
-      <FormErrorSummary ref={summaryRef} message={formError} />
-      {showSaved ? (
-        <p
-          ref={savedRef}
-          tabIndex={-1}
-          role="status"
-          className="rounded-lg border border-good-foreground/40 bg-good p-3 text-sm font-medium text-good-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          Changes saved.
-        </p>
-      ) : null}
-      <Button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? 'Saving…' : mode === 'create' ? 'Create merchant' : 'Save changes'}
-      </Button>
+      <FormFooter
+        error={formError}
+        summaryRef={summaryRef}
+        showSaved={showSaved}
+        savedRef={savedRef}
+        dirty={dirty}
+        submitting={isSubmitting}
+        submitLabel={mode === 'create' ? 'Create merchant' : 'Save changes'}
+      />
     </form>
   );
 }

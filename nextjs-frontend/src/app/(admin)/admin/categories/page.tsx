@@ -16,6 +16,7 @@ import { fetchAdminCategories, toCategoryView } from '@/lib/api/admin-categories
 import { logCatalogueFailure } from '@/lib/api/admin-catalogue-log';
 import { formatAdminDate } from '../_components/format-admin-date';
 import { InlineError } from '../_components/inline-error';
+import { requireAdminPage } from '../_lib/require-admin-page';
 import { StateToggleButton } from '../_components/state-toggle-button';
 
 export const metadata = { title: 'Categories' };
@@ -23,6 +24,7 @@ export const metadata = { title: 'Categories' };
 const CATEGORIES_PATH = '/admin/categories';
 
 export default async function AdminCategoriesPage() {
+  await requireAdminPage();
   const result = await fetchAdminCategories();
   if (!result.success) logCatalogueFailure('Admin categories page: list failed', result);
 
@@ -77,7 +79,7 @@ function CategoriesTable({
       <h2 id="categories-heading" className="mb-3 text-lg font-semibold">
         All categories ({total})
       </h2>
-      <Table stacked>
+      <Table stacked aria-labelledby="categories-heading">
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>

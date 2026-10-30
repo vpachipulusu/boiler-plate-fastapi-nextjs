@@ -1,11 +1,7 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FieldValues, Path, UseFormSetError } from 'react-hook-form';
-
-export type SubmitOutcome<T> =
-  | { success: true; data: T }
-  | { success: false; error: string; fieldErrors?: Record<string, string> };
 
 /**
  * Wires a server action's outcome into a react-hook-form form: field messages go on their fields and the first
@@ -32,4 +28,38 @@ export function useServerFormErrors<V extends FieldValues>(
   }
 
   return { formError, clearFormError: () => setFormError(null), summaryRef, showFailure };
+}
+
+/**
+ * The "Changes saved." message of an edit form. It takes focus when it appears and is shown only while the form is
+ * clean: a later edit makes it stale.
+ */
+export function useSavedMessage(isDirty: boolean) {
+  const [saved, setSaved] = useState(false);
+  const savedRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (saved) savedRef.current?.focus();
+  }, [saved]);
+
+  return {
+    showSaved: saved && !isDirty,
+    savedRef,
+    markSaved: () => setSaved(true),
+    clearSaved: () => setSaved(false),
+  };
+}
+
+/** Runs a submit once at a time: a second submit while one is in flight (a double click) is ignored. */
+export function useSubmitOnce() {
+  const busy = useRef(false);
+  return async (run: () => Promise<void>): Promise<void> => {
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      await run();
+    } finally {
+      busy.current = false;
+    }
+  };
 }
