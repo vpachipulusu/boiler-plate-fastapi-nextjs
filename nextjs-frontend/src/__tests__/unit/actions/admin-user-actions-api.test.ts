@@ -283,7 +283,7 @@ describe('admin user actions (API-backed)', () => {
 
       await banUserAction('user-1', '   ');
 
-      expect(mocks.banAdminUser).toHaveBeenCalledWith('user-1', '');
+      expect(mocks.banAdminUser).toHaveBeenCalledWith('user-1', undefined);
     });
 
     it('banUserAction rejects a reason longer than the API allows without calling it', async () => {
@@ -306,23 +306,83 @@ describe('admin user actions (API-backed)', () => {
     it.each([
       ['banUserAction', () => banUserAction('u1'), mocks.banAdminUser],
       ['unbanUserAction', () => unbanUserAction('u1'), mocks.unbanAdminUser],
-      ['updateUserAction', () => updateUserAction('u1', { bio: 'x' }), mocks.patchAdminUser],
-    ])('%s answers a 409 with a curated message and does not refresh', async (_n, call, api) => {
-      api.mockResolvedValue(fail(409));
+    ])(
+      '%s answers a 409 with the own-account message and does not refresh',
+      async (_n, call, api) => {
+        api.mockResolvedValue(fail(409));
 
-      const result = await call();
+        const result = await call();
+
+        expect(result).toEqual({
+          success: false,
+          error: 'You cannot suspend or restore your own account.',
+        });
+        expect(JSON.stringify(result)).not.toContain('SECRET');
+        expect(mocks.revalidatePath).not.toHaveBeenCalled();
+      }
+    );
+  });
+
+  describe('409 conflicts', () => {
+    it('deleteUserAction explains what blocks the delete', async () => {
+      mocks.removeAdminUser.mockResolvedValue(fail(409));
+
+      const result = await deleteUserAction('u1');
 
       expect(result).toEqual({
         success: false,
         error:
-          'That action is not allowed for this account. You cannot change your own account here.',
+          'This user cannot be deleted yet: revoke their admin role or transfer organisation ownership first.',
       });
-      expect(JSON.stringify(result)).not.toContain('SECRET');
-      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    });
+
+    it('revokeAdminRoleAction answers a 409 generically, not with the own-account message', async () => {
+      mocks.revokeAdminRole.mockResolvedValue(fail(409));
+
+      const result = await revokeAdminRoleAction('u1');
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Something went wrong. Please try again.',
+      });
+    });
+
+    it.each([
+      ['banUserAction', () => banUserAction('u1'), mocks.banAdminUser],
+      ['deleteUserAction', () => deleteUserAction('u1'), mocks.removeAdminUser],
+      ['revokeAdminRoleAction', () => revokeAdminRoleAction('u1'), mocks.revokeAdminRole],
+    ])('%s does not log a 409 as an error', async (_n, call, api) => {
+      api.mockResolvedValue(fail(409));
+
+      await call();
+
+      expect(mocks.logError).not.toHaveBeenCalled();
     });
   });
 
   describe('updateUserAction validation', () => {
+    it('trims text fields and sends a blank one as null', async () => {
+      mocks.patchAdminUser.mockResolvedValue(ok(DETAIL));
+
+      await updateUserAction('user-1', { displayName: '   ', bio: '  hi  ', location: '' });
+
+      expect(mocks.patchAdminUser).toHaveBeenCalledWith('user-1', {
+        display_name: null,
+        bio: 'hi',
+        location: null,
+      });
+    });
+
+    it('accepts an https avatar', async () => {
+      mocks.patchAdminUser.mockResolvedValue(ok(DETAIL));
+
+      await updateUserAction('user-1', { avatarUrl: 'https://x.test/a.png' });
+
+      expect(mocks.patchAdminUser).toHaveBeenCalledWith('user-1', {
+        avatar_url: 'https://x.test/a.png',
+      });
+    });
+
     it('refreshes the users pages after a save', async () => {
       mocks.patchAdminUser.mockResolvedValue(ok(DETAIL));
 
@@ -333,6 +393,11 @@ describe('admin user actions (API-backed)', () => {
 
     it.each([
       ['a non-http website', { website: 'javascript:alert(1)' }],
+      ['a data: website', { website: 'data:text/html,x' }],
+      ['an upper-case scheme', { website: 'HTTPS://x.com' }],
+      ['a scheme without slashes', { website: 'https:x.com' }],
+      ['an http avatar', { avatarUrl: 'http://x.test/a.png' }],
+      ['a javascript: avatar', { avatarUrl: 'javascript:x' }],
       ['a malformed phone number', { phoneNumber: 'call me' }],
       ['an over-long display name', { displayName: 'x'.repeat(101) }],
     ])('rejects %s before calling the API', async (_label, data) => {

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   fetchAdminAuditLogs: vi.fn(),
   fetchAdminSubscriptions: vi.fn(),
   fetchAdminRevenue: vi.fn(),
+  requireAdminPage: vi.fn(),
 }));
 
 vi.mock('@/lib/api/admin-users', async () => {
@@ -44,6 +45,9 @@ vi.mock('@/app/(admin)/admin/subscriptions/sync-panel', () => ({
 }));
 vi.mock('@/components/admin/refresh-button', () => ({ RefreshButton: () => <span /> }));
 vi.mock('next/navigation', () => ({ notFound: mocks.notFound }));
+vi.mock('@/app/(admin)/admin/_lib/require-admin-page', () => ({
+  requireAdminPage: mocks.requireAdminPage,
+}));
 vi.mock('@/lib/logger', () => ({ logger: { error: mocks.logError } }));
 vi.mock('@/app/(admin)/admin/users/user-row-actions', () => ({
   UserRowActions: ({ userId }: { userId: string }) => <span data-row-actions={userId} />,
@@ -94,7 +98,38 @@ describe('switched-off admin pages', () => {
 });
 
 describe('admin user detail page', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.requireAdminPage.mockResolvedValue(undefined);
+  });
+
+  it('checks admin access before reading the user', async () => {
+    mocks.fetchAdminUser.mockResolvedValue({ success: false, error: 'x', status: 404 });
+
+    await expect(
+      AdminUserDetailPage({ params: Promise.resolve({ id: 'user-1' }) })
+    ).rejects.toThrow('NEXT_NOT_FOUND');
+
+    expect(mocks.requireAdminPage.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.fetchAdminUser.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('does not read the user when the admin check refuses', async () => {
+    mocks.requireAdminPage.mockRejectedValue(new Error('NEXT_REDIRECT'));
+
+    await expect(
+      AdminUserDetailPage({ params: Promise.resolve({ id: 'user-1' }) })
+    ).rejects.toThrow('NEXT_REDIRECT');
+    expect(mocks.fetchAdminUser).not.toHaveBeenCalled();
+  });
+
+  it.each(['.', '..', 'a/b'])('calls notFound for the id %j without reading', async (id) => {
+    await expect(AdminUserDetailPage({ params: Promise.resolve({ id }) })).rejects.toThrow(
+      'NEXT_NOT_FOUND'
+    );
+    expect(mocks.fetchAdminUser).not.toHaveBeenCalled();
+  });
 
   it('renders the user read through the API', async () => {
     mocks.fetchAdminUser.mockResolvedValue({
@@ -118,6 +153,9 @@ describe('admin user detail page', () => {
     expect(markup).toContain('users.read');
     expect(markup).toContain('href="/admin/users/user-1/edit"');
     expect(markup).toContain('Edit user');
+    expect(markup).toMatch(
+      /<a[^>]*class="[^"]*min-h-11[^"]*"[^>]*href="\/admin\/users\/user-1\/edit"/
+    );
   });
 
   it('shows status pills and one h1, with a retry link on the error state', async () => {
@@ -145,9 +183,9 @@ describe('admin user detail page', () => {
     expect(markup.match(/<h1/g)).toHaveLength(1);
 
     mocks.fetchAdminUser.mockResolvedValue({ success: false, error: 'x', status: 500 });
-    const failed = html(await AdminUserDetailPage({ params: Promise.resolve({ id: 'a b' }) }));
+    const failed = html(await AdminUserDetailPage({ params: Promise.resolve({ id: 'a-b' }) }));
     expect(failed.match(/<h1/g)).toHaveLength(1);
-    expect(failed).toContain('href="/admin/users/a%20b"');
+    expect(failed).toContain('href="/admin/users/a-b"');
     expect(failed).toContain('Back to Users');
     expect(failed).toContain('role="alert"');
     expect(failed).toContain('>Retry<');

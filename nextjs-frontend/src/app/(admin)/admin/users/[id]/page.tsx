@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { StatusPill } from '@/components/ui/status-pill';
 import { Panel } from '@/components/dashboard/overview/panel';
 import { adminErrorMessage, fetchAdminUser, toAdminUserDetail } from '@/lib/api/admin-users';
+import { isAdminUserId } from '@/lib/admin-users/user-id';
 import { logger } from '@/lib/logger';
 import { InlineError } from '../../_components/inline-error';
+import { requireAdminPage } from '../../_lib/require-admin-page';
 import { formatAdminDate, formatAdminDateTime } from '../../_components/format-admin-date';
 
 const USERS_HREF = '/admin/users';
@@ -41,7 +43,9 @@ function ErrorState({ message, retryHref }: { message: string; retryHref: string
 }
 
 export default async function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdminPage();
   const { id } = await params;
+  if (!isAdminUserId(id)) notFound();
   const result = await fetchAdminUser(id);
 
   if (!result.success) {
@@ -69,7 +73,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           <p className="text-muted-foreground">Viewing information for {user.email}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Button asChild>
+          <Button asChild className="min-h-11">
             <Link href={`${USERS_HREF}/${encodeURIComponent(user.id)}/edit`}>Edit user</Link>
           </Button>
           <BackToUsers />

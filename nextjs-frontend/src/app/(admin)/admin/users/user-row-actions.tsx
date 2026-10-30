@@ -16,20 +16,20 @@ import { UserAccessDialog, type UserAccessMode } from './user-access-dialog';
 
 type UserRowActionsProps = {
   userId: string;
-  /** Name or email, so the trigger is distinguishable per row for screen readers. */
-  userLabel?: string;
+  /** Name or email, so the trigger and the dialog name the person. */
+  userLabel: string;
 };
 
 /**
  * The row menu: View Details and Edit User navigate; Suspend User and Restore Access open a confirmation
  * dialog and call the admin users API (which audits the change). The list does not show who is suspended, so
- * both are always offered: restoring a user who is not suspended is a harmless no-op.
+ * both are always offered: restoring a user who is not suspended leaves their access as it is.
  */
 export function UserRowActions({ userId, userLabel }: UserRowActionsProps) {
   const [mode, setMode] = useState<UserAccessMode>('suspend');
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const label = userLabel ?? 'this user';
+  const userPath = `/admin/users/${encodeURIComponent(userId)}`;
 
   function openDialog(next: UserAccessMode): void {
     setMode(next);
@@ -41,36 +41,34 @@ export function UserRowActions({ userId, userLabel }: UserRowActionsProps) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button ref={triggerRef} variant="ghost" className="size-11 p-0 hover:bg-accent">
-            <span className="sr-only">
-              {userLabel ? `Open menu for ${userLabel}` : 'Open menu'}
-            </span>
+            <span className="sr-only">Open menu for {userLabel}</span>
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <Link href={`/admin/users/${userId}`} className="flex items-center">
+          <DropdownMenuItem asChild className="min-h-11">
+            <Link href={userPath} className="flex items-center">
               <Eye className="mr-2 h-4 w-4" />
               View Details
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href={`/admin/users/${userId}/edit`} className="flex items-center">
+          <DropdownMenuItem asChild className="min-h-11">
+            <Link href={`${userPath}/edit`} className="flex items-center">
               <Edit className="mr-2 h-4 w-4" />
               Edit User
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
+            className="min-h-11 text-destructive focus:text-destructive"
             onSelect={() => openDialog('suspend')}
           >
             <Ban className="mr-2 h-4 w-4" />
             Suspend User
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => openDialog('restore')}>
+          <DropdownMenuItem className="min-h-11" onSelect={() => openDialog('restore')}>
             <RotateCcw className="mr-2 h-4 w-4" />
             Restore Access
           </DropdownMenuItem>
@@ -81,7 +79,7 @@ export function UserRowActions({ userId, userLabel }: UserRowActionsProps) {
         open={open}
         onOpenChange={setOpen}
         userId={userId}
-        userLabel={label}
+        userLabel={userLabel}
         returnFocusTo={triggerRef}
       />
     </>

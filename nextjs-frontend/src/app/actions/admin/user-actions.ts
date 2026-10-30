@@ -11,11 +11,15 @@ import {
   LOCATION_MAX,
   PHONE_PATTERN,
   SUSPEND_REASON_MAX,
+  WEBSITE_ERROR,
   WEBSITE_MAX,
+  WEBSITE_PATTERN,
 } from '@/lib/admin-users/profile-schema';
+import { USER_ID_PATTERN } from '@/lib/admin-users/user-id';
 import {
   ADMIN_REQUEST_FAILED_MESSAGE,
   ADMIN_USER_CONFLICT_MESSAGE,
+  ADMIN_USER_DELETE_CONFLICT_MESSAGE,
   ADMIN_USER_NOT_FOUND_MESSAGE,
   ADMIN_USERS_PAGE_SIZE,
   adminErrorMessage,
@@ -48,7 +52,7 @@ type AdminUserActionResponse<T = any> = {
 };
 
 /** User ids go into a URL path: only the characters real ids contain are accepted. */
-const userIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/, 'Invalid user id');
+const userIdSchema = z.string().regex(USER_ID_PATTERN, 'Invalid user id');
 
 const MAX_PAGE_SIZE = 100;
 const ADMIN_USERS_PATH = '/admin/users';
@@ -67,14 +71,20 @@ function refreshUser(userId: string): void {
   revalidatePath(`${ADMIN_USERS_PATH}/${userId}`);
 }
 
+/**
+ * A 409 means a refused state change, not a fault, so it is not logged as an error. `conflictMessage` says why
+ * for the action at hand; an action that passes none answers a 409 with the generic message.
+ */
 function failure(
   result: Extract<ApiResult<unknown>, { success: false }>,
-  logMessage: string
+  logMessage: string,
+  conflictMessage?: string
 ): AdminUserActionResponse {
-  if (result.status !== 401 && result.status !== 403 && result.status !== 404) {
+  const expected = [401, 403, 404, 409];
+  if (result.status === undefined || !expected.includes(result.status)) {
     logger.error(logMessage, { status: result.status });
   }
-  if (result.status === 409) return { success: false, error: ADMIN_USER_CONFLICT_MESSAGE };
+  if (result.status === 409 && conflictMessage) return { success: false, error: conflictMessage };
   return { success: false, error: adminErrorMessage(result) };
 }
 
@@ -145,22 +155,32 @@ export async function getUserByIdAction(userId: string): Promise<AdminUserAction
   });
 }
 
-const updateUserSchema = z.object({
-  displayName: z.string().max(DISPLAY_NAME_MAX).nullable().optional(),
-  bio: z.string().max(BIO_MAX).nullable().optional(),
-  location: z.string().max(LOCATION_MAX).nullable().optional(),
-  website: z
+/** A text field is trimmed and a blank one means "clear it": null reaches the API. */
+const clearableText = (max: number) =>
+  z
     .string()
-    .max(WEBSITE_MAX)
-    .regex(/^https?:\/\//, 'Enter a full http:// or https:// address.')
+    .trim()
+    .max(max)
+    .transform((value) => (value === '' ? null : value))
     .nullable()
-    .optional(),
+    .optional();
+
+const updateUserSchema = z.object({
+  displayName: clearableText(DISPLAY_NAME_MAX),
+  bio: clearableText(BIO_MAX),
+  location: clearableText(LOCATION_MAX),
+  website: z.string().max(WEBSITE_MAX).regex(WEBSITE_PATTERN, WEBSITE_ERROR).nullable().optional(),
   phoneNumber: z
     .string()
     .regex(PHONE_PATTERN, 'Use 3 to 20 digits, spaces and + ( ) - . characters.')
     .nullable()
     .optional(),
-  avatarUrl: z.string().max(2048).nullable().optional(),
+  avatarUrl: z
+    .string()
+    .max(2048)
+    .regex(/^https:\/\//, 'Enter a full https:// address.')
+    .nullable()
+    .optional(),
 });
 
 /**
@@ -206,7 +226,7 @@ export async function deleteUserAction(userId: string): Promise<AdminUserActionR
     }
     const result = await removeAdminUser(userId);
     if (!result.success) {
-      return failure(result, 'Admin delete user failed');
+      return failure(result, 'Admin delete user failed', ADMIN_USER_DELETE_CONFLICT_MESSAGE);
     }
     refreshUser(userId);
     return { success: true, data: { message: 'User deleted successfully' } };
@@ -269,6 +289,7 @@ const suspendReasonSchema = z
   .string()
   .trim()
   .max(SUSPEND_REASON_MAX, `Keep the reason to ${SUSPEND_REASON_MAX} characters or fewer.`)
+  .transform((value) => value || undefined)
   .optional();
 
 /**
@@ -289,7 +310,7 @@ export async function banUserAction(
     }
     const result = await banAdminUser(userId, parsedReason.data);
     if (!result.success) {
-      return failure(result, 'Admin ban user failed');
+      return failure(result, 'Admin ban user failed', ADMIN_USER_CONFLICT_MESSAGE);
     }
     refreshUser(userId);
     return { success: true, data: { message: 'User banned successfully' } };
@@ -306,7 +327,7 @@ export async function unbanUserAction(userId: string): Promise<AdminUserActionRe
     }
     const result = await unbanAdminUser(userId);
     if (!result.success) {
-      return failure(result, 'Admin unban user failed');
+      return failure(result, 'Admin unban user failed', ADMIN_USER_CONFLICT_MESSAGE);
     }
     refreshUser(userId);
     return { success: true, data: { message: 'User unbanned successfully' } };

@@ -83,9 +83,11 @@ describe('UserProfileForm', () => {
         phoneNumber: '+44 20 7946 0000',
       })
     );
-    expect(mocks.toast).toHaveBeenCalledWith({ title: 'User updated' });
     expect(mocks.refresh).toHaveBeenCalled();
-    expect(await screen.findByText('Changes saved.')).toBeInTheDocument();
+    // Announced once, by the focused "Changes saved." status; no second toast.
+    const saved = await screen.findByText('Changes saved.');
+    expect(mocks.toast).not.toHaveBeenCalled();
+    await waitFor(() => expect(saved).toHaveFocus());
   });
 
   it('blocks an invalid website and phone number before calling the action', async () => {
@@ -100,6 +102,20 @@ describe('UserProfileForm', () => {
     expect(screen.getByText(/Use 3 to 20 digits/)).toBeVisible();
     expect(mocks.updateUserAction).not.toHaveBeenCalled();
   });
+
+  it.each(['HTTPS://x.com', 'https:x.com', 'data:text/html,x'])(
+    'rejects the website %j as the backend would, without calling the action',
+    async (value) => {
+      const user = userEvent.setup();
+      render(<UserProfileForm userId="user-1" initialValues={INITIAL} />);
+
+      await user.type(screen.getByLabelText('Website'), value);
+      await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+      expect(await screen.findByText('Enter a full http:// or https:// address.')).toBeVisible();
+      expect(mocks.updateUserAction).not.toHaveBeenCalled();
+    }
+  );
 
   it('shows the curated refusal in the failure summary when the action fails', async () => {
     mocks.updateUserAction.mockResolvedValue({
@@ -163,6 +179,11 @@ describe('EditAdminUserPage', () => {
     expect(markup).toContain('aria-label="Edit user profile"');
   });
 
+  it.each(['.', '..', 'a/b'])('calls notFound for the id %j without reading', async (id) => {
+    await expect(EditAdminUserPage(params(id))).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(mocks.fetchAdminUser).not.toHaveBeenCalled();
+  });
+
   it('does not read the user when the admin check refuses', async () => {
     mocks.requireAdminPage.mockRejectedValue(new Error('NEXT_REDIRECT'));
 
@@ -179,10 +200,10 @@ describe('EditAdminUserPage', () => {
   it('shows a curated error with retry for other failures', async () => {
     mocks.fetchAdminUser.mockResolvedValue({ success: false, error: 'SECRET', status: 500 });
 
-    const markup = renderToStaticMarkup((await EditAdminUserPage(params('a b'))) as never);
+    const markup = renderToStaticMarkup((await EditAdminUserPage(params('a-b'))) as never);
 
     expect(markup).toContain('Something went wrong. Please try again.');
     expect(markup).not.toContain('SECRET');
-    expect(markup).toContain('href="/admin/users/a%20b/edit"');
+    expect(markup).toContain('href="/admin/users/a-b/edit"');
   });
 });

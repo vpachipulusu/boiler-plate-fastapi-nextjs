@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { adminErrorMessage, fetchAdminUser, toAdminUserDetail } from '@/lib/api/admin-users';
 import { userToProfileFormValues } from '@/lib/admin-users/profile-schema';
+import { isAdminUserId } from '@/lib/admin-users/user-id';
 import { logger } from '@/lib/logger';
 import { InlineError } from '../../../_components/inline-error';
 import { requireAdminPage } from '../../../_lib/require-admin-page';
@@ -17,6 +18,7 @@ export const metadata = { title: 'Edit user' };
 export default async function EditAdminUserPage({ params }: { params: Params }) {
   await requireAdminPage();
   const { id } = await params;
+  if (!isAdminUserId(id)) notFound();
   const result = await fetchAdminUser(id);
 
   if (!result.success) {

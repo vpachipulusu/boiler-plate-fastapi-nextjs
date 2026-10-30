@@ -17,7 +17,7 @@ vi.mock('@/app/actions/admin/user-actions', () => ({
   banUserAction: mocks.banUserAction,
   unbanUserAction: mocks.unbanUserAction,
 }));
-vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
+vi.mock('@/hooks/use-toast', () => ({ toast: mocks.toast }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: mocks.refresh, push: vi.fn() }),
 }));
@@ -43,9 +43,9 @@ beforeEach(() => {
 describe('UserRowActions menu', () => {
   it('links View Details and Edit User to their pages', async () => {
     const user = userEvent.setup();
-    render(<UserRowActions userId="user-123" />);
+    render(<UserRowActions userId="user-123" userLabel="Ada" />);
 
-    await openMenu(user);
+    await openMenu(user, 'Open menu for Ada');
 
     expect(screen.getByRole('menuitem', { name: /view details/i })).toHaveAttribute(
       'href',
@@ -59,7 +59,34 @@ describe('UserRowActions menu', () => {
     expect(screen.getByRole('menuitem', { name: /restore access/i })).toBeInTheDocument();
   });
 
-  it('names the trigger after the user when a label is given', () => {
+  it('encodes the user id in both links', async () => {
+    const user = userEvent.setup();
+    render(<UserRowActions userId="a b" userLabel="Ada" />);
+
+    await openMenu(user, 'Open menu for Ada');
+
+    expect(screen.getByRole('menuitem', { name: /view details/i })).toHaveAttribute(
+      'href',
+      '/admin/users/a%20b'
+    );
+    expect(screen.getByRole('menuitem', { name: /edit user/i })).toHaveAttribute(
+      'href',
+      '/admin/users/a%20b/edit'
+    );
+  });
+
+  it('gives every menu item a 44px touch target', async () => {
+    const user = userEvent.setup();
+    render(<UserRowActions userId="user-123" userLabel="Ada" />);
+
+    await openMenu(user, 'Open menu for Ada');
+
+    const items = screen.getAllByRole('menuitem');
+    expect(items).toHaveLength(4);
+    for (const item of items) expect(item).toHaveClass('min-h-11');
+  });
+
+  it('names the trigger after the user', () => {
     render(<UserRowActions userId="user-123" userLabel="Ada" />);
 
     expect(screen.getByRole('button', { name: 'Open menu for Ada' })).toBeInTheDocument();
@@ -141,6 +168,57 @@ describe('suspending a user', () => {
   });
 });
 
+describe('suspend dialog focus and in-flight behaviour', () => {
+  async function openSuspend(user: ReturnType<typeof userEvent.setup>) {
+    render(<UserRowActions userId="user-123" userLabel="Ada" />);
+    const trigger = screen.getByRole('button', { name: 'Open menu for Ada' });
+    await openMenu(user, 'Open menu for Ada');
+    await user.click(screen.getByRole('menuitem', { name: /suspend user/i }));
+    return { trigger, dialog: await screen.findByRole('dialog') };
+  }
+
+  it('returns focus to the row trigger and releases the page after Cancel', async () => {
+    const user = userEvent.setup();
+    const { trigger, dialog } = await openSuspend(user);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(document.body.style.pointerEvents).toBe('');
+  });
+
+  it('returns focus to the row trigger and releases the page after a successful suspend', async () => {
+    const user = userEvent.setup();
+    const { trigger, dialog } = await openSuspend(user);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Suspend user' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(document.body.style.pointerEvents).toBe('');
+  });
+
+  it('runs once while in flight: one call, a busy button, Cancel disabled, Escape ignored', async () => {
+    mocks.banUserAction.mockReturnValue(new Promise(() => {}));
+    const user = userEvent.setup();
+    const { dialog } = await openSuspend(user);
+
+    const confirm = within(dialog).getByRole('button', { name: 'Suspend user' });
+    await user.click(confirm);
+    await user.click(within(dialog).getByRole('button', { name: 'Suspending…' }));
+
+    expect(mocks.banUserAction).toHaveBeenCalledTimes(1);
+    const busy = within(dialog).getByRole('button', { name: 'Suspending…' });
+    expect(busy).toHaveAttribute('aria-disabled', 'true');
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+
 describe('restoring a user', () => {
   it('confirms, calls the unban action and announces success', async () => {
     const user = userEvent.setup();
@@ -164,8 +242,8 @@ describe('restoring a user', () => {
   it('shows the refusal in the dialog when restoring fails', async () => {
     mocks.unbanUserAction.mockResolvedValue({ success: false, error: 'User not found' });
     const user = userEvent.setup();
-    render(<UserRowActions userId="user-123" />);
-    await openMenu(user);
+    render(<UserRowActions userId="user-123" userLabel="Ada" />);
+    await openMenu(user, 'Open menu for Ada');
     await user.click(screen.getByRole('menuitem', { name: /restore access/i }));
     const dialog = await screen.findByRole('dialog');
 

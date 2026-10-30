@@ -15,7 +15,6 @@ import {
   userProfileFormSchema,
   type UserProfileFormValues,
 } from '@/lib/admin-users/profile-schema';
-import { useToast } from '@/hooks/use-toast';
 import { Field } from '../_components/form-field';
 import { FormFooter } from '../_components/form-footer';
 import {
@@ -37,7 +36,6 @@ type UserProfileFormProps = {
  */
 export function UserProfileForm({ userId, initialValues }: UserProfileFormProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const form = useForm<UserProfileFormValues>({
     resolver: zodResolver(userProfileFormSchema),
     defaultValues: initialValues,
@@ -63,7 +61,6 @@ export function UserProfileForm({ userId, initialValues }: UserProfileFormProps)
       showFailure({ error: outcome.error ?? 'Something went wrong. Please try again.' });
       return;
     }
-    toast({ title: 'User updated' });
     form.reset(values);
     markSaved();
     router.refresh();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type RefObject } from 'react';
+import { useRef, useState, type RefObject } from 'react';
 import { useRouter } from 'next/navigation';
 import { banUserAction, unbanUserAction } from '@/app/actions/admin/user-actions';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { settleAction } from '@/lib/admin-catalogue/settle-action';
 import { SUSPEND_REASON_MAX } from '@/lib/admin-users/profile-schema';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 export type UserAccessMode = 'suspend' | 'restore';
 
@@ -25,7 +25,7 @@ type UserAccessDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userId: string;
-  /** Name or email, shown in the dialog and the toast. */
+  /** Name or email, shown in the dialog and the toast (the row passes the display name or email). */
   userLabel: string;
   /** Where focus goes when the dialog closes: the row menu trigger, which outlives the menu item. */
   returnFocusTo: RefObject<HTMLElement | null>;
@@ -46,7 +46,7 @@ const COPY = {
     pending: 'Restoring…',
     done: 'restored',
     description:
-      'They can sign in again. The change is recorded in the audit log. Restoring someone who is not suspended changes nothing.',
+      'They can sign in again. The change is recorded in the audit log. Restoring someone who is not suspended leaves their access as it is (an audit entry is still written).',
   },
 } as const;
 
@@ -64,14 +64,15 @@ export function UserAccessDialog({
   returnFocusTo,
 }: UserAccessDialogProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // A second click can arrive before the re-render that disables the button; the ref closes that gap.
+  const busy = useRef(false);
   const copy = COPY[mode];
 
   function handleOpenChange(next: boolean): void {
-    if (pending) return;
+    if (busy.current) return;
     if (!next) {
       setError(null);
       setReason('');
@@ -80,7 +81,8 @@ export function UserAccessDialog({
   }
 
   async function confirm(): Promise<void> {
-    if (pending) return;
+    if (busy.current) return;
+    busy.current = true;
     setPending(true);
     setError(null);
     const result = await settleAction<{ success: boolean; error?: string }>(() =>
@@ -88,6 +90,7 @@ export function UserAccessDialog({
         ? banUserAction(userId, reason.trim() || undefined)
         : unbanUserAction(userId)
     );
+    busy.current = false;
     setPending(false);
     if (!result.success) {
       setError(result.error ?? 'Something went wrong. Please try again.');

@@ -13,14 +13,9 @@ export const PHONE_PATTERN = /^[0-9+()\-. ]{3,20}$/;
 /** The reason an admin gives when suspending an account; the API caps it at 200 characters. */
 export const SUSPEND_REASON_MAX = 200;
 
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:' || url.protocol === 'http:';
-  } catch {
-    return false;
-  }
-}
+/** The backend accepts a website that starts with exactly `http://` or `https://`; the form and the action agree. */
+export const WEBSITE_PATTERN = /^https?:\/\//;
+export const WEBSITE_ERROR = 'Enter a full http:// or https:// address.';
 
 function text(max: number) {
   return z.string().trim().max(max, `Keep this to ${max} characters or fewer.`);
@@ -32,8 +27,8 @@ export const userProfileFormSchema = z.object({
   bio: text(BIO_MAX),
   location: text(LOCATION_MAX),
   website: text(WEBSITE_MAX).refine(
-    (value) => value === '' || isHttpUrl(value),
-    'Enter a full http:// or https:// address.'
+    (value) => value === '' || WEBSITE_PATTERN.test(value),
+    WEBSITE_ERROR
   ),
   phoneNumber: z
     .string()
