@@ -7,24 +7,39 @@
  * `to`/`from`/`url`, and the `referer` header are all scrubbed of:
  *
  * - a `token` parameter (exact name);
- * - any parameter whose name contains `email` or `e-mail` (`email`, `Email`, `newsletter_email`, `emailAddress`);
+ * - any parameter whose name contains `email` or `e-mail` (`email`, `Email`, `newsletter_email`, `emailAddress`,
+ *   `EMAIL%5B%5D`), in the query or in a `#fragment`;
  * - any other parameter whose value is an email address (`?q=a%40b.com`: the public search box and the admin user
  *   search both take free text, and people type addresses into them).
  *
- * Each shape is covered in plain, percent-encoded (also nested in another URL, and encoded twice), JSON,
- * escaped-JSON and percent-encoded-JSON form, plus query strings held as an object or as name/value pairs. Next.js
- * also sends the route it is rendering in the `next-router-state-tree` header, which can embed the query as JSON
- * (`__PAGE__?{"token":"..."}`); that header is replaced whole.
+ * Last, any address-shaped token in any string (`name@domain.tld`, plain or percent-encoded, also twice) is
+ * replaced wherever it sits: a path segment (`/contacts/a%40b.com`), userinfo (`https://a%40b.com@host/`), a
+ * nameless query (`?a%40b.com`), a fragment or free text. The domain must be dotted and end in a label that
+ * starts with a letter, so `user@host`, `@scope/pkg`, `@Injectable()` and `pkg@8.1.0` are left alone. Not
+ * covered: a quoted local part with a space (`"a b"@x.test`), a local part longer than 256 characters (the
+ * rest is replaced, a leading part is not), and other spellings of `@` (full-width, `&#64;`).
+ *
+ * Each parameter shape is covered in plain, percent-encoded (also nested in another URL, and encoded twice),
+ * JSON, escaped-JSON and percent-encoded-JSON form, plus query strings held as an object or as name/value
+ * pairs. Next.js also sends the route it is rendering in the `next-router-state-tree` header, which can embed
+ * the query as JSON (`__PAGE__?{"token":"..."}`); that header is replaced whole.
  * `scrubEvent` is used as `beforeSend` and `beforeSendTransaction` in the client, server and edge configs.
  *
- * Pure: it never mutates its input, walks only plain objects and arrays to a bounded depth, and returns every
- * other value (dates, class instances) as it is. It never throws: an event it cannot walk safely is dropped
- * (`null`, which Sentry treats as "do not send"). It does not look for bare addresses outside a URL or query.
+ * Pure: it never mutates its input, walks only plain objects and arrays, and returns every other value (dates,
+ * class instances) as it is. It never throws: an event it cannot walk safely is dropped (`null`, which Sentry
+ * treats as "do not send"; the SDK records a dropped `before_send` event in its Client Reports, so keep
+ * `sendClientReports` on). A cycle becomes `[Circular]`, a child shared by several parents is walked once, an
+ * object nested deeper than `MAX_DEPTH` becomes `[Filtered]`, and more than `MAX_NODES` objects drops the event.
+ * Sentry's own `normalizeDepth` (default 3) already truncates and de-cycles most events before the hooks run
+ * and is the first line of defence; these limits cover whatever still gets through.
  */
 
 export const FILTERED = '[Filtered]';
 
 const MAX_DEPTH = 12;
+/** Objects and arrays visited per event; past this the event is dropped. */
+const MAX_NODES = 100_000;
+const CIRCULAR = '[Circular]';
 const QUERY_KEYS = new Set(['query_string', 'query', 'http.query', 'url.query']);
 /** Header whose value carries the rendered route, including its query. Matched in lower case. */
 const ROUTER_STATE_KEYS = new Set(['next-router-state-tree']);
@@ -35,11 +50,13 @@ const PASS_THROUGH_KEY = 'sdkProcessingMetadata';
 
 // `%` followed by any number of `25` is one percent sign encoded zero or more times (`%3D`, `%253D`, ...).
 const PCT = '%(?:25)*';
+/** One character of a parameter name: a word character, `.`, `[`, `]`, `-`, or a percent-escape that is no delimiter. */
+const NAME_CHAR = `(?:[\\w.[\\]-]|%(?!(?:25)*(?:3D|26|3F|23))[0-9a-f]{2})`;
 /** A parameter name that is always filtered: `token`, or anything containing `email` / `e-mail`. */
-const SENSITIVE_NAME = '(?:token|[\\w.[\\]-]*e-?mail[\\w.[\\]-]*)';
-const ANY_NAME = '[\\w.[\\]-]+';
-/** What can start a parameter: the start, `?`, `&`, `;`, or one of those percent-encoded (a URL inside a URL). */
-const START = `(^|[?&;]|${PCT}(?:3F|26))`;
+const SENSITIVE_NAME = `(?:token|${NAME_CHAR}*e-?mail${NAME_CHAR}*)`;
+const ANY_NAME = `${NAME_CHAR}+`;
+/** What can start a parameter: the start, `?`, `&`, `;`, `#`, or one of those percent-encoded (a URL in a URL). */
+const START = `(^|[?&;#]|${PCT}(?:3F|26|23))`;
 const EQUALS = `(?:=|${PCT}3D)`;
 /** A value runs up to `&`, `#`, `;`, white space, a quote, or an encoded `&` or `#`. */
 const VALUE = `(?:(?!${PCT}(?:26|23))[^&#;\\s"'])*`;
@@ -68,6 +85,14 @@ const JSON_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
   ],
 ];
 
+// Address-shaped tokens are found from the `@` outward, so a long run of look-alike characters costs no more
+// than the run itself: no pattern has to start at every character.
+const MARK_SCAN = /@|%(?:25)*40/gi;
+const LOCAL_CHAR = /[\w.+!%-]/;
+const MAX_LOCAL_LENGTH = 256;
+const DOT = `(?:\\.|%(?:25)*2E)`;
+const DOMAIN = new RegExp(`[\\w-]+(?:${DOT}[\\w-]+)*${DOT}[a-z][\\w-]*`, 'iy');
+
 function isSensitiveName(name: string): boolean {
   const lower = name.toLowerCase();
   return lower === 'token' || /e-?mail/.test(lower);
@@ -77,15 +102,53 @@ function hasAddressMark(text: string): boolean {
   return ADDRESS_MARK.test(text);
 }
 
+/** The [start, end) spans of address-shaped tokens in `text`, merged where they touch. */
+function addressSpans(text: string): Array<[number, number]> {
+  const spans: Array<[number, number]> = [];
+  MARK_SCAN.lastIndex = 0;
+  for (let mark = MARK_SCAN.exec(text); mark !== null; mark = MARK_SCAN.exec(text)) {
+    const afterMark = mark.index + mark[0].length;
+    DOMAIN.lastIndex = afterMark;
+    const domain = DOMAIN.exec(text);
+    if (domain === null) continue;
+    let start = mark.index;
+    while (
+      start > 0 &&
+      mark.index - start < MAX_LOCAL_LENGTH &&
+      LOCAL_CHAR.test(text.charAt(start - 1))
+    ) {
+      start -= 1;
+    }
+    if (start === mark.index) continue;
+    const end = afterMark + domain[0].length;
+    const last = spans[spans.length - 1];
+    if (last !== undefined && start <= last[1]) last[1] = Math.max(last[1], end);
+    else spans.push([start, end]);
+  }
+  return spans;
+}
+
+function redactAddresses(text: string): string {
+  if (!hasAddressMark(text)) return text;
+  let result = '';
+  let cursor = 0;
+  for (const [start, end] of addressSpans(text)) {
+    result += text.slice(cursor, start) + FILTERED;
+    cursor = end;
+  }
+  return result + text.slice(cursor);
+}
+
 function scrubString(value: string): string {
   const named = value.replace(NAMED_PARAM, `$1$2${FILTERED}`);
   const valued = named.replace(ANY_PARAM, (match, start: string, name: string, text: string) =>
     hasAddressMark(text) ? `${start}${name}${FILTERED}` : match
   );
-  return JSON_PATTERNS.reduce(
+  const withoutParams = JSON_PATTERNS.reduce(
     (text, [pattern, replacement]) => text.replace(pattern, replacement),
     valued
   );
+  return redactAddresses(withoutParams);
 }
 
 /** A string known to be (part of) a query: anything still holding an address after scrubbing goes whole. */
@@ -99,26 +162,29 @@ function isPlainObject(value: object): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-function scrubPair(name: string, value: unknown, depth: number): unknown[] {
+/** State shared by one walk: the path from the root, finished children, and the number of nodes seen. */
+type Walk = {
+  readonly ancestors: Set<object>;
+  /** Finished results, one map for query context and one for the rest: a shared child is scrubbed once. */
+  readonly done: readonly [Map<object, unknown>, Map<object, unknown>];
+  nodes: number;
+};
+
+function scrubPair(name: string, value: unknown, depth: number, walk: Walk): unknown[] {
   if (isSensitiveName(name)) return [name, FILTERED];
   const scrubbedValue =
-    typeof value === 'string' ? scrubQueryText(value) : scrub(value, depth + 1, true);
+    typeof value === 'string' ? scrubQueryText(value) : scrub(value, depth + 1, true, walk);
   return [scrubQueryText(name), scrubbedValue];
 }
 
-function scrub(value: unknown, depth: number, inQuery: boolean): unknown {
-  if (typeof value === 'string') return inQuery ? scrubQueryText(value) : scrubString(value);
-  if (value === null || typeof value !== 'object' || depth >= MAX_DEPTH) return value;
-
+function scrubContainer(value: object, depth: number, inQuery: boolean, walk: Walk): unknown {
   if (Array.isArray(value)) {
     // A query string as [name, value] pairs.
     if (inQuery && value.length === 2 && typeof value[0] === 'string') {
-      return scrubPair(value[0], value[1], depth);
+      return scrubPair(value[0], value[1], depth, walk);
     }
-    return value.map((item) => scrub(item, depth + 1, inQuery));
+    return value.map((item) => scrub(item, depth + 1, inQuery, walk));
   }
-
-  if (!isPlainObject(value)) return value;
 
   const result: Record<string, unknown> = {};
   for (const [key, item] of Object.entries(value)) {
@@ -129,19 +195,43 @@ function scrub(value: unknown, depth: number, inQuery: boolean): unknown {
     } else if (ROUTER_STATE_KEYS.has(lower) || (inQuery && isSensitiveName(key))) {
       result[key] = FILTERED;
     } else {
-      result[scrubString(key)] = scrub(item, depth + 1, inQuery || QUERY_KEYS.has(key));
+      result[scrubString(key)] = scrub(item, depth + 1, inQuery || QUERY_KEYS.has(key), walk);
     }
   }
   return result;
 }
 
+function scrub(value: unknown, depth: number, inQuery: boolean, walk: Walk): unknown {
+  if (typeof value === 'string') return inQuery ? scrubQueryText(value) : scrubString(value);
+  if (value === null || typeof value !== 'object') return value;
+  if (!Array.isArray(value) && !isPlainObject(value)) return value;
+  if (depth >= MAX_DEPTH) return FILTERED;
+  if (walk.ancestors.has(value)) return CIRCULAR;
+
+  const finished = walk.done[inQuery ? 1 : 0];
+  if (finished.has(value)) return finished.get(value);
+
+  walk.nodes += 1;
+  if (walk.nodes > MAX_NODES) throw new Error('event too large to scrub');
+
+  walk.ancestors.add(value);
+  try {
+    const result = scrubContainer(value, depth, inQuery, walk);
+    finished.set(value, result);
+    return result;
+  } finally {
+    walk.ancestors.delete(value);
+  }
+}
+
 /**
- * A copy of the event with tokens, email addresses in URLs and queries, the router state header and cookies
+ * A copy of the event with tokens, email addresses in URLs and strings, the router state header and cookies
  * removed, or `null` (drop the event) if it could not be walked safely.
  */
 export function scrubEvent<T extends object>(event: T): T | null {
   try {
-    return scrub(event, 0, false) as T;
+    const walk: Walk = { ancestors: new Set(), done: [new Map(), new Map()], nodes: 0 };
+    return scrub(event, 0, false, walk) as T;
   } catch {
     return null;
   }

@@ -153,10 +153,10 @@ describe('scrubEvent: email addresses in URLs', () => {
     );
   });
 
-  it('does not touch an email key or an address outside a query or URL', () => {
-    const event = { user: { email: ADDRESS }, extra: { email: ADDRESS }, message: ADDRESS };
+  it('leaves an email key alone outside a query, but still replaces the address it holds', () => {
+    const scrubbed = scrubEvent({ user: { email: ADDRESS, id: '7' }, extra: { email: ADDRESS } });
 
-    expect(scrubEvent(event)).toEqual(event);
+    expect(scrubbed).toEqual({ user: { email: FILTERED, id: '7' }, extra: { email: FILTERED } });
   });
 
   it('does not mutate the original event', () => {

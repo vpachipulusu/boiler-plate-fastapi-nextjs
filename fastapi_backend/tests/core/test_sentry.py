@@ -268,6 +268,39 @@ def test_breadcrumbs_drop_an_email_address_held_in_a_url_path(url: str) -> None:
     assert crumb["data"]["reason"] == "OK"
 
 
+def test_breadcrumbs_redact_addresses_in_nested_data_at_any_depth() -> None:
+    crumb = scrub_breadcrumb(
+        {
+            "category": "httplib",
+            "data": {
+                "extra": {"url": "https://api.brevo.com/v3/contacts/a%40b.com"},
+                "items": [{"to": "victim@example.com"}, "x"],
+            },
+        }
+    )
+
+    text = json.dumps(crumb)
+    assert "a%40b.com" not in text
+    assert "victim" not in text
+    assert (
+        crumb["data"]["extra"]["url"] == f"https://api.brevo.com/v3/contacts/{FILTERED}"
+    )
+    assert crumb["data"]["items"] == [{"to": FILTERED}, "x"]
+
+
+def test_scrub_redacts_addresses_in_contexts_extra_and_headers_at_any_depth() -> None:
+    event = {
+        "contexts": {"app": {"deep": {"url": "https://x/contacts/a%40b.com"}}},
+        "extra": {"rows": [{"email": "victim@example.com"}], "n": 3},
+        "request": {"headers": {"referer": "https://x/c/a%40b.com"}},
+    }
+
+    text = json.dumps(scrub_event(event))
+
+    assert "a%40b.com" not in text
+    assert "victim" not in text
+
+
 def test_scrub_drops_an_email_address_held_in_the_request_path() -> None:
     event = {"request": {"url": f"http://test/v1/x/{ADDRESS}?token=abc"}}
 

@@ -245,22 +245,31 @@ names, span data and attributes, breadcrumb `to`, `from` and `url`, `extra`, `co
 | What | Why it is listed |
 | --- | --- |
 | `token` parameter (exact name) | one-use alert tokens in the confirm and unsubscribe links |
-| any parameter whose name contains `email` or `e-mail` (`email`, `Email`, `newsletter_email`, `emailAddress`) | the parameter FREEJ-24 removed; kept as defence in depth |
+| any parameter whose name contains `email` or `e-mail` (`email`, `Email`, `newsletter_email`, `emailAddress`, `EMAIL%5B%5D`), in the query or after a `#` | the parameter FREEJ-24 removed; kept as defence in depth |
 | any parameter whose value contains an email address (`?q=a%40b.com`) | the two search boxes above |
+| any address-shaped token (`name@domain.tld`, plain, `%40` or `%2540`) in any string: path segments, userinfo, nameless queries, fragments, free text | defence for places an address could land that no parameter name catches |
 | the `next-router-state-tree` header (whole) and cookie headers | the router state can embed the query as JSON |
 
 Each is handled in plain, percent-encoded (also nested in another URL and encoded twice), JSON, escaped-JSON and
 percent-encoded-JSON form, and for a query held as a string, an object or a list of name/value pairs. It is pure
-(never mutates), bounded in depth, and never throws: an event it cannot walk is dropped (`null`). Parameters such as
+(never mutates), bounded, and never throws: a cycle becomes `[Circular]`, a shared child is walked once, an object nested
+more than 12 deep becomes `[Filtered]`, and an event of more than 100 000 objects is dropped (`null`, as is any event it
+cannot walk; keep Sentry's `sendClientReports` on so the drop is counted). Sentry's own `normalizeDepth` is the first line of
+defence. The address pass needs a dotted domain ending in a label that starts with a letter, so stack-frame
+file names (`node_modules/@sentry/core/...`, `@radix-ui/react-dialog`), decorators (`@Injectable()`), `user@host` and
+`pkg@8.1.0` are left alone. Parameters such as
 `oobCode`, `apiKey` (Firebase's public key appears as `?key=` on `googleapis.com` fetch breadcrumbs), `e` and `mail`
 are deliberately **not** listed: they do not appear in any URL of this app, and adding names that never occur only
 hides real findings. Add a name to `SENSITIVE_NAME` in `scrub-event.ts` (and a test) when a flow starts using one.
-Not covered: a bare address that is not in a URL or query (for example inside an exception message).
-Tests: `src/__tests__/unit/lib/sentry-scrub-event.test.ts` (token) and `sentry-scrub-email.test.ts` (hostile URLs,
-every shape above). They run on constructed events; **nothing here has been checked against a live Sentry project**.
+Not covered: a quoted local part with a space (`"a b"@x.test`), a local part longer than 256 characters (only its last
+256 characters are replaced), and other spellings of `@` (full-width, `&#64;`).
+Tests: `src/__tests__/unit/lib/sentry-scrub-event.test.ts` (token), `sentry-scrub-email.test.ts` (hostile URLs,
+every shape above), `sentry-scrub-hardening.test.ts` (cycles, shared references, depth, fragments, encoded names,
+address tokens, false-positive guards) and `sentry-configs.test.ts` (the three configs register the hooks). They run on constructed events; **nothing here has been checked against a live Sentry project**.
 
 **Backend.** `app/core/sentry.py` already dropped query strings, bodies and cookies; FREEJ-31 also redacts an email
-address from a request path and from every breadcrumb value, because the Brevo contact lookup and delete calls put
+address from the request path and from every string at any depth in breadcrumb data, `contexts`, `extra` and headers,
+because the Brevo contact lookup and delete calls put
 the subscriber's address in the path (`/contacts/<email>`) and the SDK's httpx integration records that URL.
 `configure_logging` now holds the `httpx` and `httpcore` loggers at WARNING for the same reason (httpx logs each
 request line, URL included, at INFO). The uvicorn access log still prints the request line, so keep running the

@@ -31,11 +31,28 @@ SERVER_NAME = "yourapp-api"
 # A path segment, query value or header word holding an email address, plain or
 # percent-encoded (also twice). The Brevo contact calls put the address in the path
 # (``/contacts/<email>``) and the SDK's httpx integration records that URL as a breadcrumb.
-EMAIL_SEGMENT = re.compile(r"[^\s/?#&=;]*(?:@|%(?:25)*40)[^\s/?#&=;]*", re.IGNORECASE)
+# Split into tokens first and test each for the mark, so a long run with no address
+# costs one pass, not one per start position.
+URL_TOKEN = re.compile(r"[^\s/?#&=;]+")
+ADDRESS_MARK = re.compile(r"@|%(?:25)*40", re.IGNORECASE)
+
+
+def _redact_addresses(value: Any) -> Any:
+    """Return ``value`` with any email address replaced; non-strings pass through."""
+    if not isinstance(value, str):
+        return value
+    return URL_TOKEN.sub(
+        lambda token: FILTERED if ADDRESS_MARK.search(token.group()) else token.group(),
+        value,
+    )
 
 
 def _redact_keys(value: Any) -> Any:
-    """Return a copy of ``value`` with sensitive dict keys' values filtered."""
+    """Return a copy of ``value`` with sensitive keys filtered and addresses redacted.
+
+    Every string leaf at any depth loses an email address (``_redact_addresses``);
+    a dict value under a sensitive key is filtered whole.
+    """
     if isinstance(value, dict):
         return {
             key: FILTERED if SENSITIVE_NAME.search(str(key)) else _redact_keys(item)
@@ -43,14 +60,7 @@ def _redact_keys(value: Any) -> Any:
         }
     if isinstance(value, list):
         return [_redact_keys(item) for item in value]
-    return value
-
-
-def _redact_addresses(value: Any) -> Any:
-    """Return ``value`` with any email address replaced; non-strings pass through."""
-    if not isinstance(value, str):
-        return value
-    return EMAIL_SEGMENT.sub(FILTERED, value)
+    return _redact_addresses(value)
 
 
 def _strip_query(url: Any) -> Any:
@@ -87,10 +97,7 @@ def scrub_breadcrumb(crumb: Any, _hint: Any = None) -> Any:
     data = crumb.get("data")
     if isinstance(data, dict):
         crumb["data"] = _redact_keys(
-            {
-                k: _strip_query(v) if k == "url" else _redact_addresses(v)
-                for k, v in data.items()
-            }
+            {k: _strip_query(v) if k == "url" else v for k, v in data.items()}
         )
     return crumb
 

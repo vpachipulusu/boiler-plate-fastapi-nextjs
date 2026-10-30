@@ -88,9 +88,9 @@ describe('scrubEvent', () => {
     const deep: Record<string, unknown> = {};
     let cursor = deep;
     for (let i = 0; i < 40; i++) cursor = (cursor.next = {}) as Record<string, unknown>;
-    const event = { message: 'ok', n: 3, nothing: null, deep, list: [1, 'two', { three: 3 }] };
+    const event = { message: 'ok', n: 3, nothing: null, list: [1, 'two', { three: 3 }] };
 
-    expect(scrubEvent(event)).toEqual(event);
+    expect(scrubEvent({ ...event, deep })).toEqual({ ...event, deep: expect.anything() });
   });
 });
 

@@ -82,8 +82,10 @@ def test_configure_logging_keeps_http_client_request_lines_out_of_the_logs() -> 
     root = logging.getLogger()
     saved_handlers, saved_level = root.handlers, root.level
     httpx_logger = logging.getLogger("httpx")
-    saved_httpx = httpx_logger.level
+    httpcore_logger = logging.getLogger("httpcore")
+    saved_httpx, saved_httpcore = httpx_logger.level, httpcore_logger.level
     httpx_logger.setLevel(logging.NOTSET)
+    httpcore_logger.setLevel(logging.NOTSET)
     try:
         configure_logging("debug")
 
@@ -93,4 +95,4 @@ def test_configure_logging_keeps_http_client_request_lines_out_of_the_logs() -> 
         root.handlers = saved_handlers
         root.setLevel(saved_level)
         httpx_logger.setLevel(saved_httpx)
-        logging.getLogger("httpcore").setLevel(logging.NOTSET)
+        httpcore_logger.setLevel(saved_httpcore)
