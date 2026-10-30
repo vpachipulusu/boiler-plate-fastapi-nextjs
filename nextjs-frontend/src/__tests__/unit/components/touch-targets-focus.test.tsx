@@ -39,10 +39,10 @@ describe('Single focus ring', () => {
   it('defines the focus-proxy outline once, with the same 3px --ring outline and a --cta inverse variant', () => {
     const css = read('app/globals.css');
     expect(css).toMatch(
-      /label:has\(> \.sr-only:focus-visible\),\s*article:has\(a:focus-visible\)\s*\{\s*outline: 3px solid hsl\(var\(--ring\)\);\s*outline-offset: 2px;/
+      /label:has\(> \.sr-only:focus-visible\),\s*article\.focus-proxy:has\(a:focus-visible\)\s*\{\s*outline: 3px solid hsl\(var\(--ring\)\);\s*outline-offset: 2px;/
     );
     expect(css).toMatch(
-      /\.on-inverse label:has\(> \.sr-only:focus-visible\),\s*\.on-inverse article:has\(a:focus-visible\)\s*\{\s*outline-color: hsl\(var\(--cta\)\);/
+      /\.on-inverse label:has\(> \.sr-only:focus-visible\),\s*\.on-inverse article\.focus-proxy:has\(a:focus-visible\)\s*\{\s*outline-color: hsl\(var\(--cta\)\);/
     );
     // A label that only contains a link (the alerts consent line) is not a proxy.
     expect(css).not.toMatch(/label:has\([^)]*a:focus-visible/);
@@ -52,7 +52,7 @@ describe('Single focus ring', () => {
     const css = read('app/globals.css');
 
     expect(css).toMatch(
-      /@supports not selector\(:has\(\*\)\)\s*\{[^}]*article a\[href\]:focus-visible\s*\{\s*outline: 3px solid hsl\(var\(--ring\)\);/
+      /@supports not selector\(:has\(\*\)\)\s*\{[^}]*article\.focus-proxy a\[href\]:focus-visible\s*\{\s*outline: 3px solid hsl\(var\(--ring\)\);/
     );
   });
 
@@ -60,7 +60,7 @@ describe('Single focus ring', () => {
     const css = read('app/globals.css');
 
     expect(css).toMatch(
-      /@media \(forced-colors: active\)\s*\{\s*@supports selector\(:has\(\*\)\)\s*\{\s*article a\[href\]:focus-visible\s*\{\s*outline-style: none;/
+      /@media \(forced-colors: active\)\s*\{\s*@supports selector\(:has\(\*\)\)\s*\{\s*article\.focus-proxy a\[href\]:focus-visible\s*\{\s*outline-style: none;/
     );
   });
 });

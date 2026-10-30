@@ -97,6 +97,27 @@ describe('focus-proxy outline has a single source', () => {
       .filter((rel) => PROXY_UTILITY.test(readFileSync(join(SRC, rel), 'utf8')));
     expect(offenders).toEqual([]);
   });
+
+  it('gives every <article> the focus-proxy hook and at most one link, so the card outline never doubles a link outline', () => {
+    const problems = sourceFiles(SRC)
+      .map((file) => relative(SRC, file).split(sep).join('/'))
+      .filter((rel) => rel.endsWith('.tsx'))
+      .flatMap((rel) => {
+        const source = readFileSync(join(SRC, rel), 'utf8');
+        return Array.from(source.matchAll(/<article\b[\s\S]*?<\/article>/g)).flatMap(([block]) => {
+          // The opening tag ends at the first `>` that closes a line.
+          const opening = block.match(/^<article\b[\s\S]*?>[ \t]*\r?\n/)?.[0] ?? '';
+          const links = block.match(/<(?:Link|a)\b/g)?.length ?? 0;
+          return [
+            ...(opening.includes('focus-proxy')
+              ? []
+              : [`${rel}: <article> without the focus-proxy class`]),
+            ...(links > 1 ? [`${rel}: <article> with ${links} links`] : []),
+          ];
+        });
+      });
+    expect(problems).toEqual([]);
+  });
 });
 
 describe('single global focus outline', () => {
@@ -113,5 +134,26 @@ describe('single global focus outline', () => {
       (rel) => !new RegExp(OUTLINE_OFF).test(readFileSync(join(SRC, rel), 'utf8'))
     );
     expect(stale).toEqual([]);
+  });
+
+  it('allows exactly one outline-off in globals.css, inside the forced-colors block', () => {
+    const css = readFileSync(join(SRC, 'app/globals.css'), 'utf8');
+    const matches = Array.from(css.matchAll(new RegExp(OUTLINE_OFF, 'g')));
+    expect(matches).toHaveLength(1);
+
+    const start = css.indexOf('@media (forced-colors: active)');
+    expect(start).toBeGreaterThan(-1);
+    let depth = 0;
+    let end = start;
+    for (let i = css.indexOf('{', start); i < css.length; i++) {
+      if (css[i] === '{') depth += 1;
+      if (css[i] === '}') depth -= 1;
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+    }
+    expect(matches[0].index).toBeGreaterThan(start);
+    expect(matches[0].index).toBeLessThan(end);
   });
 });

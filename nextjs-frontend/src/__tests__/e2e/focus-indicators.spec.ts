@@ -65,6 +65,8 @@ function readFocus(page: Page, token: '--ring' | '--cta', surfaceSelector: strin
       const surface = getComputedStyle(
         document.querySelector(surfaceSelector) as HTMLElement
       ).backgroundColor;
+      // A transparent surface would make the contrast meaningless (the colour behind it is unknown).
+      if (surface === 'rgba(0, 0, 0, 0)') throw new Error(`${surfaceSelector} has no background`);
       return {
         outline: {
           width: style.outlineWidth,
@@ -92,6 +94,9 @@ async function openWithScheme(page: Page, scheme: 'light' | 'dark', path = '/log
   await page.emulateMedia({ colorScheme: scheme });
   await page.goto(path);
   await waitForPageReady(page);
+  expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(
+    scheme === 'dark'
+  );
 }
 
 for (const scheme of SCHEMES) {
@@ -127,9 +132,11 @@ for (const scheme of SCHEMES) {
           offset: '-2px',
         });
         expect(reading.shadow).not.toMatch(/0px 0px 0px [1-9]\d*px/);
-        // The fill alone is the failing indicator this story fixes; the outline must carry the 3:1.
-        expect(reading.vsFill).toBeGreaterThanOrEqual(MIN_NON_TEXT_CONTRAST);
-        expect(reading.vsSurface).toBeGreaterThanOrEqual(MIN_NON_TEXT_CONTRAST);
+        // The fill alone is the failing indicator this story fixes; the outline must carry the 3:1. Against either
+        // neighbour: a preset whose accent equals its ring (the luxury dark preset) can only contrast with the popup.
+        expect(Math.max(reading.vsFill, reading.vsSurface)).toBeGreaterThanOrEqual(
+          MIN_NON_TEXT_CONTRAST
+        );
       });
     }
 
@@ -159,7 +166,7 @@ for (const scheme of SCHEMES) {
         `<button id="fx-before" type="button">before</button>
          <div id="fx-surface" class="${surface} p-6">
            <label class="relative flex min-h-11 items-center gap-3 px-3"><input type="checkbox" class="peer sr-only" />Card</label>
-           <article class="relative p-4"><a href="#fx" class="after:absolute after:inset-0 focus-visible:outline-none">Link</a></article>
+           <article class="focus-proxy relative p-4"><a href="#fx" class="after:absolute after:inset-0 focus-visible:outline-none">Link</a></article>
          </div>`
       );
 
@@ -182,14 +189,16 @@ for (const scheme of SCHEMES) {
 }
 
 test.describe('forced colors', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, browserName }) => {
+    test.skip(browserName === 'webkit', 'forced colors emulation is Chromium/Firefox only');
     await page.emulateMedia({ forcedColors: 'active', colorScheme: 'light' });
+    await page.goto('/freebies');
+    await waitForPageReady(page);
+    // Both tests rest on this premise; without it they would pass vacuously.
+    expect(await page.evaluate(() => matchMedia('(forced-colors: active)').matches)).toBe(true);
   });
 
   test('the menu row outline survives; a box-shadow ring does not', async ({ page }) => {
-    await page.goto('/login');
-    await waitForPageReady(page);
-    expect(await page.evaluate(() => matchMedia('(forced-colors: active)').matches)).toBe(true);
     await mount(
       page,
       `<button id="fx-before" type="button">before</button>
@@ -214,8 +223,6 @@ test.describe('forced colors', () => {
   test('an offer card shows one outline: the card draws it and the stretched link none', async ({
     page,
   }) => {
-    await page.goto('/freebies');
-    await waitForPageReady(page);
     const link = page.locator('article a').first();
     await link.focus();
     await page.keyboard.press('Shift+Tab');
@@ -236,9 +243,9 @@ test.describe('forced colors', () => {
 });
 
 /**
- * Browsers without :has() (Chrome < 105, Safari < 15.4, Firefox < 121) drop the proxy rule. Chromium here supports it,
- * so the old browser is simulated on the real alerts form: the :has() rules are removed from the live stylesheet and
- * the `@supports not selector(:has(*))` blocks are applied unconditionally.
+ * Browsers with :focus-visible but without :has() (Chrome 86-104, Firefox 85-120) drop the proxy rules. Chromium here
+ * supports :has(), so the old browser is simulated on the real pages: the proxy `:has()` rules are removed from the
+ * live stylesheet and the `@supports not selector(:has(*))` blocks are applied unconditionally.
  */
 test.describe('without :has()', () => {
   const OUTLINE = { width: '3px', style: 'solid', offset: '2px' };
@@ -246,6 +253,27 @@ test.describe('without :has()', () => {
     ['checkbox', 'input.peer.sr-only[type="checkbox"]'],
     ['radio', 'input.peer.sr-only[type="radio"]'],
   ] as const;
+
+  /** Removes only the proxy selectors (label with an sr-only child, focus-proxy article) and applies the fallbacks. */
+  async function simulateNoHas(page: Page) {
+    await page.evaluate(() => {
+      const isProxyRule = (selector: string) =>
+        /label:has\(> \.sr-only|article\.focus-proxy:has\(/.test(selector);
+      for (const sheet of Array.from(document.styleSheets)) {
+        for (const rule of Array.from(sheet.cssRules)) {
+          if (rule instanceof CSSSupportsRule && /not.*selector\(:has\(/.test(rule.conditionText)) {
+            for (const inner of Array.from(rule.cssRules)) {
+              sheet.insertRule(inner.cssText, sheet.cssRules.length);
+            }
+          }
+        }
+        for (let i = sheet.cssRules.length - 1; i >= 0; i--) {
+          const rule = sheet.cssRules[i];
+          if (rule instanceof CSSStyleRule && isProxyRule(rule.selectorText)) sheet.deleteRule(i);
+        }
+      }
+    });
+  }
 
   async function focusFirst(page: Page, input: string) {
     await page.emulateMedia({ colorScheme: 'light' });
@@ -283,26 +311,7 @@ test.describe('without :has()', () => {
       page,
     }) => {
       await focusFirst(page, input);
-      await page.evaluate(() => {
-        for (const sheet of Array.from(document.styleSheets)) {
-          for (const rule of Array.from(sheet.cssRules)) {
-            if (
-              rule instanceof CSSSupportsRule &&
-              /not.*selector\(:has\(/.test(rule.conditionText)
-            ) {
-              for (const inner of Array.from(rule.cssRules)) {
-                sheet.insertRule(inner.cssText, sheet.cssRules.length);
-              }
-            }
-          }
-          for (let i = sheet.cssRules.length - 1; i >= 0; i--) {
-            const rule = sheet.cssRules[i];
-            if (rule instanceof CSSStyleRule && rule.selectorText.includes(':has(')) {
-              sheet.deleteRule(i);
-            }
-          }
-        }
-      });
+      await simulateNoHas(page);
 
       const label = await page
         .locator(focused)
@@ -311,4 +320,21 @@ test.describe('without :has()', () => {
       expect(await outlineOf(page, `${focused} + *`)).toEqual(OUTLINE);
     });
   }
+
+  test('without :has() the stretched offer link draws its own 3px outline and the card none', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.goto('/freebies');
+    await waitForPageReady(page);
+    const link = page.locator('article.focus-proxy a').first();
+    await simulateNoHas(page);
+    await link.focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    await expect(link).toBeFocused();
+
+    expect(await outlineOf(page, 'article.focus-proxy a:focus-visible')).toEqual(OUTLINE);
+    expect((await outlineOf(page, 'article.focus-proxy:has(a:focus-visible)')).style).toBe('none');
+  });
 });

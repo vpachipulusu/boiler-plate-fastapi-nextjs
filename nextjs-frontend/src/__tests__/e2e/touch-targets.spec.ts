@@ -142,6 +142,10 @@ for (const { path, proxy, scheme } of WALKS) {
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto(path);
     await waitForPageReady(page);
+    // The theme follows the system scheme; without this a dark run could silently walk the light theme.
+    expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(
+      scheme === 'dark'
+    );
     if (path === '/alerts') {
       test.skip(
         (await page.locator('input[type="checkbox"]').count()) === 0,

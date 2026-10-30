@@ -29,7 +29,7 @@ export function OfferCard({ offer, merchant, className }: OfferCardProps) {
   return (
     <article
       className={cn(
-        'group relative flex flex-col rounded-card border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md',
+        'focus-proxy group relative flex flex-col rounded-card border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md',
         className
       )}
     >

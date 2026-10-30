@@ -178,18 +178,20 @@
    * card, whose ::after covers the card) hands its outline to the container, so the same 3px outline surrounds the
    * whole card. The control draws none itself (the card link switches its own off). The label rule
    * matches only a direct sr-only child: a label that merely contains a link (the alerts consent line) keeps the
-   * link's own outline. Browsers without :has() (Chrome < 105, Safari < 15.4, Firefox < 121) drop these rules; the
-   * checkbox and radio then fall back to peer-focus-visible in alerts-form.tsx, and the stretched link to the
-   * @supports block below, so a focus indicator is never lost.
+   * link's own outline. The card rule is opt-in through the focus-proxy class on the <article> (offer-card.tsx), so
+   * an article with ordinary links is never outlined as a whole.
+   * Browsers without :has() (Chrome 86-104, Firefox 85-120; Safari < 15.4 has no :focus-visible and shows its
+   * default ring) drop these rules. The checkbox and radio then fall back to peer-focus-visible in alerts-form.tsx,
+   * and the stretched link to the @supports block below, so a focus indicator is never lost.
    */
   label:has(> .sr-only:focus-visible),
-  article:has(a:focus-visible) {
+  article.focus-proxy:has(a:focus-visible) {
     outline: 3px solid hsl(var(--ring));
     outline-offset: 2px;
   }
 
   .on-inverse label:has(> .sr-only:focus-visible),
-  .on-inverse article:has(a:focus-visible) {
+  .on-inverse article.focus-proxy:has(a:focus-visible) {
     outline-color: hsl(var(--cta));
   }
 
@@ -199,7 +201,7 @@
    */
   @media (forced-colors: active) {
     @supports selector(:has(*)) {
-      article a[href]:focus-visible {
+      article.focus-proxy a[href]:focus-visible {
         outline-style: none;
       }
     }
@@ -207,12 +209,12 @@
 
   @supports not selector(:has(*)) {
     /* [href] lifts the specificity above the link's own outline-off utility. */
-    article a[href]:focus-visible {
+    article.focus-proxy a[href]:focus-visible {
       outline: 3px solid hsl(var(--ring));
       outline-offset: 2px;
     }
 
-    .on-inverse article a[href]:focus-visible {
+    .on-inverse article.focus-proxy a[href]:focus-visible {
       outline-color: hsl(var(--cta));
     }
   }

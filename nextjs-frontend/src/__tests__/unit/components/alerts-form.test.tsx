@@ -78,6 +78,9 @@ describe('AlertsForm keyboard focus', () => {
 
       expect(input).toHaveClass('peer', 'sr-only');
       expect(fallback).toHaveAttribute('aria-hidden', 'true');
+      // One overlay on the border box (-inset-px), so the fallback ring matches the :has() outline around the card.
+      expect(fallback).toHaveClass('pointer-events-none', 'absolute', '-inset-px');
+      expect(fallback.closest('label')).toHaveClass('relative');
       // Whole class tokens: tailwind-merge must not have dropped the plain `outline` (style) next to `outline-[3px]`.
       const classes = fallback.className.split(/\s+/);
       for (const utility of ['outline', 'outline-[3px]', 'outline-offset-2', 'outline-ring']) {
