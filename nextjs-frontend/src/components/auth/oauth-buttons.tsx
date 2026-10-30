@@ -43,10 +43,12 @@ const TOTP_ON_LOGIN_PAGE_TOAST = {
 interface OAuthButtonsProps {
   /** Two-factor sign-in is needed: continue with the code step, using this ID token. */
   onTotpRequired?: (idToken: string) => void;
+  /** Where to go after signing in (the login page's `?redirect=` value). Checked again before use; default `/dashboard`. */
+  redirectTo?: string;
 }
 
-export function OAuthButtons({ onTotpRequired }: OAuthButtonsProps = {}) {
-  const completeSignIn = useCompleteSignIn();
+export function OAuthButtons({ onTotpRequired, redirectTo }: OAuthButtonsProps = {}) {
+  const completeSignIn = useCompleteSignIn(redirectTo);
   const { toast } = useToast();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);

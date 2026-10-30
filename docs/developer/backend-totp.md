@@ -62,7 +62,8 @@ still set the session cookie. That fails safe: the person has a session, not a s
 Changing a password signs a 2FA user out: `restoreSessionWithNewPassword` (`src/lib/firebase/reauth.ts`) signs in again
 with the new password and calls `verifyTokenAction(idToken)` without a code, gets `totpRequired` and returns false, so
 the Security page signs the person out and sends them to `/login`, where they sign in with a code.
-The code step also serves Google and GitHub sign-in (`LoginPanel` hands over the ID token from either). The sign-up page
+The code step finishes through the panel's `useCompleteSignIn(redirectTo)`, so a `?redirect=` page (FREEJ-41) is still
+honoured after the code, and after Back and a new sign-in. The code step also serves Google and GitHub sign-in (`LoginPanel` hands over the ID token from either). The sign-up page
 has no code step: a 2FA account that starts a provider sign-in there is told to sign in on the login page.
 
 There are **no backup or recovery codes**. An account that loses its authenticator cannot sign in, and no admin screen

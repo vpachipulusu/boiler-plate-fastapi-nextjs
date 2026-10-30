@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, User, Shield, LogOut } from 'lucide-react';
+import { LayoutDashboard, User, Shield, ShieldCheck, LogOut } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,11 @@ interface DashboardHeaderProps {
     email?: string | null;
     dbDisplayName?: string | null;
     dbAvatarUrl?: string | null;
+    /**
+     * The backend profile says this account is an admin. It only decides whether the menu shows the link: the
+     * `/admin` layout and every admin action check admin access on the server and are the real gate.
+     */
+    isAdmin?: boolean;
   };
 }
 
@@ -68,6 +73,14 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
               <span>Security</span>
             </Link>
           </DropdownMenuItem>
+          {user.isAdmin === true && (
+            <DropdownMenuItem asChild>
+              <Link href="/admin" className="cursor-pointer">
+                <ShieldCheck className="mr-2 h-4 w-4" />
+                <span>Admin</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={handleLogout}
