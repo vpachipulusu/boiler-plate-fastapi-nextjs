@@ -45,6 +45,22 @@ beforeEach(() => {
   mocks.subscribe.mockResolvedValue({ success: true });
 });
 
+describe('AlertsForm promises', () => {
+  it('says how to stop, and makes no "no spam", "anytime" or sold-lists claim', () => {
+    const { container } = render(<AlertsForm categories={CATEGORIES} live />);
+
+    expect(container).toHaveTextContent('Unsubscribe from any email to stop them.');
+    expect(container).toHaveTextContent('Unsubscribe in one click from any email');
+    expect(container.textContent).not.toMatch(/no spam|anytime|sold/i);
+  });
+
+  it('keeps the stored consent text exactly as it is', () => {
+    expect(ALERTS_CONSENT_TEXT).toBe(
+      'I agree to receive freebie emails from Freejoy. I can unsubscribe at any time. See the privacy policy.'
+    );
+  });
+});
+
 describe('AlertsForm while alerts are not open', () => {
   it('shows a plain notice instead of a form, and never calls the server', async () => {
     render(<AlertsForm categories={CATEGORIES} live={false} />);

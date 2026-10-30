@@ -72,9 +72,7 @@ for (const viewport of VIEWPORTS) {
           page.getByRole('group', { name: /interested in/i }).getByRole('checkbox')
         ).toHaveCount(6);
         await expect(page.getByLabel('Daily highlights')).toBeChecked();
-        await expect(
-          page.getByText('No spam · no sold email lists · unsubscribe in one click')
-        ).toBeVisible();
+        await expect(page.getByText('Unsubscribe in one click from any email')).toBeVisible();
       });
 
       test('shows an error for each missing answer and sends no request', async ({ page }) => {

@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
@@ -11,6 +12,8 @@ export const OUTBOUND_LINK_REL = 'sponsored nofollow noopener';
 interface OutboundLinkProps {
   offerId: string;
   className?: string;
+  /** The id of text that describes the link (for example the postage line). Forwarded as-is. */
+  'aria-describedby'?: string;
   children: React.ReactNode;
 }
 
@@ -19,9 +22,19 @@ interface OutboundLinkProps {
  * `Link` prefetches when it scrolls into view, which would load `/go/<id>` and could count a click the
  * visitor never made.
  */
-export function OutboundLink({ offerId, className, children }: OutboundLinkProps) {
+export function OutboundLink({
+  offerId,
+  className,
+  'aria-describedby': describedBy,
+  children,
+}: OutboundLinkProps) {
   return (
-    <a href={`/go/${encodeURIComponent(offerId)}`} rel={OUTBOUND_LINK_REL} className={className}>
+    <a
+      href={`/go/${encodeURIComponent(offerId)}`}
+      rel={OUTBOUND_LINK_REL}
+      className={className}
+      aria-describedby={describedBy}
+    >
       {children}
     </a>
   );
@@ -30,18 +43,22 @@ export function OutboundLink({ offerId, className, children }: OutboundLinkProps
 interface AffiliateCtaProps {
   offerId: string;
   offerType: OfferType;
+  /** The generated postage or card line (`ctaConditions`), shown right after the button. */
+  conditions?: string | null;
 }
 
 /**
  * Call to action for a real offer: the "Ad" label comes first, then the button, then the commission
  * sentence (docs/compliance/uk-affiliate-checklist.md A1, A2). Wording is for the legal reviewer to confirm.
  */
-export function AffiliateCta({ offerId, offerType }: AffiliateCtaProps) {
+export function AffiliateCta({ offerId, offerType, conditions = null }: AffiliateCtaProps) {
+  const conditionsId = useId();
   return (
     <div>
       <p className="mb-2 px-3 text-xs font-bold uppercase tracking-wider text-foreground">Ad</p>
       <OutboundLink
         offerId={offerId}
+        aria-describedby={conditions ? conditionsId : undefined}
         className={cn(
           buttonVariants({ variant: 'accent' }),
           'h-14 w-full justify-between rounded-pill px-7 text-base font-bold shadow-sm'
@@ -50,6 +67,11 @@ export function AffiliateCta({ offerId, offerType }: AffiliateCtaProps) {
         {CTA_LABELS[offerType]}
         <ArrowRight aria-hidden="true" />
       </OutboundLink>
+      {conditions && (
+        <p id={conditionsId} className="mt-3 px-3 text-xs font-semibold text-foreground">
+          {conditions}
+        </p>
+      )}
       <p className="mt-3 px-3 text-xs text-muted-foreground">
         Freejoy is paid a commission by the brand if you take up this offer through this link.
       </p>

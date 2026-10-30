@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react';
+import { Check, Info } from 'lucide-react';
 import { DemoBadge } from '@/components/catalogue/demo-badge';
 import type { Offer } from '@/lib/catalogue/types';
 import { KIND_CHIP_LABELS, formatIsoDate, postageText } from './offer-format';
@@ -11,23 +11,33 @@ interface OfferTrustPanelProps {
 
 /**
  * Mint trust panel (design screen 03): the editor's last-checked date, the honest kind of offer,
- * postage and card requirement. Every value comes from a fixture field; the demo badge sits next
- * to the date so a sample date is never read as a real verification.
+ * postage and card requirement. A demo (fixture) offer never says "Last checked": its date is sample data,
+ * so the panel calls it a sample date, swaps the tick for an info icon and says Freejoy has not checked it.
  */
 export function OfferTrustPanel({ offer }: OfferTrustPanelProps) {
   const postage = postageText(offer.postage);
+  const date = formatIsoDate(offer.lastVerifiedAt);
   return (
-    <section aria-label="Offer checks" className="rounded-card bg-good p-4 sm:p-5">
+    <section
+      aria-label={offer.demo ? 'Offer details' : 'Offer checks'}
+      className="rounded-card bg-good p-4 sm:p-5"
+    >
       <div className="flex items-start gap-3">
         <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-card text-accent-ink">
-          <Check className="h-4 w-4" aria-hidden="true" />
+          {offer.demo ? (
+            <Info className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <Check className="h-4 w-4" aria-hidden="true" />
+          )}
         </span>
         <div>
           <p className="font-display text-base font-bold text-foreground">
-            Last checked {formatIsoDate(offer.lastVerifiedAt)}
+            {offer.demo ? `Sample date ${date}` : `Last checked ${date}`}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Availability and eligibility can change at the provider.
+            {offer.demo
+              ? 'Sample listing: Freejoy has not checked this offer.'
+              : 'Availability and eligibility can change at the provider.'}
           </p>
         </div>
       </div>

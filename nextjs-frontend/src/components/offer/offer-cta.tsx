@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,8 @@ interface OfferCtaProps {
   demo: boolean;
   /** Set for a real offer: the CTA links to `/go/<offerId>`. Null or absent keeps the demo dialog. */
   offerId?: string | null;
+  /** The generated postage or card line (`ctaConditions`), shown right after the button. */
+  conditions?: string | null;
 }
 
 /**
@@ -29,8 +32,11 @@ interface OfferCtaProps {
  * "Demo offer" dialog instead: nothing here renders an external href. The ended state is rendered by the
  * (server) hero instead of this client component.
  */
-export function OfferCta({ offerType, demo, offerId = null }: OfferCtaProps) {
-  if (offerId && !demo) return <AffiliateCta offerId={offerId} offerType={offerType} />;
+export function OfferCta({ offerType, demo, offerId = null, conditions = null }: OfferCtaProps) {
+  const conditionsId = useId();
+  if (offerId && !demo) {
+    return <AffiliateCta offerId={offerId} offerType={offerType} conditions={conditions} />;
+  }
 
   return (
     <div>
@@ -39,6 +45,7 @@ export function OfferCta({ offerType, demo, offerId = null }: OfferCtaProps) {
           <Button
             type="button"
             variant="accent"
+            aria-describedby={conditions ? conditionsId : undefined}
             className="h-14 w-full justify-between rounded-pill px-7 text-base font-bold shadow-sm"
           >
             {CTA_LABELS[offerType]}
@@ -64,6 +71,11 @@ export function OfferCta({ offerType, demo, offerId = null }: OfferCtaProps) {
           </DialogClose>
         </DialogContent>
       </Dialog>
+      {conditions && (
+        <p id={conditionsId} className="mt-3 px-3 text-xs font-semibold text-foreground">
+          {conditions}
+        </p>
+      )}
       <p className="mt-3 px-3 text-xs text-muted-foreground">
         Demo offer: this button stays on Freejoy. A real offer will take you to the brand&apos;s
         website to request your {REQUEST_KIND[offerType]}.
@@ -72,7 +84,7 @@ export function OfferCta({ offerType, demo, offerId = null }: OfferCtaProps) {
         <Link href="/affiliate-disclosure" className="underline underline-offset-2">
           Affiliate disclosure
         </Link>
-        : on real offers we may earn a commission if you qualify.
+        : real offers are marked &quot;Ad&quot; and say how Freejoy is paid.
       </p>
     </div>
   );

@@ -1,10 +1,10 @@
 import { Check } from 'lucide-react';
 
-/** Site intentions, not metrics: no counts, dates or verification claims belong here. */
+/** Site intentions, not metrics: no counts, dates, absolutes or verification claims belong here. */
 const SHARED_ITEMS = [
   { title: 'Terms in plain words', detail: 'Postage, eligibility and card needs on each listing' },
-  { title: 'UK freebies only', detail: 'Relevant local offers' },
-  { title: 'No hidden surprises', detail: 'What you pay and what you give, stated upfront' },
+  { title: 'UK offers', detail: 'Samples, trials, cashback, vouchers and competitions' },
+  { title: 'Clear labels', detail: 'Cashback and vouchers are labelled for what they are' },
 ] as const;
 
 const DEMO_ITEM = { title: 'Design preview', detail: 'Sample listings, not live offers' } as const;
@@ -16,7 +16,7 @@ const LIVE_ITEM = {
 export function TrustStrip({ demo }: { demo: boolean }) {
   const items = [...SHARED_ITEMS, demo ? DEMO_ITEM : LIVE_ITEM];
   return (
-    <section aria-label="Our promises" className="border-b border-border py-6">
+    <section aria-label="How we list offers" className="border-b border-border py-6">
       <ul className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
         {items.map((item) => (
           <li key={item.title} className="flex items-start gap-3">

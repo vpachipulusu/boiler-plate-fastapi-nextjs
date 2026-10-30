@@ -6,9 +6,9 @@
 export const siteConfig = {
   name: process.env.NEXT_PUBLIC_APP_NAME || 'Freejoy',
   description:
-    'Discover genuine UK free samples, trials and offers, with postage and terms shown before you click.',
+    'Discover UK free samples, trials and offers, with postage and terms shown before you click.',
   keywords: ['free samples UK', 'freebies', 'free trials', 'UK offers', 'free stuff'],
-  tagline: 'Good things, zero spend.',
+  tagline: 'Good things, terms upfront.',
   url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@example.com',
   ogImage: '/og-image.png',

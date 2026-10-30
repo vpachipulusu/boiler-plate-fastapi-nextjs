@@ -21,7 +21,7 @@ export function NewsletterBand() {
             Make your inbox a happier place.
           </h2>
           <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-            A regular edit of fresh freebies. No spam, just the good stuff.
+            Alerts about offers in the categories you choose.
           </p>
         </div>
         <div>
@@ -32,7 +32,7 @@ export function NewsletterBand() {
             Get free alerts
           </Link>
           <p className="mt-3 text-xs text-muted-foreground">
-            No spam. Unsubscribe anytime. See{' '}
+            Only the alerts you choose. Unsubscribe from any email. See{' '}
             <Link href="/privacy" className="font-semibold underline">
               privacy details
             </Link>

@@ -200,7 +200,7 @@ describe('once the catalogue is API-backed', () => {
     // The related offers below are fixtures in this test; the offer's own hero must be clean.
     const hero = screen.getByRole('heading', { level: 1 }).closest('section') as HTMLElement;
     expect(hero.textContent).not.toMatch(/demo|design preview|sample data|coming soon/i);
-    const cta = within(hero).getByRole('link', { name: /^get this free sample$/i });
+    const cta = within(hero).getByRole('link', { name: /^request this sample$/i });
     expect(cta).toHaveAttribute('href', `/go/${FIXTURE_LIVE.id}`);
     expect(cta).toHaveAttribute('rel', 'sponsored nofollow noopener');
     expect(within(hero).queryByRole('button')).toBeNull();

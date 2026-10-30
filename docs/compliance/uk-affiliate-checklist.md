@@ -1,4 +1,4 @@
-# UK affiliate and consumer-trust compliance checklist
+| D-15 | N-07, N-08, N-12 | `newsletter-band.tsx`, `alerts-form.tsx`, `alerts/page.tsx` | Reworded after FREEJ-24 merged | FREEJ-24 already fixed the structural parts: the band is a plain link to `/alerts` (no GET form, no email in the URL: N-07 and N-12) and `/alerts` ignores any `email` parameter. FREEJ-30 then fixed the copy. Band: "A regular edit of fresh freebies. No spam, just the good stuff." became "Alerts about offers in the categories you choose." (no cadence promise), and "No spam. Unsubscribe anytime." became "Only the alerts you choose. Unsubscribe from any email." Form: "You can change this anytime." (no preferences page exists) became "Unsubscribe from any email to stop them."; the footer line lost "No spam · no sold email lists" and reads "Unsubscribe in one click from any email" (the one-click endpoint is built, `alerts/unsubscribe/one-click`; "no sold email lists" has no backing statement in the privacy notice, so it is dropped until the reviewer adds one). **Kept on purpose:** the consent text in `src/lib/alerts/consent.ts` ("... I can unsubscribe at any time. See the privacy policy.") is stored proof of consent, so it is unchanged and a test pins it; the link text "privacy policy" versus the page title "Privacy notice" (N-08's second point) therefore stays until the reviewer signs the wording off (J5), at which point the stored text version has to change with it. || D-07 | N-04 | `lib/catalogue/types.ts` `OFFER_TYPE_LABELS` ("Free sample", "Free trial"), `components/catalogue/offer-card.tsx` | Kept wording, postage added to cards | **Owner decision (cautious line, owner can revert).** The type names stay "Free sample" and "Free trial" on the card badge and the type filter: they are the offer-type taxonomy, and CAP 3.23 allows "free sample" when the postage is the only cost and is stated. To meet the strict reading, a card for a `free_sample` offer now shows "Postage: Free", "Postage: £2.99" or "Postage: Check terms" on its own line under the title (same helper as the offer page, so it cannot disagree; real and demo offers alike). It sits above the footer row, outside it, so the footer and the two-column layout at 320px do not change width. Cards for trials show no card-requirement line. To revert: delete the `offerType === 'free_sample'` block in `offer-card.tsx` and its tests. || D-06 | N-04 | `offer-format.ts` `ctaConditions()`, `offer-hero.tsx`, `offer-cta.tsx`, `outbound-link.tsx` | Added | A single line right after the button, generated from the offer's own fields: samples get "Postage: free." / "Postage: £2.99." / "Postage: check the brand's terms."; trials that need a card get "A payment card is required to start."; other types get nothing. It sits before the commission sentence on real offers. The line is the accessible description of the button or link (`aria-describedby` through `useId`; `OutboundLink` forwards the prop), so a screen-reader user hears it with the button without the button's name changing (WCAG 2.5.3). This is B2/B3 acceptance criteria applied to the button, not new copy. |# UK affiliate and consumer-trust compliance checklist
 
 Story FREEJ-26. Engineering checklist for the Freejoy public site: UK GDPR and PECR (ICO), the CAP Code and
 ASA/CMA affiliate guidance, consumer-protection law, competitions and operator identity.
@@ -8,6 +8,9 @@ ASA/CMA affiliate guidance, consumer-protection law, competitions and operator i
 > who has to sign the legal pages off. Every legal page stays marked "Draft" until that sign-off exists.
 > Research date: 2026-10-29. Re-check each source before launch: several of them were being changed in 2026
 > (PECR and the ICO storage-and-access guidance after the Data (Use and Access) Act 2025).
+>
+> FREEJ-30 (2026-10-30) applied the public-copy findings in section I.2. Its per-item decisions, and the
+> ones the owner or reviewer still has to make, are in section I.3.
 
 ## Status key
 
@@ -65,8 +68,8 @@ domain outside the allowed research list; it is treated here as a product decisi
 - **Freejoy:** Phase 1 has no commercial relationship with any brand and no outbound link, so nothing is
   disguised. Once `/go/` links earn commission, listing content that promotes those offers is marketing that
   Freejoy is responsible for.
-- **Where:** `src/components/offer/offer-cta.tsx`, `src/components/catalogue/offer-card.tsx`, `/go/[offerId]` (Phase 3).
-- **Status:** `Pending Phase 3`
+- **Where:** `src/components/offer/offer-cta.tsx`, `src/components/offer/outbound-link.tsx` (`AffiliateCta`), `src/components/catalogue/offer-card.tsx`, `/go/[offerId]`.
+- **Status:** `Built` for criteria 1 and 2 (FREEJ-23: `AffiliateCta` puts the "Ad" text before the button on every real offer page, and that button is the only `/go/` link). Criterion 3 (a label on the card) is `Needs professional review`: see decision D-10 in I.3.
 - **Acceptance criteria:**
   1. Every control that links to `/go/<offerId>` is preceded, in the DOM and visually, by the word "Ad" (not "Affiliate" alone).
   2. The label is real text in the accessibility tree (not `aria-hidden`, not an image), with at least 4.5:1 contrast.
@@ -78,9 +81,8 @@ domain outside the allowed research list; it is treated here as a product decisi
   Wording that says the author "may" earn a commission is ambiguous. The label must be obvious before the
   visitor engages, and a disclaimer at the bottom of a page is unlikely to be enough.
 - **Source:** S5 sections on acceptable labels and placement; S7 (search result only, unverified, to confirm) for the joint ASA/CMA guidance.
-- **Freejoy:** Today's copy says "we may earn a commission if you qualify" (finding N-09). It is accurate for a
-  preview but is the wording the ASA advice calls ambiguous, and it sits in small print below the button.
-- **Where:** `src/components/offer/offer-cta.tsx:101`, `src/app/(public)/affiliate-disclosure/page.tsx`.
+- **Freejoy:** Real offers use the "Ad" label and the sentence "Freejoy is paid a commission by the brand if you take up this offer through this link." (`AffiliateCta`, FREEJ-23). The demo-offer note in `offer-cta.tsx` no longer says "may earn a commission if you qualify" (finding N-09, FREEJ-30). The reviewer still has to confirm the final sentence.
+- **Where:** `src/components/offer/outbound-link.tsx`, `src/components/offer/offer-cta.tsx`, `src/app/(public)/affiliate-disclosure/page.tsx`.
 - **Status:** `Pending Phase 3` (the `Needs professional review` list below holds the final sentence).
 - **Acceptance criteria:**
   1. Label text is "Ad", placed immediately before the call-to-action button, and the sentence next to the button reads along the lines of "Freejoy is paid a commission by the brand if you take up this offer through this link." (reviewer to confirm wording).
@@ -141,7 +143,7 @@ domain outside the allowed research list; it is treated here as a product decisi
   practice in DMCC Act Schedule 20 paragraph 23.
 - **Source:** S2 rules 3.23 to 3.26; S8 Schedule 20 paragraph 23.
 - **Freejoy rule (stricter, owner-set):** never say "completely free" for anything with postage, a card, a subscription or an entry condition.
-- **Status:** `Done` for the body copy of the Phase 1 sample listings (no "completely free" anywhere: grep of `src/components`, `src/app/(public)`, `src/lib/catalogue`). Chip, CTA and tagline wording is open: see findings N-01 to N-04.
+- **Status:** `Done` for the body copy of the Phase 1 sample listings (no "completely free" anywhere: grep of `src/components`, `src/app/(public)`, `src/lib/catalogue`). Chip, CTA and tagline wording was changed in FREEJ-30 (findings N-01 to N-04, decisions D-01 to D-04 in I.3); the owner is asked to confirm the strict reading.
 
 ### B2. Free sample with postage
 
@@ -149,7 +151,7 @@ domain outside the allowed research list; it is treated here as a product decisi
 - **Source:** S2 rule 3.23, 3.20 (optional delivery charges must be stated).
 - **Freejoy:** `postageText()` shows "Free", "£x.xx" or "Check terms"; the offer page shows a POSTAGE chip and a "Cost & postage" row. Postage "Check terms" is honest but must be resolved to a figure or "Free" before an offer goes live.
 - **Where:** `src/components/offer/offer-format.ts`, `important-bits.tsx`, `offer-trust-panel.tsx`.
-- **Status:** `Done` for display. `Pending Phase 3` for the call-to-action: see acceptance criteria.
+- **Status:** `Done` for display. Call-to-action: the line itself is `Done` (FREEJ-30: `ctaConditions()` renders "Postage: £2.99." after the button, from the offer's own postage field); the publish-time rule is `Pending Phase 3`.
 - **Acceptance criteria:** A free-sample CTA never appears without the postage amount rendered inside the same `<section>` as the CTA, after the button in DOM order, at every breakpoint ("Get this sample. Postage £2.99."); an offer with `postage.kind = 'check_terms'` cannot be published live.
 
 ### B3. Free trial that converts to a paid plan
@@ -158,7 +160,7 @@ domain outside the allowed research list; it is treated here as a product decisi
 - **Source:** S2 rules 3.1, 3.24, 3.26.
 - **Freejoy:** `important-bits.tsx` shows "A payment card is required to start", "Trial terms" and "Cancellation" from `subscriptionTerms`; the card-required chip is in the trust panel. The CTA label "Start the free trial" sits above those details.
 - **Where:** `src/components/offer/important-bits.tsx`, `offer-trust-panel.tsx`, `offer-format.ts:25,33`.
-- **Status:** `Done` for the detail block; `Pending Phase 3` for the CTA (acceptance criteria below).
+- **Status:** `Done` for the detail block. CTA: FREEJ-30 renamed the button "Start the trial" and `ctaConditions()` renders "A payment card is required to start." after it when `requiresCard` is true. The trial length, post-trial price and cancellation route are still only in the detail block, so the rest of the acceptance criteria below is `Pending Phase 3`.
 - **Acceptance criteria:** A trial offer cannot be published without `requiresCard` decided and `subscriptionTerms` containing the trial length, the post-trial price and the cancellation route. The CTA is followed by one line generated from those fields ("Card required. £X a month after day N unless you cancel.").
 - **Also:** The new subscription-contract rules in the DMCC Act are the brand's duty, not Freejoy's. Whether and when they change what a listing must say: `Needs professional review` (not researched here).
 
@@ -189,8 +191,8 @@ domain outside the allowed research list; it is treated here as a product decisi
 
 - **Rule:** The "free" rules apply to the site's own marketing, not only to listings. A slogan that says every offer costs nothing contradicts the cashback, voucher, postage and trial offers listed beside it (CAP 3.1, 3.23).
 - **Source:** S2.
-- **Freejoy:** Announcement bar, hero eyebrow and footer tagline claim "zero spend", "for £0" and "no spend" (findings N-01 to N-03).
-- **Status:** `Needs professional review` only for the replacement wording; the change itself is for the coordinator (not in files owned by this story).
+- **Freejoy:** The announcement bar, hero eyebrow and footer tagline claimed "zero spend", "for £0" and "no spend" (findings N-01 to N-03). Reworded in FREEJ-30 (decisions D-01 to D-03).
+- **Status:** `Done` for the change. `Needs professional review` for the replacement wording (J3).
 
 ### B8. Prices, "from" and "up to"
 
@@ -207,16 +209,16 @@ domain outside the allowed research list; it is treated here as a product decisi
 
 - **Rule:** Do not claim a product or its terms are available only for a limited time when that is false (CAP 3.30; Schedule 20 paragraph 7). Do not mislead about availability (3.31).
 - **Source:** S2 rules 3.30, 3.31; S8 paragraph 7.
-- **Freejoy:** Phase 1 has no countdowns or "only x left" claims. Editorial freshness labels "Ends soon" and "Limited" exist in `FRESHNESS_LABELS` (finding N-05).
-- **Status:** `Done` for copy; `Pending Phase 3` for the data model.
+- **Freejoy:** There are no countdowns or "only x left" claims. Editorial freshness labels "Ends soon" and "Limited" exist in `FRESHNESS_LABELS` (finding N-05). Since FREEJ-30, `displayFreshness()` (`src/lib/catalogue/freshness.ts`) hides them for every real (API) offer; only a demo fixture, which carries the demo badge, still shows them.
+- **Status:** `Done` for copy and for the display rule (unit-tested); `Pending Phase 3` for the data model.
 - **Acceptance criteria:** "Ends soon" is computed from the real `endAt` against the real date (suggested threshold: within seven days) and cannot be set by an editor. "Limited" can only be shown when the provider's own terms state a cap, and the editor records that wording. No label implies an unverified deadline. "While stocks last" is shown as the provider's wording, never as urgency.
 
 ### C2. No fake counts or popularity claims
 
 - **Rule:** Objective claims need documentary evidence held before publication (CAP 3.7). "Popular" is an objective claim.
 - **Source:** S2 rule 3.7.
-- **Freejoy:** The homepage trust strip has no digits (unit test). "Popular" is a freshness label on three sample offers (finding N-05).
-- **Status:** `Done` for counts. `Pending Phase 3`: remove the `popular` value or back it with a recorded, explained metric; never show visitor, click or claim counts unless the number is real and its source is shown.
+- **Freejoy:** The homepage trust strip has no digits (unit test). "Popular" is a freshness label on three sample offers (finding N-05); `displayFreshness()` hides it for real (API) offers (FREEJ-30).
+- **Status:** `Done` for counts and for keeping the label off real offers. `Pending Phase 3`: remove the `popular` value or back it with a recorded, explained metric; never show visitor, click or claim counts unless the number is real and its source is shown.
 - **Evidence:** `home-and-legal-pages.test.tsx`, "describes freshness as regular and uses no counts in the trust strip".
 
 ### C3. No testimonials or reviews
@@ -231,9 +233,9 @@ domain outside the allowed research list; it is treated here as a product decisi
 
 - **Rule:** A "last checked" date is an objective claim (CAP 3.7, 3.1). It must be the date a person actually checked the brand's page.
 - **Source:** S2.
-- **Freejoy:** `OfferTrustPanel` prints the fixture `lastVerifiedAt` next to a demo badge, so it is never read as a real check.
-- **Where:** `src/components/offer/offer-trust-panel.tsx:27`, `src/lib/catalogue/fixtures.ts`.
-- **Status:** `Done` for Phase 1; `Pending Phase 3`.
+- **Freejoy:** For a demo (fixture) offer, `OfferTrustPanel` now reads "Sample date <date>" with "Sample listing: Freejoy has not checked this offer.", an info icon instead of a tick and the region name "Offer details" (finding N-11, FREEJ-30). "Last checked <date>" appears only for a real offer, from the editor's `last_verified_at`; the API mapper drops an offer that has none.
+- **Where:** `src/components/offer/offer-trust-panel.tsx`, `src/lib/catalogue/fixtures.ts`.
+- **Status:** `Done` for the display; `Pending Phase 3` for the editor-action rule below.
 - **Acceptance criteria:** `lastVerifiedAt` is set only by an editor action that records who and when; it is never defaulted to the creation time or bumped by an import; the UI shows nothing (or "not recently checked") when it is empty or older than a threshold the owner sets. JSON-LD `dateModified` uses the same field.
 
 ### C5. Compliance claims
@@ -471,8 +473,8 @@ describe entry conditions fairly.
 - **Rule:** Information society service providers must make their name, geographic address and contact details including an email address easily, directly and permanently accessible; a VAT number if VAT-liable (E-Commerce Regulations regulation 6(1)). A UK company must show its registered name, place of registration, registered number and registered office on its website; a sole trader or partnership using a business name has related duties.
 - **Source:** S19 regulation 6(1)(a) to (c), (g); S20 (search result only, unverified, to confirm).
 - **Freejoy:** The operator is not decided or registered. No page invents one. The contact page now has a clearly marked "Who runs Freejoy" placeholder and the footer is one line with policy links.
-- **Where:** `src/app/(public)/contact/page.tsx`; footer `src/components/site/site-footer.tsx` (not owned by this story: finding N-17).
-- **Status:** `Owner action` (K1, K2) then `Pending Phase 3` for the footer.
+- **Where:** `src/app/(public)/contact/page.tsx` (marked placeholder: "They have not been added yet"); footer `src/components/site/site-footer.tsx` (finding N-14; decision D-14 in I.3: kept without operator details on purpose).
+- **Status:** `Owner action` (K1, K2) then `Pending Phase 3` for the footer. Until the owner supplies the details no public page shows any, and none is invented.
 - **Acceptance criteria:** Before any live offer is published, the footer shows (or links to the contact page showing) the legal name, trading name if different, registered number and registered office or business address for a company, a working email address, and the VAT number if registered. The values come from site configuration, not copy typed into components.
 
 ### H2. ICO data protection fee
@@ -508,7 +510,9 @@ is owned by someone else and the coordinator should apply the suggested wording.
 | F-08 | `src/app/(public)/terms/page.tsx:24` | "We take care over what we publish" is an unevidenced quality claim; competitions not covered | CAP 3.7; G1 | Fixed. |
 | F-09 | `src/components/legal/legal-page.tsx` | Draft banner could only come from `LegalPage`, so the contact page could not reuse it | Product rule | Fixed. `DraftBanner` exported and reused. |
 
-### I.2 Findings in files not owned by this story (open, for the coordinator)
+### I.2 Findings in files not owned by this story
+
+The table is the FREEJ-26 review as written. FREEJ-30 then applied N-01 to N-06, N-09, N-11 and N-13, and consciously kept N-10 and N-14; N-07, N-08 and N-12 were finished after FREEJ-24 merged. The outcome of every row is in I.3.
 
 | ID | File:line | Severity | Problem | Suggested wording |
 | --- | --- | --- | --- | --- |
@@ -527,6 +531,42 @@ is owned by someone else and the coordinator should apply the suggested wording.
 | N-13 | `src/components/catalogue/catalogue-header.tsx:41` | Low | "Find your next little free thing." covers cashback and vouchers, which are not free. | "Find your next little treat." |
 | N-14 | `src/components/site/site-footer.tsx` | Medium (launch) | No operator name, address or company number. | See H1 once the owner supplies details. |
 
+### I.3 FREEJ-30: what was done with each finding (2026-10-30)
+
+"Reworded" means the copy changed on this branch. "Kept" means it was looked at and left on purpose; the reason
+is in the row. Every rewording is an engineering suggestion for the qualified reviewer to confirm (J3), not a
+legal conclusion, and none of the new text claims compliance, verification or urgency. Unit tests pin the
+wording (`src/__tests__/unit/components/public-copy.test.tsx`, `offer-format.test.ts`, `freshness.test.ts`).
+
+| ID | Finding | File | Result | Before, after and reason |
+| --- | --- | --- | --- | --- |
+| D-01 | N-01 | `components/site/announcement-bar.tsx` | Reworded | "Good stuff. Zero spend." / "Your daily dose of the good stuff, for £0." became "Good stuff. Terms upfront." / "UK samples, trials and offers, with the terms in plain words." No cost claim and no "daily" (the site promises no daily refresh). |
+| D-02 | N-02 | `config/site.ts` (footer on every page, metadata, manifest, JSON-LD) | Reworded | Tagline "Good things, zero spend." became "Good things, terms upfront."; "genuine" dropped from the description ("Discover UK free samples, trials and offers, with postage and terms shown before you click."). "Free samples" stays: it is the offer type, with postage stated before the click. |
+| D-03 | N-03 | `components/home/home-hero.tsx` | Reworded, one part kept | Eyebrow "The good stuff, no spend" became "Samples, trials and offers"; "genuinely good freebies ... you'll actually love" became "freebies, samples and offers from brands you might like". Kept: the h1 "Small treats. Big free energy." It is a wordplay headline, not a price or quality claim; the reviewer may disagree. |
+| D-04 | N-04 | `components/offer/offer-format.ts` (chips) | Reworded | "FREE PRODUCT" and "FREE TRIAL" chips became "SAMPLE" and "TRIAL". **Owner decision.** CAP 3.23 and 3.24 are met on the offer page by the adjacent POSTAGE and CARD REQUIRED chips, so the strict reading is not forced by the rule. It was taken because the owner's own rule is stricter than the Code ("never say completely free for anything with postage, a card or an entry condition") and a chip should not need its neighbour to be true. Revert is two strings if the owner prefers "FREE". |
+| D-05 | N-04 | `components/offer/offer-format.ts` (CTA labels) | Reworded | "Get this free sample" became "Request this sample"; "Start the free trial" became "Start the trial". Cashback, voucher and competition labels were already neutral and are unchanged. |
+| D-06 | N-04 | `offer-format.ts` `ctaConditions()`, `offer-hero.tsx`, `offer-cta.tsx`, `outbound-link.tsx` | Added | A single line right after the button, generated from the offer's own fields: samples get "Postage: free." / "Postage: £2.99." / "Postage: check the brand's terms."; trials that need a card get "A payment card is required to start."; other types get nothing. It sits before the commission sentence on real offers. This is B2/B3 acceptance criteria applied to the button, not new copy. |
+| D-07 | N-04 | `lib/catalogue/types.ts` `OFFER_TYPE_LABELS` ("Free sample", "Free trial") | Kept | These are the names of the offer types, used by the card badge, and the type filter. CAP 3.23 allows "free sample" when the postage is the only cost and is stated. Open point for the owner: a card on `/freebies` shows the type badge but not the postage. If the strict reading is wanted there too, rename the labels to "Sample" and "Trial" (more tests and e2e specs change) or add the postage to the card. |
+| D-08 | N-05 | `lib/catalogue/freshness.ts` (new), `catalogue/offer-card.tsx` | Reworded (rule added) | Real (API) offers never show "Popular", "Ends soon" or "Limited": an editor can set them with nothing behind them (CAP 3.7, 3.30). A demo fixture still shows them, next to its demo badge. "New today" and "Just added" are kept for real offers: they state recency, not scarcity or popularity. They are still editor-set, not computed, so C1/C2 keep the Phase 3 follow-up (compute "Ends soon" from the real end date; back "Popular" with a recorded metric or delete it). The API and the mapper still carry the value, so turning a label back on later is a change in `displayFreshness()` only. |
+| D-09 | N-06 | `components/home/trust-strip.tsx` | Reworded | "UK freebies only / Relevant local offers" became "UK offers / Samples, trials, cashback, vouchers and competitions". "No hidden surprises / What you pay and what you give, stated upfront" became "Clear labels / Cashback and vouchers are labelled for what they are" (the first item already promises terms in plain words, so the absolute is gone rather than repeated). The region name "Our promises" became "How we list offers". Still no digits. |
+| D-10 | N-10 | `components/catalogue/offer-card.tsx` | Kept | The "Ad" label is not duplicated on the card. FREEJ-23's `AffiliateCta` (`outbound-link.tsx`) already renders "Ad" before the only `/go/` link, the button on the offer page, and a card links to that offer page, not to `/go/`. A1 criterion 3 asks for the label on the card as well when the offer carries an affiliate link. That is a reviewer judgement (J1), so it is left open and in `Needs professional review`. |
+| D-11 | N-09 | `components/offer/offer-cta.tsx` | Reworded | Demo-offer note "on real offers we may earn a commission if you qualify" became "real offers are marked "Ad" and say how Freejoy is paid". "May" and "if you qualify" are gone. The real-offer sentence in `AffiliateCta` was already the A2 wording and is unchanged. |
+| D-12 | N-11 | `components/offer/offer-trust-panel.tsx` | Reworded | A demo offer no longer says "Last checked <date>". It says "Sample date <date>", "Sample listing: Freejoy has not checked this offer.", shows an info icon instead of the tick, and names the region "Offer details". A real offer keeps "Last checked <date>" and the tick (the date comes from the editor's `last_verified_at`, and an offer without one is not shown at all). |
+| D-13 | N-13 | `components/catalogue/catalogue-header.tsx` | Reworded | "Find your next little free thing." became "Find your next little treat." (N-13's suggestion), since cashback and vouchers are listed too. The "All freebies" breadcrumb and "Discover samples, trials and lovely surprises." are kept. |
+| D-14 | N-14 | `components/site/site-footer.tsx` | Kept | No operator name, address or company number is shown, and none is invented. The contact page carries the marked placeholder ("have not been added yet"). Adding a second placeholder to the footer would repeat it on every page. At launch the footer must read the operator fields from `siteConfig` (H1 acceptance criteria) once the owner has supplied them (K1, K2). `siteConfig.supportEmail` still defaults to `support@example.com` and is not shown on any public page; do not render it until K2 is done. |
+| D-15 | N-07, N-08, N-12 | newsletter band, alerts form, alerts page, privacy page | Not touched | Owned by FREEJ-24. Still open there: "No spam" and "Unsubscribe anytime" in `newsletter-band.tsx`; the GET form that puts the email in the URL; "You can change this anytime" and the "privacy policy" link text in `alerts-form.tsx`; the `?email=` prefill in `alerts/page.tsx`. |
+| D-16 | none | "freebie" wording elsewhere ("Explore freebies", "All freebies", "View freebie", "Get free alerts") | Kept | "Freebie" is the product's vocabulary, not a price claim made about one offer, and every page that lists offers states postage, card and type separately. The reviewer may still prefer fewer "free" words around cashback and vouchers. |
+
+Decisions waiting for the owner or the reviewer:
+
+1. Owner: strict reading of the "free" chips and buttons (D-04, D-05, D-06), and whether the type names "Free
+   sample" and "Free trial" on cards and filters follow it (D-07).
+2. Owner: whether to keep "Big free energy" (D-03) and the "freebie" vocabulary (D-16).
+3. Reviewer: the new slogans, tagline, trust strip and demo-offer disclosure line (J3), and whether a card needs
+   its own "Ad" label (D-10, J1).
+4. Owner: K1 and K2 are still blocking the footer and contact page placeholders (D-14).
+5. Phase 3: replace the editor-set freshness labels with computed or evidenced ones (D-08).
+
 ---
 
 ## J. Needs professional review
@@ -537,7 +577,7 @@ these. Engineers must not.
 1. Final wording of the "Ad" label and the commission sentence next to each affiliate link (A2), and whether
    non-commission listings need any label.
 2. Whether any paid placement, sponsorship or network-specific disclosure terms apply (A6, affiliate network contract).
-3. The replacement wording for the "zero spend", "for £0" and "no spend" slogans (B7).
+3. The replacement wording for the "zero spend", "for £0" and "no spend" slogans (B7) and the other FREEJ-30 rewordings listed in I.3 (D-01 to D-09, D-11 to D-13).
 4. How the DMCC Act subscription-contract rules affect the way trial offers are described (B3).
 5. Whether the soft opt-in is unavailable for alerts, as reasoned in D1, and the final consent wording (D2).
 6. Whether an Article 21 notice is needed alongside consent, and minimum sign-up age (D7, D8).
@@ -559,7 +599,7 @@ them or enter credentials.
 | # | Action | Needed by |
 | --- | --- | --- |
 | K1 | Decide the legal form and operator (company, partnership, sole trader) and the business name. | Before any live offer |
-| K2 | Supply the registered name and number (if a company), the registered office or business address, a working contact email address and a VAT number if registered. Set them in site configuration. | Before launch |
+| K2 | Supply the registered name and number (if a company), the registered office or business address, a working contact email address and a VAT number if registered. Set them in site configuration. The contact page placeholder ("Who runs Freejoy") and the footer (no operator line yet, D-14) wait on K1 and K2. | Before launch |
 | K3 | Run the ICO data protection fee self-assessment and pay or record the exemption; keep the registration number. | Before processing subscriber data |
 | K4 | Choose the email-sending provider, the hosting and error-monitoring set-up; get each provider's data-processing terms; note the transfer mechanism for any provider outside the UK. | Phase 3 |
 | K5 | Join the affiliate networks (or direct programmes), read their disclosure terms, and keep the signed terms for the reviewer. | Phase 3 |
