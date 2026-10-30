@@ -1,0 +1,64 @@
+import 'server-only';
+
+import {
+  descriptionParagraphs,
+  poundsToMinor,
+  type OfferFormValues,
+} from '@/lib/admin-catalogue/offer-schema';
+import { localInputToIso } from '@/lib/admin-catalogue/offer-view';
+import type { CreateOfferRequest, UpdateOfferRequest } from './generated';
+
+/** Postage is only ever priced in pounds in this UI. */
+export const POSTAGE_CURRENCY = 'GBP';
+
+function textOrNull(value: string): string | null {
+  return value === '' ? null : value;
+}
+
+function dateOrNull(value: string): string | null {
+  return value === '' ? null : localInputToIso(value);
+}
+
+/** The editable fields, in the API's shape. Nullable fields are explicit nulls so an edit can clear them. */
+function editableFields(values: OfferFormValues) {
+  const costs = values.postageKind === 'COST';
+  const minor = costs ? poundsToMinor(values.postageAmount) : null;
+  return {
+    title: values.title,
+    summary: values.summary,
+    description: descriptionParagraphs(values.description),
+    category_id: values.categoryId,
+    merchant_id: values.merchantId,
+    offer_type: values.offerType,
+    featured: values.featured,
+    image_tint: values.imageTint,
+    image_label: values.imageLabel,
+    image_alt: values.imageAlt,
+    source_url: textOrNull(values.sourceUrl),
+    postage_kind: values.postageKind,
+    postage_amount_minor: minor,
+    postage_currency: costs ? POSTAGE_CURRENCY : null,
+    requires_card: values.requiresCard,
+    subscription_terms: textOrNull(values.subscriptionTerms),
+    eligibility: values.eligibility,
+    availability: values.availability,
+    steps: values.steps.map(({ title, detail }) => ({ title, detail })),
+    start_at: dateOrNull(values.startAt),
+    end_at: dateOrNull(values.endAt),
+    freshness: values.freshness === '' ? null : values.freshness,
+    publisher_notes: textOrNull(values.publisherNotes),
+  };
+}
+
+/** A new offer. The slug is sent only when the admin typed one; otherwise the API derives it from the title. */
+export function toCreateOfferBody(values: OfferFormValues): CreateOfferRequest {
+  return {
+    ...editableFields(values),
+    ...(values.slug === '' ? {} : { slug: values.slug }),
+  };
+}
+
+/** An edit sends every editable field. The slug and status are not editable and are never sent. */
+export function toUpdateOfferBody(values: OfferFormValues): UpdateOfferRequest {
+  return editableFields(values);
+}
