@@ -137,6 +137,9 @@ describe('AlertsForm submitting', () => {
     expect(await screen.findByText(INBOX_PANEL)).toBeInTheDocument();
     expect(screen.getByText(/sam@example\.com is new to our alerts/i)).toBeInTheDocument();
     expect(screen.getByText(/nothing starts until you do/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/if it has not arrived after a few minutes, you can submit the form again/i)
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Browse freebies' })).toHaveAttribute(
       'href',
       '/freebies'

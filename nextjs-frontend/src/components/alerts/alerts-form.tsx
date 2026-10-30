@@ -258,8 +258,9 @@ export function AlertsForm({ categories, live }: AlertsFormProps) {
               <p className="mt-2 text-sm">
                 If {sentTo} is new to our alerts, we have sent it a confirmation link. Open the link
                 within {CONFIRM_WINDOW_TEXT} to start your alerts: nothing starts until you do. If
-                you do not see it in a few minutes, check your spam folder. If you are already
-                signed up, there is nothing more to do.
+                you do not see it in a few minutes, check your spam folder. If it has not arrived
+                after a few minutes, you can submit the form again. If you are already signed up,
+                there is nothing more to do.
               </p>
               <div className="mt-4 flex flex-wrap items-center gap-4">
                 <Link
