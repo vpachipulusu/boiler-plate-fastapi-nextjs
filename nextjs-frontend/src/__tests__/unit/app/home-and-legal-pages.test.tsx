@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, within } from '@testing-library/react';
 
 vi.mock('@/app/globals.css', () => ({}));
 
@@ -194,8 +194,8 @@ describe('affiliate disclosure page', () => {
 });
 
 describe('about page', () => {
-  it('has the how-it-works anchor with three numbered steps', () => {
-    const { container } = render(<AboutPage />);
+  it('has the how-it-works anchor with three numbered steps', async () => {
+    const { container } = render(await AboutPage());
 
     expect(screen.getByText(DRAFT_BANNER)).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('About Freejoy');
@@ -207,18 +207,71 @@ describe('about page', () => {
     expect(aboutMetadata.robots).toEqual({ index: false });
   });
 
-  it('makes no claims about counts or verification stamps', () => {
-    const { container } = render(<AboutPage />);
+  it('makes no claims about counts or verification stamps', async () => {
+    const { container } = render(await AboutPage());
 
     expect(container.textContent).not.toMatch(/\d|verified by|guaranteed/i);
+  });
+});
+
+describe('about page copy follows the alerts and catalogue switches (FREEJ-42)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  async function aboutText(env: { alerts: string; catalogue: string }) {
+    vi.stubEnv('ALERTS_FORM_LIVE', env.alerts);
+    vi.stubEnv('CATALOGUE_SOURCE', env.catalogue);
+    const { container } = render(await AboutPage());
+    return container.textContent ?? '';
+  }
+
+  it('alerts switched on: says alerts can be signed up for and never that nothing is saved', async () => {
+    const text = await aboutText({ alerts: 'true', catalogue: 'api' });
+
+    expect(text).toMatch(/sign up for email alerts with the alerts form/i);
+    expect(text).toMatch(/confirmation link/i);
+    expect(text).not.toMatch(/does not save anything|not open yet|preview/i);
+    expect(screen.getByRole('link', { name: 'alerts form' })).toHaveAttribute('href', '/alerts');
+  });
+
+  it.each(['', 'false', 'TRUE'])(
+    'alerts switched off (%j): says they are not open yet, without "preview" or a promise to save',
+    async (value) => {
+      const text = await aboutText({ alerts: value, catalogue: 'api' });
+
+      expect(text).toMatch(/email alerts are not open yet/i);
+      expect(text).toMatch(/nothing can be entered or saved there until they launch/i);
+      expect(text).not.toMatch(/does not save anything yet|try the alerts form|sign up for email/i);
+      expect(screen.getByRole('link', { name: 'alerts page' })).toHaveAttribute('href', '/alerts');
+    }
+  );
+
+  it('keeps the contact link in both alerts states', async () => {
+    await aboutText({ alerts: 'true', catalogue: 'api' });
+    expect(screen.getByRole('link', { name: 'contact page' })).toHaveAttribute('href', '/contact');
+    cleanup();
+
+    await aboutText({ alerts: '', catalogue: 'api' });
+    expect(screen.getByRole('link', { name: 'contact page' })).toHaveAttribute('href', '/contact');
+  });
+
+  it('calls the site a design preview only while the listings are samples', async () => {
+    const sample = await aboutText({ alerts: 'true', catalogue: 'fixture' });
+    cleanup();
+    const live = await aboutText({ alerts: 'true', catalogue: 'api' });
+
+    expect(sample).toMatch(/design preview with sample listings/i);
+    expect(live).not.toMatch(/design preview|sample listings/i);
+    expect(live).toMatch(/offers change without notice/i);
   });
 });
 
 describe('draft status on every legal and editorial page', () => {
   it.each([...LEGAL_PAGES, { name: 'about', Page: AboutPage, metadata: aboutMetadata }])(
     '$name keeps the draft banner and "Not yet reviewed"',
-    ({ Page }) => {
-      render(<Page />);
+    async ({ Page }) => {
+      render(await Page());
 
       expect(screen.getByText(DRAFT_BANNER)).toBeInTheDocument();
       expect(screen.getByText(/last reviewed: not yet reviewed/i)).toBeInTheDocument();
@@ -234,8 +287,8 @@ describe('draft status on every legal and editorial page', () => {
 
   it.each([...LEGAL_PAGES, { name: 'about', Page: AboutPage, metadata: aboutMetadata }])(
     '$name makes no compliance, registration or approval claims',
-    ({ Page }) => {
-      const { container } = render(<Page />);
+    async ({ Page }) => {
+      const { container } = render(await Page());
 
       expect(container.textContent).not.toMatch(COMPLIANCE_CLAIMS);
     }
@@ -317,8 +370,8 @@ describe('terms and about copy', () => {
     expect(screen.getByText(/competitions are run by the organiser/i)).toBeInTheDocument();
   });
 
-  it('about explains that cashback and vouchers are not free and links the disclosure', () => {
-    render(<AboutPage />);
+  it('about explains that cashback and vouchers are not free and links the disclosure', async () => {
+    render(await AboutPage());
 
     expect(screen.getByRole('heading', { name: 'Not everything is free' })).toBeInTheDocument();
     expect(screen.getByText(/cashback and vouchers are not free/i)).toBeInTheDocument();

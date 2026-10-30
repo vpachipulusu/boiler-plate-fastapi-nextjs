@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { AlertsForm } from '@/components/alerts/alerts-form';
 import { InlineError } from '@/components/catalogue/inline-error';
 import { Spark } from '@/components/site/brand-mark';
+import { isAlertsFormLive } from '@/lib/alerts/live';
 import { getCategories, settle } from '@/lib/catalogue';
 import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
@@ -10,7 +11,7 @@ import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
  * once a real email provider is configured in production (ADR-012). Until then the page shows a plain "not
  * open yet" notice instead of the form, stays noindex, and the backend refuses sign-ups as a last line.
  */
-const ALERTS_FORM_LIVE = process.env.ALERTS_FORM_LIVE === 'true';
+const ALERTS_FORM_LIVE = isAlertsFormLive();
 
 const ALERTS_TITLE = 'Free alerts';
 const ALERTS_DESCRIPTION =
