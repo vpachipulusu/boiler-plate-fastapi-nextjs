@@ -102,7 +102,10 @@ function CategoriesTable({
                 </Link>
                 <div className="text-muted-foreground">{category.description}</div>
               </TableCell>
-              <TableCell label="Slug" className="break-words text-muted-foreground">
+              <TableCell
+                label="Slug"
+                className="text-muted-foreground max-sm:[overflow-wrap:anywhere] sm:break-words"
+              >
                 {category.slug}
               </TableCell>
               <TableCell label="Order" numeric>

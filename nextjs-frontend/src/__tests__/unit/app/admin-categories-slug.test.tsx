@@ -51,11 +51,12 @@ describe('admin categories table slug cell', () => {
     });
   });
 
-  it('wraps only at hyphens: normal word breaking, never break-all', async () => {
+  it('uses overflow-wrap (not break-all), with an anywhere fallback on phones for hyphen-free slugs', async () => {
     render(await AdminCategoriesPage());
 
     const cell = screen.getByText('health-wellness');
-    expect(cell.className).toContain('break-words');
+    expect(cell.className).toContain('sm:break-words');
+    expect(cell.className).toContain('max-sm:[overflow-wrap:anywhere]');
     expect(cell.className).not.toContain('break-all');
     expect(cell).toHaveAttribute('data-label', 'Slug');
   });
