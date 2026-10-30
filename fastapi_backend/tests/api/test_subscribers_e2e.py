@@ -341,28 +341,32 @@ async def test_an_unsubscribed_address_is_never_reopened_by_a_form_submission(
     assert len(provider.sent) == 1
 
 
-async def test_a_resent_confirmation_keeps_the_first_consent_time(
+async def test_a_resent_confirmation_keeps_the_first_consent_record(
     client: AsyncClient, engine: AsyncEngine, provider: FakeEmailProvider
 ) -> None:
     await client.post("/v1/subscribers", json=BODY)
     async with engine.begin() as connection:
         await connection.execute(
             text(
-                "UPDATE email_subscribers SET consent_at = now() - interval '31 days', "
+                "UPDATE email_subscribers SET consent_at = now() - interval '5 days', "
                 "confirmation_sent_at = now() - interval '2 hours'"
             )
         )
-    first = (await only_row(engine))["consent_at"]
+    first = await only_row(engine)
 
-    await client.post("/v1/subscribers", json={**BODY, "frequency": "DAILY"})
+    await client.post(
+        "/v1/subscribers",
+        json={**BODY, "frequency": "DAILY", "consent_text": "newer wording"},
+    )
 
     row = await only_row(engine)
     assert len(provider.sent) == 2
-    assert row["consent_at"] == first
+    assert row["consent_at"] == first["consent_at"]
+    assert row["consent_text"] == first["consent_text"]
     assert row["frequency"] == "DAILY"
 
 
-async def test_a_pending_signup_first_requested_31_days_ago_is_purged_even_if_resubmitted_today(
+async def test_a_pending_row_past_the_retention_period_is_restarted_by_a_resubmission(
     client: AsyncClient, engine: AsyncEngine, provider: FakeEmailProvider
 ) -> None:
     await client.post("/v1/subscribers", json=BODY)
@@ -370,6 +374,26 @@ async def test_a_pending_signup_first_requested_31_days_ago_is_purged_even_if_re
         await connection.execute(
             text(
                 "UPDATE email_subscribers SET consent_at = now() - interval '31 days', "
+                "confirmation_sent_at = now() - interval '31 days'"
+            )
+        )
+
+    await client.post("/v1/subscribers", json={**BODY, "consent_text": "newer wording"})
+
+    row = await only_row(engine)
+    assert len(provider.sent) == 2
+    assert row["consent_text"] == "newer wording"
+    assert datetime.now(UTC) - row["consent_at"] < timedelta(minutes=5)
+
+
+async def test_resubmitting_does_not_extend_a_pending_signups_retention(
+    client: AsyncClient, engine: AsyncEngine
+) -> None:
+    await client.post("/v1/subscribers", json=BODY)
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE email_subscribers SET consent_at = now() - interval '29 days', "
                 "confirmation_sent_at = now() - interval '2 hours'"
             )
         )
@@ -381,7 +405,7 @@ async def test_a_pending_signup_first_requested_31_days_ago_is_purged_even_if_re
             SubscriberRepository(session),
             session,
             FakeEmailProvider(),
-            datetime.now(UTC),
+            datetime.now(UTC) + timedelta(days=2),
             dry_run=False,
         )
 

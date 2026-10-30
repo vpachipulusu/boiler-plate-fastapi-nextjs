@@ -69,7 +69,8 @@ thin route that redirects to the landing page; do not make it change state.
   unsubscribe tokens" (D5.5) is therefore moot.
 - **Retention ages from the first request.** Re-sending a confirmation for a PENDING row updates the chosen
   categories and frequency and `confirmation_sent_at`, but not the consent record, so the 30 day clock of an
-  unconfirmed sign-up cannot be extended by resubmitting.
+  unconfirmed sign-up cannot be extended by resubmitting. Once that record is itself older than the retention period (the row is only waiting for the purge), a
+  resubmission starts it afresh: new consent time, wording and source, the same as purge then sign up again.
 
 ## The email provider
 

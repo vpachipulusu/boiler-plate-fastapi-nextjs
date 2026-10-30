@@ -155,6 +155,8 @@ class SubscriberService:
         address is never re-opened by an anonymous submission (anyone can type it): bringing it back is an
         operator action. A re-sent confirmation keeps the first request's consent record, so the 30 day
         retention of an unconfirmed sign-up ages from the first request and cannot be extended by resubmitting.
+        Once that record is past the retention period (the row is only waiting for the purge) a resubmission
+        starts it afresh, exactly as if the purge had run and the visitor had signed up again.
         """
         existing = await self._store.get_by_email(email, lock=True)
         if existing is None or existing.status is not SubscriberStatus.PENDING:
@@ -162,10 +164,12 @@ class SubscriberService:
         sent = existing.confirmation_sent_at
         if sent is not None and now - sent < RESEND_INTERVAL:
             return None
-        await self._store.update(
-            existing.id,
-            {"categories": values["categories"], "frequency": values["frequency"]},
+        changes = (
+            values
+            if now - existing.consent_at >= PENDING_RETENTION
+            else {"categories": values["categories"], "frequency": values["frequency"]}
         )
+        await self._store.update(existing.id, changes)
         return existing.id
 
     async def confirm(self, token: str) -> None:

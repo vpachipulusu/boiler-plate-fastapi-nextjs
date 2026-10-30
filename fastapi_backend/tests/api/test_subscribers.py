@@ -393,3 +393,33 @@ async def test_a_vercel_preview_without_a_provider_refuses_signups(
 
     assert response.status_code == 503
     assert harness.provider.sent == []
+
+
+async def test_the_headers_show_the_address_bucket_when_it_is_the_tighter() -> None:
+    http, _, _ = build()
+
+    async with http:
+        response = await http.post("/v1/subscribers", json=VALID)
+
+    assert response.headers["x-ratelimit-limit"] == str(SUBSCRIBE_EMAIL_POLICY.limit)
+    assert response.headers["x-ratelimit-remaining"] == str(
+        SUBSCRIBE_EMAIL_POLICY.limit - 1
+    )
+
+
+async def test_the_headers_show_the_ip_bucket_when_it_is_the_tighter() -> None:
+    http, _, limiter = build()
+    async with http:
+        for n in range(SUBSCRIBE_IP_POLICY.limit - 3):
+            await http.post(
+                "/v1/subscribers", json={**VALID, "email": f"other{n}@example.com"}
+            )
+
+        response = await http.post("/v1/subscribers", json=VALID)
+
+    ip_hits = [i for i, p in limiter.hits if p is SUBSCRIBE_IP_POLICY]
+    email_hits = [i for i, p in limiter.hits if p is SUBSCRIBE_EMAIL_POLICY]
+    assert len(ip_hits) == len(email_hits) == SUBSCRIBE_IP_POLICY.limit - 2
+    assert response.status_code == 202
+    assert response.headers["x-ratelimit-limit"] == str(SUBSCRIBE_IP_POLICY.limit)
+    assert response.headers["x-ratelimit-remaining"] == "2"

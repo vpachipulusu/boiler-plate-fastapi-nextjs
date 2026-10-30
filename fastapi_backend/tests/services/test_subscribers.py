@@ -8,6 +8,7 @@ from app.core.email_provider import EmailProviderError
 from app.core.subscriber_tokens import TokenPurpose, token_digest
 from app.models.platform.email_subscriber import AlertFrequency, SubscriberStatus
 from app.services.subscribers import (
+    PENDING_RETENTION,
     RESEND_INTERVAL,
     InvalidToken,
     ProviderUnavailable,
@@ -109,6 +110,34 @@ async def test_resubmission_while_pending_updates_the_choices_but_keeps_the_firs
     assert row.frequency is AlertFrequency.DAILY
     assert row.consent_at == first_consent_at
     assert row.confirmation_sent_at == harness.clock.now
+
+
+async def test_a_pending_row_older_than_the_retention_period_gets_a_fresh_consent_record() -> (
+    None
+):
+    harness = await subscribed()
+    harness.clock.advance(PENDING_RETENTION)
+
+    await harness.service.subscribe(make_request(EMAIL))
+
+    (row,) = harness.store.rows.values()
+    assert row.consent_at == harness.clock.now
+    assert row.confirmation_sent_at == harness.clock.now
+    assert len(harness.provider.sent) == 2
+
+
+async def test_a_pending_row_younger_than_the_retention_period_keeps_its_consent_record() -> (
+    None
+):
+    harness = await subscribed()
+    first = harness.clock.now
+    harness.clock.advance(timedelta(days=5))
+
+    await harness.service.subscribe(make_request(EMAIL))
+
+    (row,) = harness.store.rows.values()
+    assert row.consent_at == first
+    assert len(harness.provider.sent) == 2
 
 
 async def test_a_pending_row_inside_the_resend_interval_is_left_alone_and_sends_nothing() -> (
