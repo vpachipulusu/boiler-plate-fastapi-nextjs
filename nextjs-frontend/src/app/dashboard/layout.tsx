@@ -49,6 +49,8 @@ async function getUser() {
       email: decodedClaims.email,
       dbDisplayName: profile.data.display_name,
       dbAvatarUrl: profile.data.avatar_url,
+      // Only decides whether the menu shows an Admin link; /admin still checks admin access on the server.
+      isAdmin: profile.data.is_admin === true,
     };
   } catch (error) {
     unstable_rethrow(error);
@@ -99,6 +101,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
                   email: user.email,
                   dbDisplayName: user.dbDisplayName,
                   dbAvatarUrl: user.dbAvatarUrl,
+                  isAdmin: user.isAdmin,
                 }}
               />
             </div>

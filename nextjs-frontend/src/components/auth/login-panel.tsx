@@ -8,15 +8,22 @@ import { OAuthButtons } from './oauth-buttons';
 import { TotpChallengeForm } from './totp-challenge-form';
 import { useCompleteSignIn } from './use-complete-sign-in';
 
+interface LoginPanelProps {
+  /** Where to go after signing in: the login page's `?redirect=` value, already checked with `resolveSafeRedirect`. */
+  redirectTo?: string;
+}
+
 /**
  * The sign-in area: provider buttons and the email form, plus the two-factor code step they both hand over to
  * when the account has 2FA on. The first step stays mounted (hidden) during the code step so the typed email
  * survives "Back to sign in".
  */
-export function LoginPanel() {
+export function LoginPanel({ redirectTo }: LoginPanelProps = {}) {
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [notice, setNotice] = useState<AuthFormError | null>(null);
-  const completeSignIn = useCompleteSignIn();
+  // The code step's completion. The password form and provider buttons get the same `redirectTo` and resolve it
+  // themselves.
+  const completeSignIn = useCompleteSignIn(redirectTo);
   const stepOneRef = useRef<HTMLDivElement>(null);
   const wasInCodeStep = useRef(false);
 
@@ -48,9 +55,9 @@ export function LoginPanel() {
         />
       )}
       <div ref={stepOneRef} className="space-y-4" hidden={challengeToken !== null}>
-        <OAuthButtons onTotpRequired={startCodeStep} />
+        <OAuthButtons onTotpRequired={startCodeStep} redirectTo={redirectTo} />
         <AuthDivider>Or continue with email</AuthDivider>
-        <LoginForm onTotpRequired={startCodeStep} notice={notice} />
+        <LoginForm onTotpRequired={startCodeStep} notice={notice} redirectTo={redirectTo} />
       </div>
     </>
   );

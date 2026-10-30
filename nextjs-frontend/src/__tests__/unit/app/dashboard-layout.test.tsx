@@ -229,6 +229,22 @@ describe('DashboardLayout session check', () => {
     });
 
     it.each([
+      [true, true],
+      [false, false],
+      [undefined, false],
+      ['true', false],
+    ])('passes is_admin %j to the header as isAdmin %j', async (isAdmin, expected) => {
+      mocks.fetchProfile.mockResolvedValue({
+        success: true,
+        data: { display_name: null, avatar_url: null, is_admin: isAdmin },
+      });
+
+      const tree = await DashboardLayout({ children: null });
+
+      expect(findHeaderUser(tree)).toMatchObject({ isAdmin: expected });
+    });
+
+    it.each([
       [401, 'Invalid authentication'],
       [404, 'Not found'],
     ])('clears the session when the backend answers %s (%s)', async (status, error) => {

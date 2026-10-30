@@ -227,8 +227,9 @@ Goal: a visitor's email address never reaches logs, history or Sentry through a 
 **Audit (code, FREEJ-31).** No component, link, redirect, server action, auth flow or test puts an address in a
 URL. The newsletter band is a link to `/alerts`; `/alerts` ignores `?email=` (the e2e spec `alerts.spec.ts` loads
 `/alerts?email=...` on purpose and asserts nothing is prefilled); subscribe, confirm and unsubscribe go through
-server actions with the token or address in a body. Sign-in, reset-password and verify-email read no query
-parameter (sign-up reads only `plan`; the billing success handler reads `upgrade`). Firebase's
+server actions with the token or address in a body. Reset-password and verify-email read no query
+parameter. Sign-in reads only `redirect`, which is a path on this site (never an address; `resolveSafeRedirect` in
+`src/lib/auth/safe-redirect.ts`, FREEJ-41) and is not sent to any service. Sign-up reads only `plan`; the billing success handler reads `upgrade`. Firebase's
 `sendPasswordResetEmail` and `sendEmailVerification` are called without action-code settings, so their links point
 at Firebase's own handler, and the app has no `oobCode` or `continueUrl` page (`verifyEmailAction(oobCode)` exists
 but nothing calls it).

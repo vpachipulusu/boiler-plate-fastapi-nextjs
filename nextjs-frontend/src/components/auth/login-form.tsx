@@ -40,10 +40,12 @@ interface LoginFormProps {
   onTotpRequired: (idToken: string) => void;
   /** Shown above the form until the next submit (for example when the code step timed out). */
   notice?: AuthFormError | null;
+  /** Where to go after signing in (the login page's `?redirect=` value). Checked again before use; default `/dashboard`. */
+  redirectTo?: string;
 }
 
-export function LoginForm({ onTotpRequired, notice = null }: LoginFormProps) {
-  const completeSignIn = useCompleteSignIn();
+export function LoginForm({ onTotpRequired, notice = null, redirectTo }: LoginFormProps) {
+  const completeSignIn = useCompleteSignIn(redirectTo);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<AuthFormError | null>(null);
   // A notice is shown until the next submit; remembering which one was dismissed keeps this derived, not synced.

@@ -106,7 +106,7 @@ describe('auth layout', () => {
 
 describe('auth pages', () => {
   const pages: Array<[string, () => Promise<React.ReactElement> | React.ReactElement, RegExp]> = [
-    ['login', () => <LoginPage />, /welcome back/i],
+    ['login', async () => await LoginPage({ searchParams: Promise.resolve({}) }), /welcome back/i],
     [
       'signup',
       async () => await SignupPage({ searchParams: Promise.resolve({}) }),
@@ -126,8 +126,8 @@ describe('auth pages', () => {
     expect(container.innerHTML).not.toMatch(RAW_COLOURS);
   });
 
-  it('login keeps its form and a sign-up cross link with a 44px target', () => {
-    render(<LoginPage />);
+  it('login keeps its form and a sign-up cross link with a 44px target', async () => {
+    render(await LoginPage({ searchParams: Promise.resolve({}) }));
     const signUp = screen.getByRole('link', { name: /sign up/i });
     expect(signUp).toHaveAttribute('href', '/signup');
     expect(signUp.className).toMatch(/min-h-11/);
