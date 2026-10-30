@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('@/components/auth/login-form', () => ({
-  LoginForm: () => <form data-testid="login-form" />,
+vi.mock('@/components/auth/login-panel', () => ({
+  LoginPanel: () => <form data-testid="login-form" />,
 }));
 vi.mock('@/components/auth/signup-form', () => ({
   SignupForm: () => <form data-testid="signup-form" />,

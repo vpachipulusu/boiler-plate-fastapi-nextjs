@@ -4,7 +4,6 @@ import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { signInWithEmail } from '@/lib/firebase/auth-helpers';
 import { verifyTokenAction } from '@/app/actions/auth-actions';
+import { isTotpRequiredResult } from '@/lib/auth/auth-error-messages';
 import { AuthFormAlert, FIELD_ERROR_CLASS } from './auth-form-alert';
 import {
   classifyAuthError,
@@ -26,6 +26,7 @@ import {
   REDIRECT_RECOVERY_MS,
   type AuthFormError,
 } from './auth-form-errors';
+import { useCompleteSignIn } from './use-complete-sign-in';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -34,8 +35,13 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-export function LoginForm() {
-  const router = useRouter();
+interface LoginFormProps {
+  /** The account has two-factor authentication on: continue with the code step, using this ID token. */
+  onTotpRequired: (idToken: string) => void;
+}
+
+export function LoginForm({ onTotpRequired }: LoginFormProps) {
+  const completeSignIn = useCompleteSignIn();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<AuthFormError | null>(null);
   const isSubmitting = useRef(false);
@@ -77,6 +83,11 @@ export function LoginForm() {
         const result = await verifyTokenAction(idToken);
 
         if (!result.success) {
+          if (isTotpRequiredResult(result)) {
+            // The password was right; the code step finishes the sign-in with this same ID token.
+            onTotpRequired(idToken);
+            return;
+          }
           setError(classifyAuthResult(result, 'sign-in'));
           return;
         }
@@ -84,8 +95,7 @@ export function LoginForm() {
         redirected = true;
         // If navigation fails or stalls, give the form back instead of leaving it locked.
         setTimeout(release, REDIRECT_RECOVERY_MS);
-        router.push('/dashboard');
-        router.refresh();
+        completeSignIn();
       }
     } catch (error) {
       redirected = false;

@@ -7,10 +7,16 @@ import { applyActionCode } from 'firebase/auth';
 import { emailSchema, passwordSchema } from '@/lib/utils/validation';
 import { logger } from '@/lib/logger';
 import {
+  SIGN_IN_RATE_LIMITED_ERROR,
   SIGN_IN_SERVICE_UNAVAILABLE_ERROR,
+  TOTP_INVALID_ERROR,
+  TOTP_REQUIRED_ERROR,
   isServiceUnavailable,
   isServiceUnavailableError,
+  type RateLimitedData,
   type ServiceUnavailableData,
+  type TotpInvalidData,
+  type TotpRequiredData,
 } from '@/lib/auth/auth-error-messages';
 import {
   isEmailNotVerifiedError,
@@ -160,9 +166,20 @@ export async function logoutAction(): Promise<AuthActionResponse> {
 /**
  * Explicit sign-in (login, signup, OAuth): verifies the token, syncs the user, mints the session
  * cookie and records ONE login-history row (plus the new-device notice).
+ *
+ * For an account with two-factor authentication the first call (no `totpCode`) fails with
+ * `data.totpRequired`; the form then asks for the six-digit code and calls again with the same ID token and
+ * `totpCode`. A wrong code fails with `data.totpInvalid`. A malformed code is refused here without calling the API,
+ * so a typo never spends the API's per-account code budget. The code is never logged.
  */
-export async function verifyTokenAction(idToken: string): Promise<AuthActionResponse> {
-  return establishSession(idToken, { isExplicitSignIn: true });
+export async function verifyTokenAction(
+  idToken: string,
+  totpCode?: string
+): Promise<AuthActionResponse> {
+  // Anything but a string (a tampered call) is treated as "no code": the API then asks for one.
+  const code = typeof totpCode === 'string' ? totpCode : undefined;
+  if (code !== undefined && !TOTP_CODE_PATTERN.test(code)) return totpInvalidResult();
+  return establishSession(idToken, { isExplicitSignIn: true, totpCode: code });
 }
 
 /**
@@ -176,6 +193,7 @@ export async function refreshSessionAction(idToken: string): Promise<AuthActionR
 }
 
 const GENERIC_SIGN_IN_ERROR = 'Token verification failed';
+const TOTP_CODE_PATTERN = /^\d{6}$/;
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 5; // 5 days, matches the backend session lifetime
 
 /** The one outage result: display text plus the typed flag the forms act on. */
@@ -185,6 +203,29 @@ function serviceUnavailableResult(): AuthActionResponse<ServiceUnavailableData> 
     error: SIGN_IN_SERVICE_UNAVAILABLE_ERROR,
     data: { serviceUnavailable: true },
   };
+}
+
+function totpInvalidResult(): AuthActionResponse<TotpInvalidData> {
+  return { success: false, error: TOTP_INVALID_ERROR, data: { totpInvalid: true } };
+}
+
+/**
+ * The typed refusals of an explicit sign-in that the form handles itself: a missing or wrong two-factor code
+ * (401 with the API's stable `code`) and a rate limit (429). Anything else is null, for the generic handling.
+ * The flags carry no backend text, and the code and token never reach a log.
+ */
+function explicitSignInRefusal(failure: {
+  status?: number;
+  code?: string;
+}): AuthActionResponse<TotpRequiredData | TotpInvalidData | RateLimitedData> | null {
+  if (failure.status === 401 && failure.code === 'totp_required') {
+    return { success: false, error: TOTP_REQUIRED_ERROR, data: { totpRequired: true } };
+  }
+  if (failure.status === 401 && failure.code === 'totp_invalid') return totpInvalidResult();
+  if (failure.status === 429) {
+    return { success: false, error: SIGN_IN_RATE_LIMITED_ERROR, data: { rateLimited: true } };
+  }
+  return null;
 }
 
 /** Maps a failed backend call to the outage result (5xx or unreachable) or the generic refusal. */
@@ -229,7 +270,10 @@ async function setSessionCookie(value: string, maxAgeSeconds: number): Promise<v
 
 async function establishSession(
   idToken: string,
-  { isExplicitSignIn: requestedExplicit }: { isExplicitSignIn: boolean }
+  {
+    isExplicitSignIn: requestedExplicit,
+    totpCode,
+  }: { isExplicitSignIn: boolean; totpCode?: string }
 ): Promise<AuthActionResponse> {
   try {
     // Verify Firebase ID token, rejecting revoked tokens. A revoked or invalid token gets the
@@ -255,10 +299,19 @@ async function establishSession(
     // Explicit sign-in: the API verifies the token again (fresh sign-in required), syncs the platform user,
     // records ONE login-history row and returns the session cookie only after both commit.
     // Refresh: needs the current session and the same uid; the API records no login history.
+    const userAgent = isExplicitSignIn ? (await headers()).get('user-agent') : null;
     const session = isExplicitSignIn
-      ? await createBackendSession(idToken, (await headers()).get('user-agent'))
+      ? await createBackendSession(idToken, userAgent, ...(totpCode ? [totpCode] : []))
       : await refreshBackendSession(idToken);
     if (!session.success) {
+      const refusal = isExplicitSignIn ? explicitSignInRefusal(session) : null;
+      if (refusal) {
+        // totp_required is the normal first answer for a 2FA account, not a failure worth logging.
+        if (refusal.error !== TOTP_REQUIRED_ERROR) {
+          logger.warn('Sign-in refused:', { status: session.status, code: session.code });
+        }
+        return refusal;
+      }
       logger.error(
         isExplicitSignIn ? 'Backend session creation failed:' : 'Backend session refresh failed:',
         { status: session.status, error: session.error }

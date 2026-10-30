@@ -340,7 +340,7 @@ export default function SecurityPage() {
         </Dialog>
       </Panel>
 
-      {/* Two-factor status. Setup stays hidden until sign-in enforces 2FA (parked); disable is offered when it is on. */}
+      {/* Two-factor status. Setup stays hidden until a recovery path exists (sign-in asks for the code, but there are no backup codes); disable is offered when it is on. */}
       <Panel title="Two-Factor Authentication" titleId="security-two-factor">
         <PanelHint>An extra verification step when you sign in</PanelHint>
         {twoFactorEnabled === null ? (

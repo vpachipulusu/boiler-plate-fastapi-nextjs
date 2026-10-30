@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { signInWithGoogle, signInWithGitHub } from '@/lib/firebase/auth-helpers';
 import { verifyTokenAction } from '@/app/actions/auth-actions';
-import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { AuthFailureResult } from '@/lib/auth/auth-error-messages';
+import { isTotpRequiredResult, type AuthFailureResult } from '@/lib/auth/auth-error-messages';
 import { classifyAuthResult } from './auth-form-errors';
+import { useCompleteSignIn } from './use-complete-sign-in';
 
 /**
  * Toast for a failed server-side verification, shared by every provider. An outage (typed flag) is
@@ -15,18 +15,31 @@ import { classifyAuthResult } from './auth-form-errors';
  */
 function verificationFailureToast(result: AuthFailureResult) {
   const failure = classifyAuthResult(result, 'sign-in');
-  const isOutage = failure.kind === 'service-unavailable';
+  // The outage and the rate limit have their own curated copy; nothing else shows backend text.
+  const hasOwnCopy = failure.kind === 'service-unavailable' || failure.kind === 'rate-limit';
   return {
-    title: isOutage ? failure.title : 'Authentication Failed',
-    description: isOutage
+    title: hasOwnCopy ? failure.title : 'Authentication Failed',
+    description: hasOwnCopy
       ? failure.message
       : result.error || 'Failed to create session. Please try again.',
     variant: 'destructive' as const,
   };
 }
 
-export function OAuthButtons() {
-  const router = useRouter();
+/** Shown when two-factor sign-in is needed but this page has no code step (for example the sign-up page). */
+const TOTP_ON_LOGIN_PAGE_TOAST = {
+  title: 'Two-factor code needed',
+  description: 'Sign in on the login page and enter the code from your authenticator app.',
+  variant: 'destructive' as const,
+};
+
+interface OAuthButtonsProps {
+  /** Two-factor sign-in is needed: continue with the code step, using this ID token. */
+  onTotpRequired?: (idToken: string) => void;
+}
+
+export function OAuthButtons({ onTotpRequired }: OAuthButtonsProps = {}) {
+  const completeSignIn = useCompleteSignIn();
   const { toast } = useToast();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
@@ -59,6 +72,11 @@ export function OAuthButtons() {
         const result = await verifyTokenAction(idToken);
 
         if (!result.success) {
+          if (isTotpRequiredResult(result)) {
+            if (onTotpRequired) onTotpRequired(idToken);
+            else toast(TOTP_ON_LOGIN_PAGE_TOAST);
+            return;
+          }
           toast(verificationFailureToast(result));
           return;
         }
@@ -68,8 +86,7 @@ export function OAuthButtons() {
           description: 'Signed in successfully!',
         });
 
-        router.push('/dashboard');
-        router.refresh();
+        completeSignIn();
       }
     } catch (error: unknown) {
       console.error(`${providerName} sign-in error:`, error);

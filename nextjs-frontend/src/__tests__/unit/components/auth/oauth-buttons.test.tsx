@@ -74,4 +74,54 @@ describe('OAuthButtons verification failures', () => {
     await waitFor(() => expect(mocks.toast).toHaveBeenCalled());
     expect(mocks.toast.mock.calls[0][0].title).toBe('Authentication Failed');
   });
+
+  it.each(['Google', 'GitHub'])(
+    '%s hands the ID token to the two-factor step when the account needs a code',
+    async (provider) => {
+      const onTotpRequired = vi.fn();
+      mocks.verifyTokenAction.mockResolvedValue({
+        success: false,
+        error: 'Two-factor code required',
+        data: { totpRequired: true },
+      });
+      render(<OAuthButtons onTotpRequired={onTotpRequired} />);
+
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(provider, 'i') }));
+
+      await waitFor(() => expect(onTotpRequired).toHaveBeenCalledWith('tok'));
+      expect(mocks.toast).not.toHaveBeenCalled();
+    }
+  );
+
+  it('points to the login page for the code when the page has no code step', async () => {
+    mocks.verifyTokenAction.mockResolvedValue({
+      success: false,
+      error: 'Two-factor code required',
+      data: { totpRequired: true },
+    });
+    render(<OAuthButtons />);
+
+    fireEvent.click(screen.getByRole('button', { name: /google/i }));
+
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalled());
+    const toast = mocks.toast.mock.calls[0][0];
+    expect(toast.title).toBe('Two-factor code needed');
+    expect(toast.description).toMatch(/login page/i);
+  });
+
+  it('names a rate limit instead of "Authentication Failed"', async () => {
+    mocks.verifyTokenAction.mockResolvedValue({
+      success: false,
+      error: 'Too many sign-in attempts',
+      data: { rateLimited: true },
+    });
+    render(<OAuthButtons />);
+
+    fireEvent.click(screen.getByRole('button', { name: /google/i }));
+
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalled());
+    const toast = mocks.toast.mock.calls[0][0];
+    expect(toast.title).toBe('Too many attempts');
+    expect(toast.description).toMatch(/wait a few minutes/i);
+  });
 });

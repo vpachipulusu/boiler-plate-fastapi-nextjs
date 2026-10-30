@@ -11,13 +11,15 @@ export const FIELD_ERROR_CLASS =
 
 interface AuthFormAlertProps {
   error: AuthFormError;
+  /** Lets a field name this alert in `aria-describedby`. */
+  id?: string;
 }
 
 /**
  * Form-level alert panel (plan 5.8): icon, bold summary and a plain sentence. It takes focus when
  * it appears, which is how a failed submit with no field errors is announced and reached.
  */
-export function AuthFormAlert({ error }: AuthFormAlertProps) {
+export function AuthFormAlert({ error, id }: AuthFormAlertProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,6 +29,7 @@ export function AuthFormAlert({ error }: AuthFormAlertProps) {
   return (
     <div
       ref={ref}
+      id={id}
       role="alert"
       tabIndex={-1}
       className="flex gap-3 rounded-lg border-2 border-crit-foreground bg-crit p-3 text-sm text-crit-foreground"

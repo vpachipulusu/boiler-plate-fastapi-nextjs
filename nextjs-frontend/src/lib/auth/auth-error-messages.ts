@@ -12,15 +12,58 @@ export interface ServiceUnavailableData {
   serviceUnavailable: true;
 }
 
+/**
+ * Display text for the two-factor and rate-limit refusals of an explicit sign-in. Like the outage text it is never
+ * matched by the forms: they read the typed flags below, and show their own curated copy.
+ */
+export const TOTP_REQUIRED_ERROR = 'Two-factor code required';
+export const TOTP_INVALID_ERROR = 'Invalid two-factor code';
+export const SIGN_IN_RATE_LIMITED_ERROR = 'Too many sign-in attempts';
+
+/** Typed marker: the account has two-factor authentication on and no code was sent. */
+export interface TotpRequiredData {
+  totpRequired: true;
+}
+
+/** Typed marker: a code was sent and it was wrong or malformed. */
+export interface TotpInvalidData {
+  totpInvalid: true;
+}
+
+/** Typed marker: the API's sign-in rate limit (or the per-account code limit) answered 429. */
+export interface RateLimitedData {
+  rateLimited: true;
+}
+
 /** The part of a failed auth action response the forms read. */
 export interface AuthFailureResult {
   error?: string;
-  data?: { serviceUnavailable?: boolean } | null;
+  data?: {
+    serviceUnavailable?: boolean;
+    totpRequired?: boolean;
+    totpInvalid?: boolean;
+    rateLimited?: boolean;
+  } | null;
 }
 
 /** True when an auth action response carries the typed outage flag. */
 export function isServiceUnavailableResult(result: AuthFailureResult): boolean {
   return result.data?.serviceUnavailable === true;
+}
+
+/** True when sign-in needs the account's two-factor code (the form moves to its code step). */
+export function isTotpRequiredResult(result: AuthFailureResult): boolean {
+  return result.data?.totpRequired === true;
+}
+
+/** True when the two-factor code sent was refused. */
+export function isTotpInvalidResult(result: AuthFailureResult): boolean {
+  return result.data?.totpInvalid === true;
+}
+
+/** True when the sign-in was refused by a rate limit. */
+export function isRateLimitedResult(result: AuthFailureResult): boolean {
+  return result.data?.rateLimited === true;
 }
 
 /**
