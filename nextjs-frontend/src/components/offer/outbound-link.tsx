@@ -30,13 +30,15 @@ export function OutboundLink({ offerId, className, children }: OutboundLinkProps
 interface AffiliateCtaProps {
   offerId: string;
   offerType: OfferType;
+  /** The generated postage or card line (`ctaConditions`), shown right after the button. */
+  conditions?: string | null;
 }
 
 /**
  * Call to action for a real offer: the "Ad" label comes first, then the button, then the commission
  * sentence (docs/compliance/uk-affiliate-checklist.md A1, A2). Wording is for the legal reviewer to confirm.
  */
-export function AffiliateCta({ offerId, offerType }: AffiliateCtaProps) {
+export function AffiliateCta({ offerId, offerType, conditions = null }: AffiliateCtaProps) {
   return (
     <div>
       <p className="mb-2 px-3 text-xs font-bold uppercase tracking-wider text-foreground">Ad</p>
@@ -50,6 +52,9 @@ export function AffiliateCta({ offerId, offerType }: AffiliateCtaProps) {
         {CTA_LABELS[offerType]}
         <ArrowRight aria-hidden="true" />
       </OutboundLink>
+      {conditions && (
+        <p className="mt-3 px-3 text-xs font-semibold text-foreground">{conditions}</p>
+      )}
       <p className="mt-3 px-3 text-xs text-muted-foreground">
         Freejoy is paid a commission by the brand if you take up this offer through this link.
       </p>

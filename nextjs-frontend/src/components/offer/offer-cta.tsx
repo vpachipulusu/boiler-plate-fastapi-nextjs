@@ -21,6 +21,8 @@ interface OfferCtaProps {
   demo: boolean;
   /** Set for a real offer: the CTA links to `/go/<offerId>`. Null or absent keeps the demo dialog. */
   offerId?: string | null;
+  /** The generated postage or card line (`ctaConditions`), shown right after the button. */
+  conditions?: string | null;
 }
 
 /**
@@ -29,8 +31,10 @@ interface OfferCtaProps {
  * "Demo offer" dialog instead: nothing here renders an external href. The ended state is rendered by the
  * (server) hero instead of this client component.
  */
-export function OfferCta({ offerType, demo, offerId = null }: OfferCtaProps) {
-  if (offerId && !demo) return <AffiliateCta offerId={offerId} offerType={offerType} />;
+export function OfferCta({ offerType, demo, offerId = null, conditions = null }: OfferCtaProps) {
+  if (offerId && !demo) {
+    return <AffiliateCta offerId={offerId} offerType={offerType} conditions={conditions} />;
+  }
 
   return (
     <div>
@@ -64,6 +68,9 @@ export function OfferCta({ offerType, demo, offerId = null }: OfferCtaProps) {
           </DialogClose>
         </DialogContent>
       </Dialog>
+      {conditions && (
+        <p className="mt-3 px-3 text-xs font-semibold text-foreground">{conditions}</p>
+      )}
       <p className="mt-3 px-3 text-xs text-muted-foreground">
         Demo offer: this button stays on Freejoy. A real offer will take you to the brand&apos;s
         website to request your {REQUEST_KIND[offerType]}.
@@ -72,7 +79,7 @@ export function OfferCta({ offerType, demo, offerId = null }: OfferCtaProps) {
         <Link href="/affiliate-disclosure" className="underline underline-offset-2">
           Affiliate disclosure
         </Link>
-        : on real offers we may earn a commission if you qualify.
+        : real offers are marked &quot;Ad&quot; and say how Freejoy is paid.
       </p>
     </div>
   );

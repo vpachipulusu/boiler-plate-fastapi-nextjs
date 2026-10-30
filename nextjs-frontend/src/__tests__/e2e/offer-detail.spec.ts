@@ -33,7 +33,7 @@ for (const viewport of VIEWPORTS) {
       await expect(
         page.getByRole('heading', { level: 1, name: 'Glow-boosting face cream sample' })
       ).toBeVisible();
-      await expect(page.getByText('Last checked 27 October 2026')).toBeVisible();
+      await expect(page.getByText('Sample date 27 October 2026')).toBeVisible();
       await expect(page.getByText('POSTAGE: FREE', { exact: true })).toBeVisible();
       await expect(page.getByText('UK OFFER')).toBeVisible();
       await expect(
@@ -57,7 +57,7 @@ for (const viewport of VIEWPORTS) {
     }) => {
       await page.goto(SAMPLE);
       await waitForPageReady(page);
-      const cta = page.getByRole('button', { name: 'Get this free sample' });
+      const cta = page.getByRole('button', { name: 'Request this sample' });
 
       await cta.click();
       await expect(page.getByRole('dialog', { name: 'Demo offer' })).toBeVisible();
@@ -75,7 +75,7 @@ for (const viewport of VIEWPORTS) {
 
       await expect(page.getByText('CARD REQUIRED')).toBeVisible();
       await expect(page.getByText('Cancellation', { exact: true })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Start the free trial' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Start the trial' })).toBeVisible();
     });
 
     test('replaces the call to action when the offer has ended', async ({ page }) => {

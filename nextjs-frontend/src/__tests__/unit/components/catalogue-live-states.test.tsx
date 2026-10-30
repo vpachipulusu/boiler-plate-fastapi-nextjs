@@ -55,7 +55,7 @@ describe('offer call to action for a real offer', () => {
   it('links through the first-party redirect, with no demo wording and no external link', () => {
     render(<OfferCta offerType="free_sample" demo={false} offerId="api-1" />);
 
-    const link = screen.getByRole('link', { name: 'Get this free sample' });
+    const link = screen.getByRole('link', { name: 'Request this sample' });
     expect(link).toHaveAttribute('href', '/go/api-1');
     expect(link).toHaveAttribute('rel', 'sponsored nofollow noopener');
     expect(screen.queryByRole('button')).toBeNull();
@@ -68,7 +68,7 @@ describe('offer call to action for a real offer', () => {
   it('leaves the demo button exactly as it was, with no coming-soon badge', () => {
     render(<OfferCta offerType="free_sample" demo />);
 
-    const button = screen.getByRole('button', { name: 'Get this free sample' });
+    const button = screen.getByRole('button', { name: 'Request this sample' });
     expect(button).not.toHaveTextContent(/coming soon/i);
     expect(button).not.toHaveAttribute('aria-label');
   });

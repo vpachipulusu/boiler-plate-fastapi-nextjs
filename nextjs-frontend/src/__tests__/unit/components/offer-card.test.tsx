@@ -33,3 +33,41 @@ describe('OfferGrid', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(4);
   });
 });
+
+describe('OfferCard urgency and popularity labels', () => {
+  const withLabel = (freshness: 'popular' | 'ends_soon' | 'limited', over = {}) => ({
+    ...offer,
+    freshness,
+    ...over,
+  });
+
+  it.each([
+    ['popular', 'Popular'],
+    ['ends_soon', 'Ends soon'],
+    ['limited', 'Limited'],
+  ] as const)('does not show "%s" on a real API offer', (freshness, text) => {
+    render(
+      <OfferCard offer={withLabel(freshness, { source: 'api', demo: false })} merchant={merchant} />
+    );
+
+    expect(screen.queryByText(text)).toBeNull();
+  });
+
+  it('still shows the label on a demo fixture offer, next to the demo badge', () => {
+    render(<OfferCard offer={withLabel('ends_soon')} merchant={merchant} />);
+
+    expect(screen.getByText('Ends soon')).toBeInTheDocument();
+    expect(screen.getByText('Demo')).toBeInTheDocument();
+  });
+
+  it('keeps a recency label on a real API offer', () => {
+    render(
+      <OfferCard
+        offer={{ ...offer, freshness: 'just_added', source: 'api', demo: false }}
+        merchant={merchant}
+      />
+    );
+
+    expect(screen.getByText('Just added')).toBeInTheDocument();
+  });
+});

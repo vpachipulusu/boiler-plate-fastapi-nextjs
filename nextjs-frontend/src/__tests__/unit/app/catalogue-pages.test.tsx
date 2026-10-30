@@ -138,7 +138,7 @@ describe('freebies page', () => {
     render(header);
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      /Find your next\s*little free thing\./
+      /Find your next\s*little treat\./
     );
     expect(screen.getByRole('searchbox', { name: 'Search freebies' })).toHaveValue('tea');
   });

@@ -82,7 +82,7 @@ describe('homepage', () => {
 
     expect(screen.getByText('Design preview with sample listings')).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/every day|daily dose|checked daily/i);
-    const strip = screen.getByRole('region', { name: /our promises/i });
+    const strip = screen.getByRole('region', { name: /how we list offers/i });
     expect(within(strip).getAllByRole('listitem')).toHaveLength(4);
     expect(strip.textContent).not.toMatch(/\d/);
   });
