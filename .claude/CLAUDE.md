@@ -20,7 +20,7 @@ npm run build            # production build
 npm run lint             # ESLint
 npm run typecheck        # tsc --noEmit
 npm run test:unit        # Vitest (src/__tests__/unit)
-npm run test:coverage    # Vitest with coverage (80% thresholds)
+npm run test:coverage    # Vitest with coverage (ratchet thresholds in vitest.config.ts)
 npm run test:e2e:local -- <spec>   # Playwright against a production build; needs a running backend
 npm run generate:client  # openapi.json -> src/lib/api/generated (backend changes only)
 npm run check:client     # fails when the committed client is stale
@@ -28,7 +28,7 @@ npm run check:client     # fails when the committed client is stale
 # Backend (fastapi_backend/)
 uv run ruff check . && uv run ruff format --check .
 uv run mypy
-uv run pytest --cov                                     # coverage ratchet in pyproject.toml
+uv run pytest --cov                                     # coverage ratchet (fail_under in pyproject.toml)
 uv run alembic upgrade head && uv run alembic check     # models must match migrations
 uv run python -m commands.generate_openapi_schema       # writes ../nextjs-frontend/openapi.json
 ```
@@ -80,8 +80,13 @@ secret in a `NEXT_PUBLIC_*` variable. The brand name is `NEXT_PUBLIC_APP_NAME` (
 
 ## Testing notes
 
-- Vitest thresholds are 80% (branches, functions, lines, statements). The backend `fail_under` is a ratchet:
-  raise it, never lower it.
+- Coverage thresholds are ratchets, not the 80% project minimum. Frontend (`vitest.config.ts`): statements 87,
+  branches 86, functions 85, lines 88. Backend (`pyproject.toml`): `fail_under = 89.0`. Each sits about 1 to 2
+  points under the measured figure (frontend 89.4 / 88.3 / 87.1 / 90.3; backend 89.9 without the database, 95.6
+  with it). Raise a threshold when measured coverage rises; never lower one.
+- The backend floor is set against the database-less run, the lower of the two. CI and `scripts/gate.sh` run the
+  suite with a Postgres (`*_e2e.py` included) and `gate.sh` without `GATE_TEST_DATABASE_URL` runs it
+  database-less; both must pass `fail_under`.
 - Backend tests use fakes (`tests/fakes.py`) and need no database; `*_e2e.py` tests run only with
   `TEST_DATABASE_URL` (a local database whose name ends in `_test`; they rebuild it with Alembic). CI provides one.
 - Playwright: `npm run test:setup` creates test accounts in a separate Firebase test project; `test:e2e:local`
