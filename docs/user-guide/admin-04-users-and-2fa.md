@@ -79,8 +79,10 @@ Two-factor authentication adds a six-digit code from an authenticator app to sig
 - **Status only.** The Security page has a **Two-Factor Authentication** panel that says either "Two-factor
   authentication is enabled" or "Two-factor authentication is not enabled" (or "Two-factor status unavailable" if it
   cannot be read).
-- **Setting it up is switched off.** The page has no **Enable** button yet: sign-in does not ask for the code, so setup
-  is hidden until it does. (The backend can enrol and verify codes already.)
+- **Setting it up is switched off.** The page has no **Enable** button yet. The sign-in form has no box for the
+  six-digit code, but the system behind it refuses to sign in an account that has 2FA enabled unless a code is sent.
+  That means an account with 2FA switched on cannot sign in through the website today; the setup screen stays hidden
+  until the sign-in form asks for the code. (The backend can enrol and verify codes already.)
 - **Turning it off.** An account that does have 2FA enabled sees a **Disable** button. It asks for your password and a
   six-digit code from your authenticator app ("Disable Two-Factor Authentication").
 - **For admins.** An admin can see whether another user has 2FA enabled on that user's **User Details** page. Admins

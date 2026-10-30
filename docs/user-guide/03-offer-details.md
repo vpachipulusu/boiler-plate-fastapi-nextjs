@@ -126,5 +126,5 @@ Phone:
 ![The same on a phone](images/go-ended-m.png)
 
 For an offer that is not public at all (a draft, archived or unknown), the claim link shows a plain page with the
-words "This offer is not available." If you open claim links many times in a short while the site answers "too many
-requests"; wait a minute and try again. If the site cannot reach its data you may see "This link is not available right now. Please try again later."
+words "This offer is not available." If you open claim links many times in a short while the site answers "Too many
+requests. Please try again shortly."; wait a minute and try again. If the site cannot reach its data you may see "This link is not available right now. Please try again later."

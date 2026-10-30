@@ -4,8 +4,8 @@
 
 > **Every page described in this section except the 404 page is a draft.** Each shows a banner at the top reading
 > **"Draft — placeholder text pending legal review"**, and the About, Privacy, Cookie, Terms and Affiliate disclosure
-> pages also say **"Last reviewed: Not yet reviewed"**. Each ends with a **"For the reviewer to confirm"** checklist
-> of open questions for the person who will review it. The wording is a placeholder and is not legal advice. The
+> pages also say **"Last reviewed: Not yet reviewed"**. Each, except Contact, ends with a **"For the reviewer to confirm"**
+> checklist of open questions for the person who will review it. The wording is a placeholder and is not legal advice. The
 > pages are also asked not to be indexed by search engines.
 
 ## Step 1. Find the pages

@@ -55,11 +55,11 @@ The screenshots were taken from a private test copy of Freejoy running on a comp
   layout differs from the desktop one.
 - Admin pages: sign-in to the real site goes through Firebase, which needs a Firebase project. This guide was
   written without one. The admin screenshots were taken through the project's documented, test-only identity
-  server (see [admin-offers.md](../developer/admin-offers.md#journey-4-playwright)), which accepts two random
-  session values on a private test database and seeds one admin and one ordinary user. It is not part of the
+  server (see [admin-offers.md](../developer/admin-offers.md#journey-4-playwright)), which accepts only two
+  throwaway session values that the developer sets when starting it, on a private test database and seeds one admin and one ordinary user. It is not part of the
   application, and the app has no sign-in shortcut. Screens that need a real Firebase sign-in, a Stripe account or
-  two-factor authentication are marked **Screen pending: needs the Firebase test project (owner action)**; they
-  have no picture. No image in this guide is a mock-up.
+  two-factor authentication are marked **Screen pending**, with the reason (needs the Firebase test project, or a Stripe test account; both are
+  owner actions); they have no picture. No image in this guide is a mock-up.
 
 ### The legal and information pages are drafts
 

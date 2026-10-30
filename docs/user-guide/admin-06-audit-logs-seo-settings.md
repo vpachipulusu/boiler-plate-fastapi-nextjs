@@ -37,8 +37,8 @@ verify, publish, expire and archive for each), made by the test admin account fr
 
 - **Recorded**: creating, editing and every status change of an offer ("verify", "publish", "unpublish", "expire",
   "archive"), affiliate link changes, category and merchant changes (create, edit, enable/disable, activate/deactivate),
-  admin changes to users and admin roles, subscription grants/cancellations/refunds, and organisation and billing
-  changes.
+  admin changes to users and admin roles, subscription grants/cancellations/refunds, organisation and billing
+  changes, and a person's own **Export my data** download.
 - **Not recorded**: a refused action (for example the "could not publish" in [Admin 2](admin-02-offers.md)), simply
   looking at a page, signing in, and changes to a person's own profile, settings or two-factor.
 - The log keeps *which* fields changed, not secrets: passwords, tokens and card details are never stored in it.

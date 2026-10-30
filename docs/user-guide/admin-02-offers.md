@@ -86,7 +86,7 @@ nothing is changed.
 | Section | Fields |
 | --- | --- |
 | **Basics** | **Title**\*, **Slug** (the web address of the page; leave blank to use the title; it cannot be changed later), **Summary**\*, **Description** (separate paragraphs with a blank line, up to 20) |
-| **Category and merchant** | **Category**\*, **Merchant**\*, **Offer type**\* (Free sample, Free trial, Cashback, Voucher, Competition), **Freshness label** (None, New today, Just added, Popular, Ends soon, Limited: an editor's label, never worked out from dates), **Featured on the home page** |
+| **Category and merchant** | **Category**\*, **Merchant**\*, **Offer type**\* (Free sample, Free trial, Cashback, Voucher, Competition), **Freshness label** (None, New today, Just added, Popular, Ends soon, Limited: an editor's label, never worked out from dates. Only **New today** and **Just added** are shown to visitors; Popular, Ends soon and Limited are saved but hidden on the public site), **Featured on the home page** |
 | **Picture** | **Picture tint**\* (Blush, Mint, Lavender, Sky, Butter, Cream, Sage, Sand), **Picture label**\* (short text drawn on the illustration), **Picture description**\* (text for people who cannot see the picture) |
 | **Terms and claiming** | **Postage**\* (Free postage, Postage costs money, Check the terms; with a **Postage cost (GBP)** box when it costs money), **Needs a payment card to claim**, **Subscription terms**, **Who can claim**\*, **Availability**\*, **Source URL** (the merchant's own page) |
 | **How to claim** | **Add a step**: each step has a **Step title** and **Step detail**; steps can be removed |

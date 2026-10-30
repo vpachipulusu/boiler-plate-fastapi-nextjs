@@ -89,7 +89,8 @@ Phone:
 
 The email is sent a moment after you press the button. In the test used for this guide the email provider was a
 "fake" one that writes each email to a file, so there is no inbox screenshot. This is the text of the email that was
-captured (the two long codes are shortened to `<code>`; real links carry one-use codes):
+captured (the two long codes are shortened to `<code>` and the local test address is replaced by `<freejoy address>`; real
+links carry one-use codes):
 
 ```text
 Subject: Confirm your Freejoy alerts
@@ -99,16 +100,16 @@ Hello,
 Someone, hopefully you, asked for Freejoy alerts using this email address.
 
 To confirm, open this link within 24 hours:
-http://localhost:3281/alerts/confirm?token=<code>
+https://<freejoy address>/alerts/confirm?token=<code>
 
 If this was not you, do nothing: you will not be added to the list. To make sure we never email this address, use
 this link instead:
-http://localhost:3281/alerts/unsubscribe?token=<code>
+https://<freejoy address>/alerts/unsubscribe?token=<code>
 
 Freejoy
 ```
 
-On the live site the links start with the real Freejoy address instead of `localhost`. The email also carries the
+The email also carries the
 standard "unsubscribe" header, so many mail apps show their own **Unsubscribe** button.
 
 If it never arrives, look in your spam folder, then submit the form again. If the same address is waiting for
