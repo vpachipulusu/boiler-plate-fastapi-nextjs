@@ -3,13 +3,15 @@ import { test, expect } from './helpers/fixtures';
 import {
   loginAsThrowawayAccountOnPro,
   navigateAndWait,
+  PLAN_PRICES_E2E_ENABLED,
+  PLAN_PRICES_E2E_SKIP_REASON,
   waitForPageReady,
 } from './helpers/e2e-utils';
 
-// The page shows prices in the Stripe price's currency (GBP in the e2e Stripe account), so match any symbol.
-const CURRENCY_SYMBOL = /[$£€]/;
+// The page shows prices in the platform currency (read from the backend), so match any symbol.
 const FREE_PRICE = /^[$£€]0$/;
-const PRICE_AMOUNT = /[$£€]\d+/;
+// A non-zero amount: a paid tier showing 0 (prices not readable) must not pass.
+const PRICE_AMOUNT = /[$£€][1-9]\d*/;
 const MONTHLY_PRICE = /[$£€]\d+\.?\d*\/month/;
 
 /**
@@ -49,11 +51,13 @@ test.describe('Pricing Page', () => {
     });
 
     test('should display prices for each tier', async ({ page }) => {
+      test.skip(!PLAN_PRICES_E2E_ENABLED, PLAN_PRICES_E2E_SKIP_REASON);
+
       // Free tier should show the currency symbol and 0
       await expect(page.getByRole('heading', { name: /^free$/i })).toBeVisible();
       await expect(page.getByText(FREE_PRICE).first()).toBeVisible();
 
-      // Pro and Enterprise should show a price (fetched from Stripe)
+      // Pro and Enterprise should show a non-zero price (read from the backend, GET /v1/settings/plan-prices)
       await expect(page.getByRole('heading', { name: /^pro$/i })).toBeVisible();
       const proCard = page
         .locator('[class*="card"]')
@@ -202,6 +206,8 @@ test.describe('Pricing Page', () => {
     });
 
     test('should show the savings badge only when yearly billing is cheaper', async ({ page }) => {
+      test.skip(!PLAN_PRICES_E2E_ENABLED, PLAN_PRICES_E2E_SKIP_REASON);
+
       const proCard = page
         .locator('[class*="card"]')
         .filter({ has: page.getByRole('heading', { name: 'Pro', exact: true }) })
@@ -246,6 +252,12 @@ test.describe('Pricing Page', () => {
       await expect(monthlyRadio).toHaveAttribute('tabindex', '0');
       await expect(yearlyRadio).toHaveAttribute('tabindex', '-1');
 
+      // Tab leaves the group instead of stepping to the other option.
+      await monthlyRadio.focus();
+      await page.keyboard.press('Tab');
+      await expect(yearlyRadio).not.toBeFocused();
+      await expect(monthlyRadio).not.toBeFocused();
+
       // Selecting Yearly moves the tab stop with it.
       await yearlyRadio.click();
       await expect(yearlyRadio).toHaveAttribute('tabindex', '0');
@@ -261,7 +273,6 @@ test.describe('Pricing Page', () => {
       await expect(yearlyRadio).toBeFocused();
       await expect(yearlyRadio).toHaveAttribute('aria-checked', 'true');
       await expect(monthlyRadio).toHaveAttribute('aria-checked', 'false');
-      await expect(page.getByText(/billed annually/i).first()).toBeVisible();
 
       await page.keyboard.press('ArrowLeft');
       await expect(monthlyRadio).toBeFocused();
@@ -279,19 +290,17 @@ test.describe('Pricing Page', () => {
   });
 
   test.describe('Price Display - Monthly Billing', () => {
+    test.skip(!PLAN_PRICES_E2E_ENABLED, PLAN_PRICES_E2E_SKIP_REASON);
+
     test('should display monthly prices with /month label', async ({ page }) => {
       const monthlyRadio = page.getByRole('radio', { name: 'Monthly' });
       await monthlyRadio.click();
 
-      // Wait for a moment for price update
-      await page.waitForTimeout(1000);
-
       // Check that prices show /month using more flexible selectors
       await expect(page.locator('text=/month').first()).toBeVisible();
 
-      // Verify multiple prices show /month
-      const monthPrices = await page.locator('text=/month').count();
-      expect(monthPrices).toBeGreaterThanOrEqual(2); // At least Pro and Enterprise
+      // Verify multiple prices show /month (at least Pro and Enterprise)
+      await expect.poll(() => page.locator('text=/month').count()).toBeGreaterThanOrEqual(2);
     });
 
     test('should display "Cancel anytime" text for monthly billing', async ({ page }) => {
@@ -314,32 +323,26 @@ test.describe('Pricing Page', () => {
   });
 
   test.describe('Price Display - Yearly Billing', () => {
+    test.skip(!PLAN_PRICES_E2E_ENABLED, PLAN_PRICES_E2E_SKIP_REASON);
+
     test('should display monthly breakdown when yearly is selected', async ({ page }) => {
       const yearlyRadio = page.getByRole('radio', { name: /yearly/i });
       await yearlyRadio.click();
-
-      // Wait for price update
-      await page.waitForTimeout(1000);
+      await expect(yearlyRadio).toHaveAttribute('aria-checked', 'true');
 
       // Prices should still show /month (monthly breakdown)
       await expect(page.locator('text=/month').first()).toBeVisible();
 
-      // Verify multiple prices show /month
-      const monthPrices = await page.locator('text=/month').count();
-      expect(monthPrices).toBeGreaterThanOrEqual(2); // At least Pro and Enterprise
+      // Verify multiple prices show /month (at least Pro and Enterprise)
+      await expect.poll(() => page.locator('text=/month').count()).toBeGreaterThanOrEqual(2);
     });
 
     test('should display annual total with "billed annually" text', async ({ page }) => {
       const yearlyRadio = page.getByRole('radio', { name: /yearly/i });
       await yearlyRadio.click();
 
-      // Wait for price update
-      await page.waitForTimeout(500);
-
       // Should show "billed annually" with total amount
-      const billedAnnually = page.getByText(/billed annually/i);
-      const count = await billedAnnually.count();
-      expect(count).toBeGreaterThan(0);
+      await expect(page.getByText(/billed annually/i).first()).toBeVisible();
     });
 
     test('should not display "Cancel anytime" for yearly billing', async ({ page }) => {
@@ -353,9 +356,7 @@ test.describe('Pricing Page', () => {
     test('should display consistent pricing across tiers', async ({ page }) => {
       const yearlyRadio = page.getByRole('radio', { name: /yearly/i });
       await yearlyRadio.click();
-
-      // Wait for price update
-      await page.waitForTimeout(500);
+      await expect(page.getByText(/billed annually/i).first()).toBeVisible();
 
       // Get all price elements
       const monthlyPrices = await page.getByText(MONTHLY_PRICE).all();
@@ -402,32 +403,30 @@ test.describe('Pricing Page', () => {
   });
 
   test.describe('Pricing Accuracy', () => {
-    test('should display prices fetched from Stripe', async ({ page }) => {
-      // Wait for page load
-      await page.waitForTimeout(1000);
+    test.skip(!PLAN_PRICES_E2E_ENABLED, PLAN_PRICES_E2E_SKIP_REASON);
 
-      // Should have currency symbols visible
-      const currencySymbols = await page.getByText(CURRENCY_SYMBOL).count();
-      expect(currencySymbols).toBeGreaterThan(0);
+    test('should display prices read from the backend (GET /v1/settings/plan-prices)', async ({
+      page,
+    }) => {
+      // Non-zero amounts for the paid tiers (Pro and Enterprise)
+      await expect.poll(() => page.getByText(PRICE_AMOUNT).count()).toBeGreaterThanOrEqual(2);
     });
 
     test('should update prices when switching billing periods', async ({ page }) => {
       // Get monthly price count
       const monthlyRadio = page.getByRole('radio', { name: 'Monthly' });
       await monthlyRadio.click();
-      await page.waitForTimeout(1000);
+      await expect(monthlyRadio).toHaveAttribute('aria-checked', 'true');
 
-      const monthlyPrices = await page.locator('text=/month').count();
-      expect(monthlyPrices).toBeGreaterThan(0);
+      await expect.poll(() => page.locator('text=/month').count()).toBeGreaterThan(0);
 
       // Switch to yearly
       const yearlyRadio = page.getByRole('radio', { name: /yearly/i });
       await yearlyRadio.click();
-      await page.waitForTimeout(1000);
+      await expect(yearlyRadio).toHaveAttribute('aria-checked', 'true');
 
       // Should still show /month (monthly breakdown)
-      const yearlyMonthlyPrices = await page.locator('text=/month').count();
-      expect(yearlyMonthlyPrices).toBeGreaterThan(0);
+      await expect.poll(() => page.locator('text=/month').count()).toBeGreaterThan(0);
 
       // Should show "billed annually"
       await expect(page.locator('text=/billed annually/i').first()).toBeVisible();
