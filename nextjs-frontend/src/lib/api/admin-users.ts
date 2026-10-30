@@ -6,6 +6,7 @@ import {
   ADMIN_UNAVAILABLE_MESSAGE,
   adminErrorMessage as baseAdminErrorMessage,
 } from './admin-errors';
+import { isAdminUserId } from '@/lib/admin-users/user-id';
 import { callBackend, type ApiResult } from './server';
 import {
   banUser,
@@ -32,6 +33,25 @@ export const ADMIN_USERS_PAGE_SIZE = 50;
 
 export { ADMIN_FORBIDDEN_MESSAGE, ADMIN_REQUEST_FAILED_MESSAGE, ADMIN_UNAVAILABLE_MESSAGE };
 export const ADMIN_USER_NOT_FOUND_MESSAGE = 'User not found';
+/** A 409 from ban/unban: an admin cannot suspend or restore their own account. */
+export const ADMIN_USER_CONFLICT_MESSAGE = 'You cannot suspend or restore your own account.';
+/** A 409 from delete: your own account, an account that is still an admin, or one that owns an organisation. */
+export const ADMIN_USER_DELETE_CONFLICT_MESSAGE =
+  "This user cannot be deleted: you cannot delete your own account, and an admin's role must be revoked and any organisation ownership transferred first.";
+/** A 409 from grant or revoke: your own admin role, or the last super admin. */
+export const ADMIN_ROLE_CONFLICT_MESSAGE =
+  'You cannot change your own admin role or remove the last super admin.';
+
+/** Defence in depth: an id that is not a real user id never reaches the backend; it answers like a 404. */
+const NOT_FOUND_RESULT: Extract<ApiResult<never>, { success: false }> = {
+  success: false,
+  error: ADMIN_USER_NOT_FOUND_MESSAGE,
+  status: 404,
+};
+
+function withUserId<T>(userId: string, call: () => Promise<ApiResult<T>>): Promise<ApiResult<T>> {
+  return isAdminUserId(userId) ? call() : Promise.resolve(NOT_FOUND_RESULT);
+}
 
 /** Search text is capped before it reaches the API; the backend validates again. */
 const MAX_SEARCH_LENGTH = 100;
@@ -51,33 +71,47 @@ export function fetchAdminUsers(params: { search?: string; limit?: number; offse
 }
 
 export function fetchAdminUser(userId: string) {
-  return callBackend((client) => readUser({ client, path: { user_id: userId } }));
+  return withUserId(userId, () =>
+    callBackend((client) => readUser({ client, path: { user_id: userId } }))
+  );
 }
 
 export function patchAdminUser(userId: string, body: UpdateUserRequest) {
-  return callBackend((client) => updateUser({ client, path: { user_id: userId }, body }));
+  return withUserId(userId, () =>
+    callBackend((client) => updateUser({ client, path: { user_id: userId }, body }))
+  );
 }
 
 export function removeAdminUser(userId: string) {
-  return callBackend((client) => deleteUser({ client, path: { user_id: userId } }));
+  return withUserId(userId, () =>
+    callBackend((client) => deleteUser({ client, path: { user_id: userId } }))
+  );
 }
 
 export function grantAdminRole(userId: string, body: GrantAdminRequest) {
-  return callBackend((client) => grantAdmin({ client, path: { user_id: userId }, body }));
+  return withUserId(userId, () =>
+    callBackend((client) => grantAdmin({ client, path: { user_id: userId }, body }))
+  );
 }
 
 export function revokeAdminRole(userId: string) {
-  return callBackend((client) => revokeAdmin({ client, path: { user_id: userId } }));
+  return withUserId(userId, () =>
+    callBackend((client) => revokeAdmin({ client, path: { user_id: userId } }))
+  );
 }
 
 export function banAdminUser(userId: string, reason?: string) {
-  return callBackend((client) =>
-    banUser({ client, path: { user_id: userId }, body: reason ? { reason } : null })
+  return withUserId(userId, () =>
+    callBackend((client) =>
+      banUser({ client, path: { user_id: userId }, body: reason ? { reason } : null })
+    )
   );
 }
 
 export function unbanAdminUser(userId: string) {
-  return callBackend((client) => unbanUser({ client, path: { user_id: userId } }));
+  return withUserId(userId, () =>
+    callBackend((client) => unbanUser({ client, path: { user_id: userId } }))
+  );
 }
 
 /** Curated message for a failed admin users call; a 404 means the user was not found. */

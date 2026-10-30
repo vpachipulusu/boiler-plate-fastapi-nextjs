@@ -1,5 +1,10 @@
 import { siteConfig } from '@/config/site';
-import { isServiceUnavailableResult, type AuthFailureResult } from '@/lib/auth/auth-error-messages';
+import {
+  isRateLimitedResult,
+  isServiceUnavailableResult,
+  isTotpInvalidResult,
+  type AuthFailureResult,
+} from '@/lib/auth/auth-error-messages';
 import { getFirebaseErrorMessage } from '@/lib/utils/firebase-errors';
 
 /**
@@ -18,6 +23,8 @@ export type AuthErrorKind =
   | 'suspended'
   | 'weak-password'
   | 'service-unavailable'
+  | 'totp-invalid'
+  | 'totp-expired'
   | 'unknown';
 
 export interface AuthFormError {
@@ -64,6 +71,13 @@ export const NETWORK_ERROR: AuthFormError = {
   message: 'Check your connection and try again.',
 };
 
+/** What step one shows when the code step gave up because the first sign-in is too old to finish. */
+export const SIGN_IN_TIMED_OUT: AuthFormError = {
+  kind: 'totp-expired',
+  title: 'Your sign-in timed out',
+  message: 'Sign in again.',
+};
+
 /** Slow-redirect recovery: how long a submitted form stays locked while navigation is in flight. */
 export const REDIRECT_RECOVERY_MS = 8000;
 
@@ -82,7 +96,26 @@ export function classifyThrownAuthError(thrown: unknown, flow: AuthFlow): AuthFo
  * `data.serviceUnavailable` field; the message is display text and is never matched for it.
  */
 export function classifyAuthResult(result: AuthFailureResult, flow: AuthFlow): AuthFormError {
+  if (isRateLimitedResult(result)) return errorForKind('rate-limit', flow);
   return classifyAuthError(result.error, flow, isServiceUnavailableResult(result));
+}
+
+/**
+ * Classifies a failed answer to the two-factor code step. A wrong code and a rate limit get their own copy; an
+ * outage reuses the sign-in outage copy. Anything else (typically a sign-in that is too old to finish, which the
+ * API answers like a bad token) says so and points back to the first step, never to a bad code.
+ */
+export function classifyTotpResult(result: AuthFailureResult): AuthFormError {
+  if (isTotpInvalidResult(result)) return errorForKind('totp-invalid', 'sign-in');
+  if (isRateLimitedResult(result)) {
+    return {
+      kind: 'rate-limit',
+      title: 'Too many attempts',
+      message: 'Too many codes were tried. Wait a few minutes, then sign in again.',
+    };
+  }
+  if (isServiceUnavailableResult(result)) return errorForKind('service-unavailable', 'sign-in');
+  return errorForKind('totp-expired', 'sign-in');
 }
 
 export function classifyAuthError(
@@ -93,7 +126,10 @@ export function classifyAuthError(
   const kind = serviceUnavailable
     ? 'service-unavailable'
     : (message && KIND_BY_MESSAGE.get(message)) || 'unknown';
+  return errorForKind(kind, flow);
+}
 
+function errorForKind(kind: AuthErrorKind, flow: AuthFlow): AuthFormError {
   switch (kind) {
     case 'service-unavailable':
       return {
@@ -129,6 +165,19 @@ export function classifyAuthError(
         kind,
         title: TITLE_BY_FLOW[flow],
         message: 'Choose a stronger password and try again.',
+      };
+    case 'totp-invalid':
+      return {
+        kind,
+        title: 'That code did not work',
+        message:
+          'Check the six-digit code in your authenticator app and try again. The code changes every 30 seconds.',
+      };
+    case 'totp-expired':
+      return {
+        kind,
+        title: 'Your sign-in timed out',
+        message: 'Sign in again.',
       };
     default:
       return {

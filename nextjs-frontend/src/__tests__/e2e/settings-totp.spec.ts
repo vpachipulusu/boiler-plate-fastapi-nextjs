@@ -39,7 +39,7 @@ test.describe('Legacy settings and authenticator setup', () => {
     );
   });
 
-  // /authenticator setup stays hidden while (2FA at sign-in) is parked. Disable is covered
+  // The authenticator setup screen stays hidden (no backup codes yet). Disable is covered
   // in reauth-dialog.spec.ts. Re-enable this test when enrolment returns.
   test.skip('rejects an invalid authenticator code, enables and then disables setup', async ({
     page,

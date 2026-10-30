@@ -56,11 +56,13 @@ the panel's description, as here:
 
 ### Step 4. Newest paid organisations
 
-The table lists up to 20 of the newest paid organisations with **Organisation**, **Slug**, **Plan**, **Status**,
-**Renewal Date** and **Actions**. With none it says **No Active Subscriptions**: "There are no active paid
-subscriptions yet. When users upgrade to Pro or Enterprise plans, they will appear here automatically."
+The table lists up to 20 of the newest paid organisations with **Organisation**, **Slug**, **Plan**, **Status** and
+**Renewal Date**. The table is read-only: it has no buttons or menus. With none it says **No Active Subscriptions**:
+"There are no active paid subscriptions yet. When users upgrade to Pro or Enterprise plans, they will appear here automatically."
 
-The **Manage** button on a row does nothing yet. Grants and cancellations exist in the backend but have no screen.
+Managing a subscription (cancelling it, refunding a payment, granting or revoking a plan) has no screen yet. The
+backend can do these, but a developer does them there for now. An earlier version of this page showed a **Manage**
+button on each row that did nothing; it has been removed.
 
 ## Part B. Analytics
 

@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
 /**
+ * The one rule for a two-factor sign-in code: exactly six ASCII digits. The sign-in code step and the server action
+ * both use it (a `'use server'` file cannot export it).
+ */
+export const totpCodeSchema = z.string().regex(/^\d{6}$/);
+
+/**
  * Validates email format
  */
 export function validateEmail(email: string): boolean {

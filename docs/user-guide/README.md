@@ -24,7 +24,7 @@ the guide uses the same word in **bold**.
 | [Admin 1. Signing in and the admin shell](admin-01-signing-in.md) | Who counts as an admin, how to get to `/admin`, the sidebar, the phone tab bar, the Dashboard page |
 | [Admin 2. Offers (freebies)](admin-02-offers.md) | The offers list, search and filters, adding an offer, editing, "Mark verified", publishing, unpublishing, expiring, archiving and what each status means |
 | [Admin 3. Categories and merchants](admin-03-categories-and-merchants.md) | Adding, editing, enabling and disabling categories; adding, editing, activating and deactivating merchants |
-| [Admin 4. Users and two-factor sign-in](admin-04-users-and-2fa.md) | The user list, search, the user details page, and what two-factor authentication does today |
+| [Admin 4. Users and two-factor sign-in](admin-04-users-and-2fa.md) | The user list, search, user details, editing a profile, suspending and restoring access, and two-factor sign-in |
 | [Admin 5. Subscriptions and analytics](admin-05-subscriptions-and-analytics.md) | The Subscriptions and Analytics pages (the optional Stripe billing module) |
 | [Admin 6. Audit logs, SEO and settings](admin-06-audit-logs-seo-settings.md) | The audit log, and the SEO and Settings pages, which are not fully built yet |
 

@@ -208,6 +208,30 @@ test.describe('Admin Dashboard', () => {
       await expect(page.getByRole('menuitem', { name: /suspend user/i })).toBeVisible();
     });
 
+    test('Edit User opens the edit page and Suspend User opens a dialog that Escape closes', async ({
+      page,
+    }) => {
+      const firstRow = page.getByRole('table').getByRole('row').nth(1);
+      const trigger = firstRow.getByRole('button', { name: /open menu/i });
+
+      // Edit User navigates to the profile form, and back returns to the list.
+      await trigger.click();
+      await page.getByRole('menuitem', { name: /edit user/i }).click();
+      await expect(page).toHaveURL(/\/admin\/users\/[^/]+\/edit$/);
+      await expect(page.getByRole('heading', { name: 'Edit user' })).toBeVisible();
+      await page.goBack();
+      await expect(page).toHaveURL(/\/admin\/users(\?.*)?$/);
+
+      // Suspend User asks first. Never confirm it here: it would suspend a real account.
+      await trigger.click();
+      await page.getByRole('menuitem', { name: /suspend user/i }).click();
+      const dialog = page.getByRole('dialog', { name: /suspend this user/i });
+      await expect(dialog).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeHidden();
+      await expect(trigger).toBeFocused();
+    });
+
     test('should show verification badges for users', async ({ page }) => {
       // Every user row carries a "Verified" or "Unverified" badge.
       const rows = page.getByRole('table').getByRole('row');
@@ -298,14 +322,9 @@ test.describe('Admin Dashboard', () => {
       }
     });
 
-    test('should display manage buttons for subscriptions', async ({ page }) => {
-      const manageBtn = page.getByRole('button', { name: /manage/i });
-      const hasManage = await manageBtn
-        .first()
-        .isVisible()
-        .catch(() => false);
-      // Manage buttons should exist if there are subscriptions
-      expect(hasManage || true).toBeTruthy();
+    test('should not show controls that do nothing', async ({ page }) => {
+      await expect(page.getByRole('button', { name: /^manage/i })).toHaveCount(0);
+      await expect(page.getByRole('columnheader', { name: /^actions$/i })).toHaveCount(0);
     });
   });
 

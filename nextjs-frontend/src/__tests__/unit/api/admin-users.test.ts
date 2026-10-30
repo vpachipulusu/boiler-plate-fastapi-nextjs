@@ -109,6 +109,51 @@ describe('admin users wrappers', () => {
     expect(new URL(fetchMock.mock.calls[0][0].url).searchParams.has('search')).toBe(false);
   });
 
+  it.each([
+    '.',
+    '..',
+    'a/b',
+    '',
+    'a b',
+    'x'.repeat(129),
+    'abc\n',
+    '%2e%2e',
+    'a%2Fb',
+    '\uff41bc',
+    'abc\u200b',
+  ])(
+    'every by-id wrapper refuses the id %j with a 404-shaped failure and never calls the backend',
+    async (id) => {
+      const results = await Promise.all([
+        fetchAdminUser(id),
+        patchAdminUser(id, { bio: 'x' }),
+        removeAdminUser(id),
+        grantAdminRole(id, { role: 'admin', permissions: [] }),
+        revokeAdminRole(id),
+        banAdminUser(id, 'why'),
+        unbanAdminUser(id),
+      ]);
+
+      for (const result of results) {
+        expect(result).toEqual({
+          success: false,
+          error: ADMIN_USER_NOT_FOUND_MESSAGE,
+          status: 404,
+        });
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('accepts the longest valid id (128 characters)', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ success: true, data: DETAIL }));
+
+    const result = await fetchAdminUser('a'.repeat(128));
+
+    expect(result.success).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('fetchAdminUser reads one user by id', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ success: true, data: DETAIL }));
 

@@ -20,6 +20,8 @@ vi.mock('@/app/actions/auth-actions', () => ({ verifyTokenAction: mocks.verifyTo
 import { LoginForm } from '@/components/auth/login-form';
 import { REDIRECT_RECOVERY_MS } from '@/components/auth/auth-form-errors';
 
+const onTotpRequired = vi.fn();
+
 const fail = (code: string) => ({
   user: null,
   idToken: null,
@@ -38,7 +40,7 @@ describe('LoginForm', () => {
 
   it('moves focus to the first invalid field on submit', async () => {
     const user = userEvent.setup();
-    render(<LoginForm />);
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
 
     await user.type(screen.getByLabelText(/^password$/i), 'secret123');
     await user.click(screen.getByRole('button', { name: /sign in/i }));
@@ -55,7 +57,7 @@ describe('LoginForm', () => {
     async (code) => {
       const user = userEvent.setup();
       mocks.signInWithEmail.mockResolvedValue(fail(code));
-      render(<LoginForm />);
+      render(<LoginForm onTotpRequired={onTotpRequired} />);
 
       await fillAndSubmit(user);
 
@@ -70,7 +72,7 @@ describe('LoginForm', () => {
   it('shows the network message', async () => {
     const user = userEvent.setup();
     mocks.signInWithEmail.mockResolvedValue(fail('auth/network-request-failed'));
-    render(<LoginForm />);
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
 
     await fillAndSubmit(user);
 
@@ -82,7 +84,7 @@ describe('LoginForm', () => {
   it('shows the rate limit message with the wait', async () => {
     const user = userEvent.setup();
     mocks.signInWithEmail.mockResolvedValue(fail('auth/too-many-requests'));
-    render(<LoginForm />);
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
 
     await fillAndSubmit(user);
 
@@ -92,7 +94,7 @@ describe('LoginForm', () => {
   it('shows the suspended message with a support link', async () => {
     const user = userEvent.setup();
     mocks.signInWithEmail.mockResolvedValue(fail('auth/user-disabled'));
-    render(<LoginForm />);
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
 
     await fillAndSubmit(user);
 
@@ -111,7 +113,7 @@ describe('LoginForm', () => {
       success: false,
       error: 'Token verification failed',
     });
-    render(<LoginForm />);
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
 
     await fillAndSubmit(user);
 
@@ -128,7 +130,7 @@ describe('LoginForm', () => {
       error: 'Sign-in service unavailable',
       data: { serviceUnavailable: true },
     });
-    render(<LoginForm />);
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
 
     await fillAndSubmit(user);
 
@@ -142,7 +144,7 @@ describe('LoginForm', () => {
       success: false,
       error: 'Sign-in service unavailable',
     });
-    render(<LoginForm />);
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
 
     await fillAndSubmit(user);
 
@@ -153,7 +155,7 @@ describe('LoginForm', () => {
     const user = userEvent.setup();
     mocks.signInWithEmail.mockRejectedValue(new TypeError('Failed to fetch'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    render(<LoginForm />);
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
 
     await fillAndSubmit(user);
 
@@ -164,7 +166,7 @@ describe('LoginForm', () => {
     const user = userEvent.setup();
     mocks.signInWithEmail.mockResolvedValueOnce(fail('auth/wrong-password'));
     mocks.signInWithEmail.mockReturnValueOnce(new Promise(() => {}));
-    render(<LoginForm />);
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
     await fillAndSubmit(user);
     await screen.findByRole('alert');
 
@@ -176,7 +178,7 @@ describe('LoginForm', () => {
   it('shows a loading label and submits once on a double submit', async () => {
     const user = userEvent.setup();
     mocks.signInWithEmail.mockReturnValue(new Promise(() => {}));
-    render(<LoginForm />);
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
 
     await fillAndSubmit(user);
     const button = await screen.findByRole('button', { name: /signing in/i });
@@ -192,7 +194,7 @@ describe('LoginForm', () => {
     const user = userEvent.setup();
     mocks.signInWithEmail.mockRejectedValue(new Error('boom'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    render(<LoginForm />);
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
 
     await fillAndSubmit(user);
 
@@ -209,7 +211,7 @@ describe('LoginForm', () => {
       throw new Error('navigation failed');
     });
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    render(<LoginForm />);
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
 
     await fillAndSubmit(user);
 
@@ -223,7 +225,7 @@ describe('LoginForm', () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       mocks.signInWithEmail.mockResolvedValue({ user: {}, idToken: 't', error: null });
       mocks.verifyTokenAction.mockResolvedValue({ success: true });
-      render(<LoginForm />);
+      render(<LoginForm onTotpRequired={onTotpRequired} />);
 
       await fillAndSubmit(user);
       await waitFor(() => expect(mocks.push).toHaveBeenCalled());
@@ -243,10 +245,61 @@ describe('LoginForm', () => {
     const user = userEvent.setup();
     mocks.signInWithEmail.mockResolvedValue({ user: {}, idToken: 't', error: null });
     mocks.verifyTokenAction.mockResolvedValue({ success: true });
-    render(<LoginForm />);
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
 
     await fillAndSubmit(user);
 
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/dashboard'));
+  });
+
+  it('hands the ID token to the two-factor step when the account needs a code', async () => {
+    const user = userEvent.setup();
+    mocks.signInWithEmail.mockResolvedValue({ user: {}, idToken: 'tok-1', error: null });
+    mocks.verifyTokenAction.mockResolvedValue({
+      success: false,
+      error: 'Two-factor code required',
+      data: { totpRequired: true },
+    });
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
+
+    await fillAndSubmit(user);
+
+    await waitFor(() => expect(onTotpRequired).toHaveBeenCalledWith('tok-1'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(mocks.push).not.toHaveBeenCalled();
+    // The form is usable again for when the person comes back from the code step.
+    expect(screen.getByRole('button', { name: /^sign in$/i })).toBeEnabled();
+  });
+
+  it('does not open the two-factor step from the message text alone', async () => {
+    const user = userEvent.setup();
+    mocks.signInWithEmail.mockResolvedValue({ user: {}, idToken: 'tok-1', error: null });
+    mocks.verifyTokenAction.mockResolvedValue({
+      success: false,
+      error: 'Two-factor code required',
+    });
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
+
+    await fillAndSubmit(user);
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(onTotpRequired).not.toHaveBeenCalled();
+  });
+
+  it('shows the rate limit message when the API limits the sign-in', async () => {
+    const user = userEvent.setup();
+    mocks.signInWithEmail.mockResolvedValue({ user: {}, idToken: 'tok-1', error: null });
+    mocks.verifyTokenAction.mockResolvedValue({
+      success: false,
+      error: 'Too many sign-in attempts',
+      data: { rateLimited: true },
+    });
+    render(<LoginForm onTotpRequired={onTotpRequired} />);
+
+    await fillAndSubmit(user);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Too many attempts');
+    expect(alert).not.toHaveTextContent('Too many sign-in attempts');
   });
 });
