@@ -13,6 +13,7 @@ from app.core.database import (
     SessionProvider,
     async_session_maker,
 )
+from app.core.email_provider import EmailProvider, build_email_provider
 from app.core.rate_limit import DisabledRateLimiter, RateLimiter, UpstashRateLimiter
 from app.repositories.health import HealthRepository
 from app.services.health import HealthService
@@ -47,6 +48,24 @@ def get_health_service(session: SessionDep) -> HealthService:
 
 HealthServiceDep = Annotated[HealthService, Depends(get_health_service)]
 
+
+_email_provider: EmailProvider | None = None
+
+
+def get_email_provider() -> EmailProvider:
+    """The alerts email provider (ADR-012); the disabled one unless EMAIL_PROVIDER is set.
+
+    Tests override this dependency with a ``FakeEmailProvider``.
+    """
+    global _email_provider
+    if _email_provider is None:
+        _email_provider = build_email_provider(settings)
+        if settings.EMAIL_PROVIDER == "":
+            logger.warning("EMAIL_PROVIDER is not set: no email will be sent")
+    return _email_provider
+
+
+EmailProviderDep = Annotated[EmailProvider, Depends(get_email_provider)]
 
 _rate_limiter: RateLimiter | None = None
 

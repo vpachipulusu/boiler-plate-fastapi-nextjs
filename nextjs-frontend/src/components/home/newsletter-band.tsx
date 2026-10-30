@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { Spark } from '@/components/site/brand-mark';
 
 /**
- * Mint sign-up band. A plain GET form: submitting only navigates to /alerts?email=..., where the
- * alerts page owns the real (demo) flow. Nothing is saved here and the copy never says it was.
+ * Mint sign-up band. It only links to /alerts, where the visitor picks categories, ticks consent and
+ * starts the double opt-in. It collects no address itself, so none is ever put in a page address.
  */
 export function NewsletterBand() {
   return (
@@ -25,26 +25,12 @@ export function NewsletterBand() {
           </p>
         </div>
         <div>
-          <form method="get" action="/alerts" className="flex flex-col gap-3 sm:flex-row">
-            <label htmlFor="newsletter-email" className="sr-only">
-              Your email address
-            </label>
-            <input
-              id="newsletter-email"
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="Your email address"
-              className="min-h-12 w-full flex-1 rounded-input border border-input bg-card px-4 text-base text-foreground placeholder:text-muted-foreground"
-            />
-            <button
-              type="submit"
-              className="inline-flex min-h-12 items-center justify-center rounded-pill bg-cta px-6 text-base font-bold text-cta-foreground shadow-sm hover:bg-cta-hover"
-            >
-              Get free alerts
-            </button>
-          </form>
+          <Link
+            href="/alerts"
+            className="inline-flex min-h-12 items-center justify-center rounded-pill bg-cta px-6 text-base font-bold text-cta-foreground shadow-sm hover:bg-cta-hover"
+          >
+            Get free alerts
+          </Link>
           <p className="mt-3 text-xs text-muted-foreground">
             No spam. Unsubscribe anytime. See{' '}
             <Link href="/privacy" className="font-semibold underline">

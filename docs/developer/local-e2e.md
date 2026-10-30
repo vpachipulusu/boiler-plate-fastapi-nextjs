@@ -96,6 +96,27 @@ Remove the container when done (`docker rm -f my-e2e-pg`). A spec that fails wit
 
 **3. A server you start yourself (optional).** `E2E_REUSE_SERVER=1` makes plain Playwright (`npm run test:e2e`, `test:e2e:baseline`) reuse a server already on `E2E_PORT` instead of starting one, so a normal dev server is never tested by accident. Build with `npm run test:e2e:build`, start it with `node scripts/e2e-start.mjs`. `npm run test:e2e:local` does not need this: it builds, serves and stops its own server.
 
+## Alerts sign-up (fake email provider)
+
+`alerts-optin.spec.ts` runs the double opt-in in a browser without sending any email. It needs the backend to use the
+fake provider and the frontend to be built with the form open:
+
+```bash
+# backend shell (local DB, ENVIRONMENT=local as above); the fake provider is refused anywhere else
+export EMAIL_PROVIDER=fake EMAIL_FAKE_OUTBOX=/tmp/freejoy-outbox.jsonl
+export SUBSCRIBER_TOKEN_SECRET=<32+ random chars> RATE_LIMIT_EMAIL_KEY=<32+ random chars>
+export PUBLIC_SITE_URL=http://localhost:<E2E port>
+: > /tmp/freejoy-outbox.jsonl
+# frontend shell: start the server with the form open, and tell the spec where the outbox is
+export ALERTS_FORM_LIVE=true E2E_ALERTS_LIVE=1 E2E_EMAIL_OUTBOX=/tmp/freejoy-outbox.jsonl
+npm run test:e2e:local -- src/__tests__/e2e/alerts.spec.ts src/__tests__/e2e/alerts-optin.spec.ts
+```
+
+The spec reads the confirm and unsubscribe links from the outbox file, the way a person reads their inbox. Without
+`E2E_EMAIL_OUTBOX` and `E2E_ALERTS_LIVE=1` the opt-in spec and the form tests in `alerts.spec.ts` skip, and the
+closed-page tests run instead. `alerts-token-pages.spec.ts` needs neither a backend nor an outbox. The page reads
+`ALERTS_FORM_LIVE` when the server starts, so restart the server (not rebuild) to switch between open and closed runs.
+
 ## Stripe webhooks
 
 Stripe cannot reach `localhost`, so a checkout completes at Stripe but the app never learns it ("Processing Your Subscription..." forever). The backend receives the events at `POST /webhooks/stripe` and verifies each one with `STRIPE_WEBHOOK_SECRET`. For e2e the Stripe CLI forwards test-mode events to your local uvicorn. The Stripe specs run only with `E2E_STRIPE=1` (`E2E_ENABLED` is unrelated and stays `false`).

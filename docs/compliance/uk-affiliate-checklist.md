@@ -284,6 +284,14 @@ domain outside the allowed research list; it is treated here as a product decisi
   9. The confirmation link survives mail-scanner prefetch: the link opens a GET landing page that changes nothing, and a POST from that page confirms.
   10. Subscribe, confirm and unsubscribe are reachable only through server actions or POST requests.
 
+- **Implementation note (FREEJ-24, [backend-subscribers.md](../developer/backend-subscribers.md)):** criteria 1 to 10
+  are built, with these differences for the reviewer: the token expires after 24 hours (not 48) and is
+  an HMAC-signed value of at least 128 bits of nonce whose SHA-256 is stored; unconfirmed records are deleted after
+  30 days and unsubscribed records after 12 months by a manually run command (the story's periods; criterion 4 and D4
+  suggested shorter, and D4 an indefinite suppression list); the consent wording is stored in full rather than as a
+  version id; D5 criterion 5 (re-subscribing revokes an old unsubscribe token) is not built. Status stays `Pending
+  Phase 3` until a provider is live and the owner has reviewed the wording.
+
 ### D4. Records of consent
 
 - **Rule:** Keep records showing who consented, when and how (ICO email guidance; UK GDPR Article 7(1): be able to show consent).

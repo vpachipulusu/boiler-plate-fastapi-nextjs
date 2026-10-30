@@ -5,8 +5,12 @@ import { Spark } from '@/components/site/brand-mark';
 import { getCategories, settle } from '@/lib/catalogue';
 import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
-/** Flip to true when the alerts form really subscribes people; until then the page stays noindex. */
-const ALERTS_FORM_LIVE = false;
+/**
+ * Alerts are open only when ALERTS_FORM_LIVE=true is set (server-only, read when the server starts). Set it
+ * once a real email provider is configured in production (ADR-012). Until then the page shows a plain "not
+ * open yet" notice instead of the form, stays noindex, and the backend refuses sign-ups as a last line.
+ */
+const ALERTS_FORM_LIVE = process.env.ALERTS_FORM_LIVE === 'true';
 
 const ALERTS_TITLE = 'Free alerts';
 const ALERTS_DESCRIPTION =
@@ -24,22 +28,12 @@ export const metadata: Metadata = {
   robots: listingRobots({ indexable: ALERTS_FORM_LIVE }),
 };
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_EMAIL_LENGTH = 254;
+// Dynamic, like the other catalogue pages: a build never reaches the catalogue, and a request that cannot
+// reach it shows an error instead of failing the page.
+export const dynamic = 'force-dynamic';
 
-/** Only a plausible address is prefilled; anything else (or a repeated param) is ignored. */
-function prefillEmail(value: string | string[] | undefined): string {
-  if (typeof value !== 'string') return '';
-  return value.length <= MAX_EMAIL_LENGTH && EMAIL_PATTERN.test(value) ? value : '';
-}
-
-export default async function AlertsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ email?: string | string[] }>;
-}) {
-  // Read the query first: the page is dynamic, so a build never reaches the catalogue.
-  const params = await searchParams;
+/** No query string is read: an address must never travel in a page address, so nothing is prefilled. */
+export default async function AlertsPage() {
   const categories = await settle(getCategories());
 
   return (
@@ -76,7 +70,7 @@ export default async function AlertsPage({
           {categories.ok ? (
             <AlertsForm
               categories={categories.data.map(({ slug, name }) => ({ slug, name }))}
-              defaultEmail={prefillEmail(params.email)}
+              live={ALERTS_FORM_LIVE}
             />
           ) : (
             <InlineError
