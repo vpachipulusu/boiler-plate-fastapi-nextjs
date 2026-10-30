@@ -63,12 +63,22 @@ thin route that redirects to the landing page; do not make it change state.
     hash is still that mail's hash, so a newer link from a later request is never undone. The row then does not
     claim a mail was sent, no live link exists for an undelivered mail, and the next submission sends at once
     (instead of waiting the hour). The visitor was already told 202 and "check your inbox, then spam", so a
-    silent outage costs them one resubmission; it is logged as `confirmation email failed: email provider send
-    failed (status=...)` (operation and HTTP status, or the exception class for non-provider errors; never the
-    address, token or body) and non-provider errors also go to Sentry. A failed withdrawal is logged and swallowed.
+    silent outage costs them one resubmission (the confirmation panel now says so, in state-neutral words:
+    "If it has not arrived after a few minutes, you can submit the form again"). The operator sees it: every
+    failure is logged as `confirmation email failed: <operation> <status>` (or `unexpected <ExceptionClass>`) and
+    reported to Sentry as a `ConfirmationDeliveryFailed` whose only text is that same string. The original
+    exception is never attached (its message can hold the address, a token or a response body), and the log call
+    is made outside the `except` block because Sentry's logging integration attaches the exception being handled
+    to an error log. A failed withdrawal is logged and reported the same way (`withdraw <ExceptionClass>`) and
+    swallowed.
   - **A failed brand-new sign-up keeps its row** (PENDING, consent recorded, no token, no claim) until the 30 day
     purge or the visitor's retry, where before the whole row was rolled back. It holds nothing beyond what the
-    visitor submitted.
+    visitor submitted. The same goes for a PENDING row already past the 30 day retention period: a resubmission
+    starts it afresh (`consent_at` = now, new wording), and if that send fails the row keeps the fresh consent
+    record and no token. That is deliberate: the visitor did consent just now, the retention clock starts over
+    from this request, and the loop is bounded by the one-per-hour resend rule and the rate limits (20 per hour per
+    IP, 5 per hour per address). The privacy notice's "a sign-up that is never confirmed is deleted after 30 days"
+    already covers a sign-up whose email could never be delivered.
   - **Production without a provider** still answers 503 before anything is stored (`require_email_delivery`).
 - **Throttle.** A confirmation is re-sent at most once per hour per address (`confirmation_sent_at`). A newer token
   replaces the stored hash, so older links stop working.
@@ -166,21 +176,45 @@ brings it back.
 ## Known residual risks (pre-launch follow-ups)
 
 - **Background send is best effort, not a queue.** The email is sent by a FastAPI background task in the same
-  process after the response. If the process is stopped between the commit and the send (a crash, a deploy, or a host
-  that freezes the function as soon as the response is out), nothing withdraws the claim: the row says a mail was
-  sent for up to one hour (`RESEND_INTERVAL`), then a resubmission sends again. Before launch, check that the
-  production runtime keeps the task alive after the response (on Vercel, Python functions may be frozen once the
-  response is sent; if so, hand the send to a platform "run after response" hook or a durable outbox). A durable outbox
-  (a table drained by a worker or cron) would remove this window and also retry failed sends without a visitor.
+  process. Starlette runs it inside the ASGI call, after the last response body chunk, so a function freeze right
+  after the response is unlikely, but nothing here makes the send durable. If the process is stopped between the
+  commit and the send (a crash, a deploy), nothing withdraws the claim: the row says a mail was sent for up to one
+  hour (`RESEND_INTERVAL`), then a resubmission sends again. A durable outbox (a table drained by a worker or cron)
+  would remove this window and also retry failed sends without a visitor; it is a separate story.
+- **PRE-LAUNCH VERIFICATION GATE: the response must really leave before the send.** The timing fix only works if the
+  host streams the response before the ASGI call returns. Nothing in the code or the tests can show that for Vercel's
+  Python runtime. Before `ALERTS_FORM_LIVE=true` goes to production, verify on a Vercel preview deployment (do not add
+  an inline-on-Vercel branch):
+  1. **The mail arrives after the 202.** `EMAIL_PROVIDER=fake` with an outbox file is local-only (refused outside
+     `local`/`test`), so use a real or test provider, or watch for the absence of a
+     `confirmation email failed` log line and check the test inbox.
+  2. **The response returns before the provider call.** Measure, from the Next.js side, the duration of
+     `POST /v1/subscribers` for an already-confirmed address and for a new one, several times each. The two should be
+     within a few milliseconds of each other (see the next item); a gap of a provider round trip (hundreds of ms)
+     means the response is buffered until the background task finishes.
+  3. **Keep-alive.** Two sequential requests on one connection must not block on the first one's send (the second
+     request's duration must not include the first one's provider call).
+  4. **If the response is buffered until the ASGI call returns, or background tasks are killed**, the timing gain is
+     zero or mails are lost. The fallback is a durable outbox drained by a cron job (a separate story), not an inline
+     send.
 - **Remaining timing differences on `POST /v1/subscribers`.** No path awaits the provider, so the hundreds of
-  milliseconds of an HTTP round trip are gone, but the database work still differs by path: a new address does an
-  `INSERT`, an `UPDATE` and a `COMMIT`; a resend-eligible pending address an `INSERT` (which conflicts), a locking
-  `SELECT`, two `UPDATE`s and a `COMMIT`; a confirmed, unsubscribed or recently-sent address an `INSERT`, a locking
-  `SELECT` and a `ROLLBACK`. That is a few statements and one write-ahead-log flush on a nearby database, in the
-  order of milliseconds, and is within the noise of a network round trip from the Next.js server. It is not constant
-  time and this change does not claim it is. Rate limiting (20 per hour per IP, 5 per hour per address) bounds how
-  many samples a prober gets. If it ever matters, equalise by doing a dummy write and commit on the no-op paths or
-  pad every answer to a fixed minimum duration.
+  milliseconds of an HTTP round trip are gone (once item 2 of the gate above is confirmed), but the database work
+  still differs by path. Statements per request, pinned by
+  `test_the_statements_each_address_state_runs_match_the_documented_table` (`tests/api/test_subscribers_e2e.py`):
+
+  | Address state | Statements | Ends with |
+  | --- | --- | --- |
+  | new | `INSERT`, `UPDATE` | `COMMIT` |
+  | pending, resend allowed (over an hour since the last mail) | `INSERT` (conflicts), locking `SELECT`, one `UPDATE` | `COMMIT` |
+  | pending, mailed within the hour | `INSERT` (conflicts), locking `SELECT` | `ROLLBACK` |
+  | confirmed | `INSERT` (conflicts), locking `SELECT` | `ROLLBACK` |
+  | unsubscribed | `INSERT` (conflicts), locking `SELECT` | `ROLLBACK` |
+
+  The resend path writes the new choices and the new token in one `UPDATE`. What remains is one statement and a
+  write-ahead-log flush on a nearby database, in the order of milliseconds, within the noise of a network round trip
+  from the Next.js server. It is not constant time and this change does not claim it is. Rate limiting (20 per hour
+  per IP, 5 per hour per address) bounds how many samples a prober gets. If it ever matters, equalise by doing a dummy
+  write and commit on the no-op paths or pad every answer to a fixed minimum duration.
 - **Client IP off Vercel.** `callBackend` forwards `X-Client-IP` only when `VERCEL=1` (it trusts
   `x-vercel-forwarded-for`, never a raw `X-Forwarded-For`). Anywhere else (local runs, another host) every visitor
   reaches the backend as one address and shares one per-IP bucket, so the 20 per hour IP limit is shared by all.
