@@ -121,9 +121,9 @@ describe('BillingToggle', () => {
     expect(yearly).toHaveAttribute('tabindex', '0');
   });
 
-  it('has a visible focus ring', () => {
+  it('leaves the focus style to the global outline', () => {
     const { monthly } = setup();
-    expect(monthly.className).toContain('focus-visible:ring-2');
+    expect(monthly.className).not.toMatch(/outline-none|(^|[\s:])ring(-|\s|$)/);
   });
 
   it('gives the yearly radio the accessible name "Yearly Save 17%"', () => {

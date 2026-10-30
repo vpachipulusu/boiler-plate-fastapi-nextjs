@@ -48,8 +48,9 @@ interface AlertsFormProps {
 
 const LABEL_CLASS = 'text-[11px] font-bold uppercase tracking-wider text-foreground';
 const ERROR_CLASS = 'mt-2 text-sm font-medium text-crit-foreground';
+// The checkbox/radio is sr-only, so the label carries the focus outline (same 3px solid --ring, 2px offset as globals.css; an arbitrary property so tailwind-merge in cn() keeps it).
 const CARD_CLASS =
-  'flex min-h-11 cursor-pointer items-center gap-3 rounded-input border border-border bg-background px-3 text-sm font-bold text-foreground transition-colors has-[:checked]:border-accent-ink has-[:checked]:bg-good has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring';
+  'flex min-h-11 cursor-pointer items-center gap-3 rounded-input border border-border bg-background px-3 text-sm font-bold text-foreground transition-colors has-[:checked]:border-accent-ink has-[:checked]:bg-good has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:[outline:3px_solid_hsl(var(--ring))]';
 
 function NotOpenYet() {
   return (
@@ -252,7 +253,7 @@ export function AlertsForm({ categories, live }: AlertsFormProps) {
               // The submit button unmounts on success, so the panel takes focus as it mounts.
               ref={(node) => node?.focus()}
               tabIndex={-1}
-              className="rounded-card bg-good p-5 text-good-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-card bg-good p-5 text-good-foreground"
             >
               <h3 className="font-display text-xl font-extrabold">Check your inbox</h3>
               <p className="mt-2 text-sm">

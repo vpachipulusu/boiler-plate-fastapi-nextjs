@@ -162,13 +162,13 @@
     scroll-behavior: smooth;
   }
 
-  /* The one focus style: 3px outline, 2px offset, --ring (navy in light, gold in dark). */
+  /* The one focus style: 3px outline, 2px offset, in --ring as defined by the active preset in src/config/themes.ts. */
   *:focus-visible {
     outline: 3px solid hsl(var(--ring));
     outline-offset: 2px;
   }
 
-  /* Inverse surfaces (sidebar, featured plan) use the brass CTA colour for the ring. */
+  /* Inverse surfaces (sidebar, featured plan) use --cta, as defined by the active preset, for the outline. */
   .on-inverse *:focus-visible {
     outline-color: hsl(var(--cta));
   }
