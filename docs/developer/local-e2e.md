@@ -1,6 +1,6 @@
 # Running Playwright E2E locally
 
-**Last updated:** 2026-10-16
+**Last updated:** 2026-10-30
 
 CI skips Playwright (`E2E_ENABLED=false`), so developers run E2E before opening a PR for user-facing changes. This page is the fast path. Test accounts, the test Firebase project and the test database are described in [testing.md](testing.md).
 
@@ -96,10 +96,65 @@ Remove the container when done (`docker rm -f my-e2e-pg`). A spec that fails wit
 
 **3. A server you start yourself (optional).** `E2E_REUSE_SERVER=1` makes plain Playwright (`npm run test:e2e`, `test:e2e:baseline`) reuse a server already on `E2E_PORT` instead of starting one, so a normal dev server is never tested by accident. Build with `npm run test:e2e:build`, start it with `node scripts/e2e-start.mjs`. `npm run test:e2e:local` does not need this: it builds, serves and stops its own server.
 
+## Money-path specs (no Firebase)
+
+`outbound.spec.ts` (anonymous browse -> offer -> tracked outbound click, plus the ended-offer path) and
+`alerts-lifecycle.spec.ts` (alerts double opt-in: sign up, confirm, unsubscribe, repeat submissions) are the two journeys
+whose regressions cost money (redirects, consent). They need **no login and no Firebase project**, so they run in their
+own Playwright projects, `money-desktop` (Desktop Chrome) and `money-mobile` (Pixel 7 user agent at 390 x 844), which have
+no `setup` dependency (`playwright.local.config.ts`). When every spec on the command line is one of these two (or
+`E2E_PUBLIC=1`), `test:e2e:local` switches to a **public run** (`scripts/e2e-public-mode.cjs`): no `.env.e2e.local`
+needed, placeholder Firebase values for the build (nothing signs in), the live catalogue (`CATALOGUE_SOURCE=api`), the
+alerts form open (`ALERTS_FORM_LIVE=true`), and only those two projects. Write other Playwright options as `--name=value`.
+
+```bash
+# 1. A backend on a TEST database you own (the name must end in _test), the fake email provider and the seed
+cd fastapi_backend
+export DATABASE_URL=postgresql+asyncpg://postgres:<password>@127.0.0.1:5433/<yourname>_test ENVIRONMENT=test
+export BACKEND_INTERNAL_KEY=<32+ random chars> RATE_LIMIT_EMAIL_KEY=<32+ random chars> SUBSCRIBER_TOKEN_SECRET=<32+ random chars>
+export EMAIL_PROVIDER=fake EMAIL_FAKE_OUTBOX=/tmp/freejoy-outbox.jsonl PUBLIC_SITE_URL=http://localhost:3271
+: > /tmp/freejoy-outbox.jsonl
+uv run alembic upgrade head && uv run python -m commands.seed_catalogue
+uv run uvicorn app.main:app --port 8271 --no-access-log
+
+# 2. The specs (nextjs-frontend/), same key as the backend
+export BACKEND_API_URL=http://127.0.0.1:8271 BACKEND_INTERNAL_KEY=<the same key> E2E_PORT=3271
+export E2E_EMAIL_OUTBOX=/tmp/freejoy-outbox.jsonl
+export E2E_PSQL="docker exec freejoy-test-pg psql -U postgres -d <yourname>_test"   # optional: the database seam
+npm run test:e2e:local -- outbound alerts-lifecycle
+```
+
+- **The database seam (`E2E_PSQL`).** The browser and the Next.js server never read the database, so a click row or a
+  subscriber's status can only be checked from the test process. `E2E_PSQL` is a `psql` command up to and including the
+  connection, split on spaces (`psql postgresql://...` works as well as `docker exec <container> psql -U ... -d ...`).
+  `helpers/db-seam.ts` appends `-X -tA -F | -c <read-only SQL>`; only point it at a `*_test` database. With it, the specs
+  assert that exactly one `click_events` row (device class and referrer host only) is written for the click, that an
+  ended offer writes none, and each subscriber status along the lifecycle (`PENDING`, `CONFIRMED`, `UNSUBSCRIBED`, and
+  that an unsubscribed address stays `UNSUBSCRIBED` after a new submission). Without it those assertions are skipped
+  (the report notes it) and everything else still runs.
+- **The ended offer.** `/go/<id>` needs the offer's id. The spec reads `GO_E2E_ENDED_OFFER_ID` (the variable
+  `go-redirect.spec.ts` uses) or, with the seam, looks `laundry-sheets-sample` up (`E2E_ENDED_OFFER_SLUG` overrides the
+  slug); with neither, that test skips. The seeded ended offer is dated relative to the day `seed_catalogue` ran, and its
+  page is a 404 once it has been over for 30 days: re-run the seed command if the spec says so.
+- **Rows and addresses.** Every run adds click rows and subscriber rows to the test database (nothing deletes them) and
+  every address is new for the run, so repeat runs are safe; the backend's limiter is off with `ENVIRONMENT=test`.
+- **Nothing leaves the machine.** The browser in `outbound.spec.ts` is started with every host except localhost
+  unresolvable (`helpers/block-external-hosts.ts`), so the real `307` is followed in a real browser and the request to
+  the provider dies at name resolution (the spec asserts `ERR_NAME_NOT_RESOLVED`). `page.route()` cannot stub a redirect
+  target in Chromium, which is why the block is done at the resolver. Known gap: the two click-through tests in
+  `go-redirect.spec.ts` stub the provider with `page.route()`, so on a redirect they do reach the real provider origin
+  (`example.com` with the sample seed). Moving them to the same block is a follow-up.
+- **Redirect status.** The redirect to the provider is a `307` (the story text says 302): the spec asserts what
+  `src/lib/outbound/respond.ts` does. The ended-offer redirect is a relative `302`.
+- **CI.** `.github/workflows/e2e.yml` has a `money-paths` job with the whole recipe (Postgres service, backend, fake
+  provider), behind the same `E2E_ENABLED` switch as the Firebase job, so it is off until the owner turns E2E on. It has
+  not been run on GitHub.
+
 ## Alerts sign-up (fake email provider)
 
-`alerts-optin.spec.ts` runs the double opt-in in a browser without sending any email. It needs the backend to use the
-fake provider and the frontend to be built with the form open:
+`alerts-lifecycle.spec.ts` (see [Money-path specs](#money-path-specs-no-firebase), which is the quickest way to run it) runs the
+double opt-in in a browser without sending any email. It needs the backend to use the fake provider and the frontend to be
+served with the form open. The same fake-provider variables also drive it in a full, Firebase-backed run:
 
 ```bash
 # backend shell (local DB, ENVIRONMENT=local as above); the fake provider is refused anywhere else
@@ -109,7 +164,7 @@ export PUBLIC_SITE_URL=http://localhost:<E2E port>
 : > /tmp/freejoy-outbox.jsonl
 # frontend shell: start the server with the form open, and tell the spec where the outbox is
 export ALERTS_FORM_LIVE=true E2E_ALERTS_LIVE=1 E2E_EMAIL_OUTBOX=/tmp/freejoy-outbox.jsonl
-npm run test:e2e:local -- src/__tests__/e2e/alerts.spec.ts src/__tests__/e2e/alerts-optin.spec.ts
+npm run test:e2e:local -- src/__tests__/e2e/alerts.spec.ts src/__tests__/e2e/alerts-lifecycle.spec.ts
 ```
 
 The spec reads the confirm and unsubscribe links from the outbox file, the way a person reads their inbox. Without

@@ -13,6 +13,13 @@
 # ones (Firebase Admin private key, Stripe secret key) are exposed only to the
 # steps that need them, not to `npm ci` or the Playwright install.
 #
+# Two jobs. `chromium` is the Firebase-backed baseline. `money-paths` (FREEJ-27) runs the two public money-path specs
+# (outbound, alerts-lifecycle) with NO Firebase and NO secrets: a throwaway Postgres service, the seeded backend with the
+# fake email provider, and a production build with placeholder Firebase values (scripts/e2e-public-mode.cjs). Both jobs
+# sit behind the same E2E_ENABLED switch, so neither runs until the owner turns E2E on (the Firebase test project does not
+# exist yet). `money-paths` has not been executed on GitHub; the same steps were run by hand locally (see
+# docs/developer/local-e2e.md). The `paths` filter below does not include fastapi_backend/**: add it when this job is enabled.
+#
 # Stripe-dependent specs run only when the repository variable E2E_STRIPE is "true" (and E2E_ENABLED is
 # "true"; this job never runs otherwise). Stripe cannot reach a CI runner, so the job runs the Stripe CLI, which
 # forwards test-mode events to the backend's POST /webhooks/stripe (BACKEND_API_URL, or the variable
@@ -220,5 +227,120 @@ jobs:
           name: playwright-report
           path: |
             nextjs-frontend/playwright-report/
+            nextjs-frontend/test-results/
+          retention-days: 7
+
+  # FREEJ-27: the two public money-path journeys. No environment, no secrets: everything below is a CI-only value.
+  money-paths:
+    name: Money paths (outbound, alerts opt-in)
+    # The same switch and skips as the `chromium` job.
+    if: >-
+      vars.E2E_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: freejoy_money_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+      # CI-only values for the throwaway service container above; the database name must end in _test.
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/freejoy_money_test
+      ENVIRONMENT: test
+      BACKEND_PORT: '8000'
+      E2E_PORT: '3000'
+      BACKEND_API_URL: http://127.0.0.1:8000
+      PUBLIC_SITE_URL: http://localhost:3000
+      EMAIL_PROVIDER: fake
+      EMAIL_FAKE_OUTBOX: /tmp/freejoy-outbox.jsonl
+      E2E_EMAIL_OUTBOX: /tmp/freejoy-outbox.jsonl
+      # The database seam: click rows and subscriber status are read through psql (helpers/db-seam.ts).
+      E2E_PSQL: psql postgresql://postgres:postgres@127.0.0.1:5432/freejoy_money_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: nextjs-frontend/package-lock.json
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: '0.8.12'
+          enable-cache: true
+          cache-dependency-glob: fastapi_backend/uv.lock
+
+      # Random per run, masked in the log, never stored: the keys only have to match between the two apps.
+      - name: Generate throwaway keys
+        run: |
+          for name in BACKEND_INTERNAL_KEY RATE_LIMIT_EMAIL_KEY SUBSCRIBER_TOKEN_SECRET; do
+            value="$(openssl rand -hex 24)"
+            echo "::add-mask::${value}"
+            echo "${name}=${value}" >> "$GITHUB_ENV"
+          done
+          : > "${E2E_EMAIL_OUTBOX}"
+
+      - name: Install the psql client
+        run: command -v psql >/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client)
+
+      - name: Prepare the backend (migrate, seed the sample catalogue)
+        working-directory: fastapi_backend
+        run: |
+          uv sync --frozen
+          uv run alembic upgrade head
+          uv run python -m commands.seed_catalogue
+
+      - name: Start the backend
+        working-directory: fastapi_backend
+        run: |
+          nohup uv run uvicorn app.main:app --port "${BACKEND_PORT}" --no-access-log > "${RUNNER_TEMP}/backend.log" 2>&1 &
+          for _ in $(seq 1 40); do
+            if curl -fsS -H "X-Internal-Key: ${BACKEND_INTERNAL_KEY}" "http://127.0.0.1:${BACKEND_PORT}/health/ready" > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat "${RUNNER_TEMP}/backend.log"
+          echo '::error::the backend did not become ready'
+          exit 1
+
+      - name: Install dependencies
+        working-directory: nextjs-frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Chromium
+        working-directory: nextjs-frontend
+        run: npx playwright install --with-deps chromium
+
+      # `outbound` and `alerts-lifecycle` select a public run: placeholder Firebase values, no login project,
+      # the live catalogue, the alerts form open (scripts/e2e-public-mode.cjs). It builds, serves and stops the app.
+      - name: Run the money-path specs
+        working-directory: nextjs-frontend
+        run: npm run test:e2e:local -- outbound alerts-lifecycle
+
+      - name: Backend log
+        if: failure()
+        run: cat "${RUNNER_TEMP}/backend.log" || true
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: money-paths-test-results
+          path: |
             nextjs-frontend/test-results/
           retention-days: 7
