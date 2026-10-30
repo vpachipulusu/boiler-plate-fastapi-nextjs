@@ -52,6 +52,45 @@ describe('AlertsForm keyboard focus', () => {
 
     expect(card.className).not.toMatch(/(^|[\s:])ring(-|\s|$)/);
   });
+
+  it('leaves the card outline to the focus-proxy rule in globals.css (no per-component outline utilities)', () => {
+    render(<AlertsForm categories={CATEGORIES} live />);
+    const cards = [
+      screen.getByLabelText('Beauty & skincare').closest('label')!,
+      screen.getByLabelText('Daily highlights').closest('label')!,
+    ];
+
+    for (const card of cards) {
+      expect(card.className).not.toMatch(/outline|has-\[:focus/);
+      expect(card.querySelector(':scope > input.sr-only')).not.toBeNull();
+    }
+  });
+
+  it.each([
+    ['checkbox', 'Beauty & skincare'],
+    ['radio', 'Daily highlights'],
+  ])(
+    'gives the %s a peer-focus-visible outline for browsers without :has(), off where :has() works',
+    (_type, label) => {
+      render(<AlertsForm categories={CATEGORIES} live />);
+      const input = screen.getByLabelText(label);
+      const fallback = input.nextElementSibling!;
+
+      expect(input).toHaveClass('peer', 'sr-only');
+      expect(fallback).toHaveAttribute('aria-hidden', 'true');
+      // One overlay on the border box (-inset-px), so the fallback ring matches the :has() outline around the card.
+      expect(fallback).toHaveClass('pointer-events-none', 'absolute', '-inset-px');
+      expect(fallback.closest('label')).toHaveClass('relative');
+      // Whole class tokens: tailwind-merge must not have dropped the plain `outline` (style) next to `outline-[3px]`.
+      const classes = fallback.className.split(/\s+/);
+      for (const utility of ['outline', 'outline-[3px]', 'outline-offset-2', 'outline-ring']) {
+        expect(classes).toContain(
+          `supports-[not_(selector(:has(*)))]:peer-focus-visible:${utility}`
+        );
+      }
+      expect(fallback.className).not.toMatch(/(^|[\s:])ring(-|\s|$)/);
+    }
+  );
 });
 
 describe('AlertsForm promises', () => {

@@ -59,7 +59,7 @@ test('primary button on /login is 44px and focus ring is a 3px outline', async (
 });
 
 /**
- * Keyboard walkthrough: every Tab stop shows exactly one 3px outline at a 2px offset and no ring shadow (light mode).
+ * Keyboard walkthrough: every Tab stop shows exactly one 3px outline at a 2px offset and no ring shadow (light and dark).
  * The colour is read from the live token, never hard-coded: `--ring`, or `--cta` inside an `.on-inverse` surface
  * (globals.css). Documentation only: the default `freejoy` theme (src/config/themes.ts) currently resolves them to
  * ink green (162 27% 17%) and coral (8 92% 68%).
@@ -126,18 +126,26 @@ function readStop(page: Page): Promise<StopSnapshot> {
   });
 }
 
-const WALKS = [
+const PAGES = [
   { path: '/login', proxy: null },
   { path: '/pricing', proxy: null },
   { path: '/alerts', proxy: 'sr-only checkbox/radio' },
   { path: '/freebies', proxy: 'offer card title link' },
 ] as const;
+const SCHEMES = ['light', 'dark'] as const;
+const WALKS = PAGES.flatMap((entry) => SCHEMES.map((scheme) => ({ ...entry, scheme })));
 
-for (const { path, proxy } of WALKS) {
-  test(`tab order on ${path} shows one 3px focus outline per stop`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme: 'light' });
+for (const { path, proxy, scheme } of WALKS) {
+  test(`tab order on ${path} shows one 3px focus outline per stop (${scheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
     await page.goto(path);
     await waitForPageReady(page);
+    // The theme follows the system scheme; without this a dark run could silently walk the light theme.
+    expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(
+      scheme === 'dark'
+    );
     if (path === '/alerts') {
       test.skip(
         (await page.locator('input[type="checkbox"]').count()) === 0,

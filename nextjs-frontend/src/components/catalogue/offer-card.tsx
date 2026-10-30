@@ -29,7 +29,7 @@ export function OfferCard({ offer, merchant, className }: OfferCardProps) {
   return (
     <article
       className={cn(
-        'group relative flex flex-col rounded-card border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:[outline:3px_solid_hsl(var(--ring))]',
+        'focus-proxy group relative flex flex-col rounded-card border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md',
         className
       )}
     >
@@ -43,7 +43,7 @@ export function OfferCard({ offer, merchant, className }: OfferCardProps) {
         {merchant.name}
       </p>
       <h3 className="mt-1.5 font-display text-base font-bold leading-snug text-foreground sm:text-lg">
-        {/* Stretched link: its ::after covers the card, so the card draws the one focus outline (has-[a:focus-visible]) and the link draws none. */}
+        {/* Stretched link: its ::after covers the card, so the card draws the one focus outline (the focus-proxy rule in globals.css) and the link draws none. */}
         <Link
           href={href}
           className="after:absolute after:inset-0 after:rounded-card focus-visible:outline-none"

@@ -23,6 +23,7 @@ describe('OfferCard', () => {
     const { container } = render(<OfferCard offer={offer} merchant={merchant} />);
 
     expect(container.querySelector('article')!.className).not.toMatch(/(^|[\s:])ring(-|\s|$)/);
+    expect(container.querySelector('article')).toHaveClass('focus-proxy');
     expect(screen.getByRole('link', { name: offer.title }).className).toContain(
       'focus-visible:outline-none'
     );
