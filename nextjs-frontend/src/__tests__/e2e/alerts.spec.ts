@@ -7,7 +7,7 @@ import { waitForPageReady } from './helpers/e2e-utils';
  * The page has two modes. Without ALERTS_FORM_LIVE=true it shows a plain "not open yet" notice and no form;
  * with it, the form. Set E2E_ALERTS_LIVE=1 for the run against a server started with ALERTS_FORM_LIVE=true to run
  * the form tests; otherwise the closed-page tests run. The sign-up itself (double opt-in, confirm,
- * unsubscribe) needs a backend with the fake email provider and is in alerts-optin.spec.ts. The category
+ * unsubscribe) needs a backend with the fake email provider and is in alerts-lifecycle.spec.ts. The category
  * checkboxes come from the fixture catalogue (the e2e server runs with CATALOGUE_SOURCE=fixture unless
  * E2E_LIVE_CATALOGUE=1).
  */
