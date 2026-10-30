@@ -90,10 +90,11 @@ The audit log records which fields were changed, never their values.
    says the user was suspended.
 4. To undo it, choose **Restore Access** from the same menu and confirm. The person can sign in again.
 
-Some refusals are expected: you cannot suspend your own account, and you cannot suspend an admin whose permissions you
-do not hold (the box shows "That action is not allowed for this account..."). The list and details pages do not
+Some refusals are expected. You cannot suspend or restore your own account (the box shows "You cannot suspend or restore
+your own account."). Suspending or restoring an admin also needs the `admins.delete` permission and every permission
+that admin holds; without them the box shows "You do not have permission to do that". The list and details pages do not
 show whether someone is suspended, so **Restore Access** is always offered; restoring someone who is not suspended
-changes nothing.
+leaves their access as it is (an audit entry is still written).
 
 ## Not on these screens yet
 
