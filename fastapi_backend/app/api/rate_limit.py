@@ -95,16 +95,18 @@ def _handle_outage(request: Request, policy: RateLimitPolicy, exc: Exception) ->
     report_exception(exc)
 
 
-async def enforce_rate_limit(
+async def enforce_rate_limits(
     request: Request,
     response: Response,
     limiter: RateLimiter,
-    policy: RateLimitPolicy,
-    identifiers: list[str],
+    checks: list[tuple[RateLimitPolicy, str]],
 ) -> None:
-    """Hit every identifier; the first denial raises 429. Headers show the tightest."""
+    """Hit every (policy, identifier) pair in order; the first denial raises 429.
+
+    Each pair follows its own policy's fail mode on a Redis outage. Headers show the tightest decision.
+    """
     tightest: RateLimitDecision | None = None
-    for identifier in identifiers:
+    for policy, identifier in checks:
         try:
             decision = await limiter.hit(identifier, policy)
         except Exception as exc:  # noqa: BLE001 - any adapter failure follows the fail mode
@@ -116,6 +118,19 @@ async def enforce_rate_limit(
             tightest = decision
     if tightest is not None:
         response.headers.update(_rate_limit_headers(tightest))
+
+
+async def enforce_rate_limit(
+    request: Request,
+    response: Response,
+    limiter: RateLimiter,
+    policy: RateLimitPolicy,
+    identifiers: list[str],
+) -> None:
+    """Hit every identifier under one policy; the first denial raises 429. Headers show the tightest."""
+    await enforce_rate_limits(
+        request, response, limiter, [(policy, identifier) for identifier in identifiers]
+    )
 
 
 def limit_by_subject(
@@ -202,6 +217,37 @@ def email_digest(email: str) -> str:
 
 async def _no_email() -> None:
     return None
+
+
+def limit_by_client_ip_and_email(
+    ip_policy: RateLimitPolicy,
+    email_policy: RateLimitPolicy,
+    email_dependency: Callable[..., str | Awaitable[str]],
+) -> Callable[..., Awaitable[None]]:
+    """Dependency factory for public routes that act on an address the caller supplies.
+
+    Limits by client IP (``ip_policy``) and by the keyed HMAC of the address, never the address itself
+    (``email_policy``), so one address cannot be mailed in bulk from many IPs and one IP cannot mail many
+    addresses.
+    """
+
+    async def dependency(
+        request: Request,
+        response: Response,
+        limiter: RateLimiterDep,
+        email: Annotated[str, Depends(email_dependency)],
+    ) -> None:
+        await enforce_rate_limits(
+            request,
+            response,
+            limiter,
+            [
+                (ip_policy, f"{ip_policy.scope}:ip:{client_key(request)}"),
+                (email_policy, f"{email_policy.scope}:email:{email_digest(email)}"),
+            ],
+        )
+
+    return dependency
 
 
 def limit_auth_attempts(

@@ -18,6 +18,7 @@ from app.api.v1 import (
     org_billing,
     organizations,
     settings,
+    subscribers,
     totp,
     webhooks,
 )
@@ -39,6 +40,7 @@ api_router.include_router(organizations.router)
 api_router.include_router(settings.router)
 api_router.include_router(catalogue.router)
 api_router.include_router(catalogue_click.router)
+api_router.include_router(subscribers.router)
 
 # Stripe Billing module (docs/developer/modules.md): remove these three lines with the module.
 api_router.include_router(webhooks.router)

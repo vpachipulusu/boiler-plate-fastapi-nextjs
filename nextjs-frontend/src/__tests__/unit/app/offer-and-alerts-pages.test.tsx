@@ -132,25 +132,20 @@ describe('offer detail page', () => {
 });
 
 describe('alerts page', () => {
-  async function renderAlerts(email?: string | string[]) {
-    render(await AlertsPage({ searchParams: Promise.resolve({ email }) }));
+  async function renderAlerts() {
+    render(await AlertsPage());
   }
 
-  it('shows the promise heading, the form and one checkbox per category', async () => {
+  it('shows the promise heading and, until alerts are open, a plain notice and no form', async () => {
     await renderAlerts();
 
     expect(
       screen.getByRole('heading', { level: 1, name: 'Good things. Straight to you.' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Create your free alerts' })).toBeInTheDocument();
-    const group = screen.getByRole('group', { name: /interested in/i });
-    expect(within(group).getAllByRole('checkbox')).toHaveLength(6);
-  });
-
-  it('prefills a valid email from the query string', async () => {
-    await renderAlerts('sam@example.com');
-
-    expect(screen.getByLabelText(/email address/i)).toHaveValue('sam@example.com');
+    expect(screen.getByText(/alerts aren.t open yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /interested in/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /send me free alerts/i })).toBeNull();
+    expect(screen.queryByText(/something went wrong/i)).toBeNull();
   });
 
   it('shows a retryable alert instead of the form when the categories cannot be read', async () => {
@@ -165,13 +160,4 @@ describe('alerts page', () => {
       screen.getByRole('heading', { level: 1, name: 'Good things. Straight to you.' })
     ).toBeInTheDocument();
   });
-
-  it.each(['not an email', ['a@b.co', 'c@d.co'], undefined])(
-    'ignores an unusable email parameter: %j',
-    async (value) => {
-      await renderAlerts(value as string | string[] | undefined);
-
-      expect(screen.getByLabelText(/email address/i)).toHaveValue('');
-    }
-  );
 });
