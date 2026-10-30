@@ -30,13 +30,17 @@ import {
  * these instead of the generated SDK, which ESLint restricts to `src/lib/api/**` (ADR-008).
  */
 
-/** Exchanges a fresh Firebase ID token for a session cookie; the backend syncs the user and records the login. */
-export function createBackendSession(idToken: string, userAgent: string | null) {
+/**
+ * Exchanges a fresh Firebase ID token for a session cookie; the backend syncs the user and records the login.
+ * For an account with two-factor authentication, `totpCode` is the six-digit authenticator code: without it the
+ * API answers 401 `totp_required`, with a wrong one 401 `totp_invalid`. The code is only forwarded, never logged.
+ */
+export function createBackendSession(idToken: string, userAgent: string | null, totpCode?: string) {
   return callBackend(
     (client) =>
       createSession({
         client,
-        body: { id_token: idToken },
+        body: { id_token: idToken, ...(totpCode ? { totp_code: totpCode } : {}) },
         ...(userAgent ? { headers: { 'User-Agent': userAgent.slice(0, 512) } } : {}),
       }),
     { requireInternalKey: true }

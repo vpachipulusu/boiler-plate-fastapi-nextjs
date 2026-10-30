@@ -4,7 +4,6 @@ import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { signInWithEmail } from '@/lib/firebase/auth-helpers';
 import { verifyTokenAction } from '@/app/actions/auth-actions';
+import { isTotpRequiredResult } from '@/lib/auth/auth-error-messages';
 import { AuthFormAlert, FIELD_ERROR_CLASS } from './auth-form-alert';
 import {
   classifyAuthError,
@@ -26,6 +26,7 @@ import {
   REDIRECT_RECOVERY_MS,
   type AuthFormError,
 } from './auth-form-errors';
+import { useCompleteSignIn } from './use-complete-sign-in';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -34,10 +35,20 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-export function LoginForm() {
-  const router = useRouter();
+interface LoginFormProps {
+  /** The account has two-factor authentication on: continue with the code step, using this ID token. */
+  onTotpRequired: (idToken: string) => void;
+  /** Shown above the form until the next submit (for example when the code step timed out). */
+  notice?: AuthFormError | null;
+}
+
+export function LoginForm({ onTotpRequired, notice = null }: LoginFormProps) {
+  const completeSignIn = useCompleteSignIn();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<AuthFormError | null>(null);
+  // A notice is shown until the next submit; remembering which one was dismissed keeps this derived, not synced.
+  const [dismissedNotice, setDismissedNotice] = useState<AuthFormError | null>(null);
+  const shownError = error ?? (notice !== dismissedNotice ? notice : null);
   const isSubmitting = useRef(false);
 
   const form = useForm<LoginFormValues>({
@@ -60,6 +71,7 @@ export function LoginForm() {
     try {
       setIsLoading(true);
       setError(null);
+      setDismissedNotice(notice);
 
       const {
         user,
@@ -77,6 +89,13 @@ export function LoginForm() {
         const result = await verifyTokenAction(idToken);
 
         if (!result.success) {
+          if (isTotpRequiredResult(result)) {
+            // The password was right; the code step finishes the sign-in with this same ID token.
+            // Drop the password from the form: it is not needed again, and Back asks for it anew.
+            form.resetField('password');
+            onTotpRequired(idToken);
+            return;
+          }
           setError(classifyAuthResult(result, 'sign-in'));
           return;
         }
@@ -84,8 +103,7 @@ export function LoginForm() {
         redirected = true;
         // If navigation fails or stalls, give the form back instead of leaving it locked.
         setTimeout(release, REDIRECT_RECOVERY_MS);
-        router.push('/dashboard');
-        router.refresh();
+        completeSignIn();
       }
     } catch (error) {
       redirected = false;
@@ -105,7 +123,7 @@ export function LoginForm() {
         noValidate
         aria-busy={isLoading}
       >
-        {error && <AuthFormAlert error={error} />}
+        {shownError && <AuthFormAlert error={shownError} />}
 
         <FormField
           control={form.control}

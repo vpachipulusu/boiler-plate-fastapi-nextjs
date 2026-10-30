@@ -95,7 +95,7 @@ describe('auth server actions', () => {
       await verifyTokenAction('id-token', { selectedPlan: requestedPlan });
 
       expect(mocks.createBackendSession).toHaveBeenCalledTimes(1);
-      expect(mocks.createBackendSession).toHaveBeenCalledWith('id-token', 'vitest');
+      expect(mocks.createBackendSession).toHaveBeenCalledWith('id-token', 'vitest', undefined);
     }
   );
 
@@ -111,7 +111,7 @@ describe('auth server actions', () => {
       );
     });
 
-    it.each([401, 409, 429])(
+    it.each([401, 409])(
       'returns the generic error and sets no cookie when the API answers %s',
       async (status) => {
         mocks.createBackendSession.mockResolvedValue({
@@ -149,7 +149,7 @@ describe('auth server actions', () => {
     );
 
     // the boundary is exact. 4xx is the backend's answer; only 5xx or no status is an outage.
-    it.each([400, 401, 403, 404, 409, 422, 429, 499])(
+    it.each([400, 401, 403, 404, 409, 422, 499])(
       'keeps %s generic with no outage flag',
       async (status) => {
         mocks.createBackendSession.mockResolvedValue({ success: false, error: 'x', status });

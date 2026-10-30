@@ -10,6 +10,14 @@ interface TwoFactorCodeFieldProps {
   error?: string | null;
   /** Id of an error element rendered elsewhere (e.g. the dialog's alert); linked and marks the input invalid. */
   describedBy?: string;
+  /**
+   * Overrides the invalid state, for a caller whose `describedBy` also lists help text that is always present.
+   * Left out, the input is invalid when `error` or `describedBy` is set.
+   */
+  invalid?: boolean;
+  disabled?: boolean;
+  /** Form field name (default `totpCode`). */
+  name?: string;
 }
 
 /** Six-digit authenticator code: one 56px input, numeric keypad on phones, one-time-code autofill. */
@@ -20,6 +28,9 @@ export function TwoFactorCodeField({
   onChange,
   error,
   describedBy,
+  invalid,
+  disabled,
+  name = 'totpCode',
 }: TwoFactorCodeFieldProps) {
   const errorId = `${id}-error`;
 
@@ -28,14 +39,16 @@ export function TwoFactorCodeField({
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}
+        name={name}
         inputMode="numeric"
         autoComplete="one-time-code"
-        maxLength={6}
         className="h-14 text-center font-mono text-xl tracking-[0.5em]"
         value={value}
-        aria-invalid={error || describedBy ? true : undefined}
+        disabled={disabled}
+        aria-invalid={(invalid ?? Boolean(error || describedBy)) ? true : undefined}
         aria-describedby={error ? errorId : describedBy}
-        onChange={(event) => onChange(event.target.value.replace(/\D/g, ''))}
+        // No maxLength: it would cut a pasted "123 456" to "123 45" before the non-digits are dropped.
+        onChange={(event) => onChange(event.target.value.replace(/\D/g, '').slice(0, 6))}
       />
       {error && (
         <p id={errorId} className="mt-1.5 text-sm text-destructive">

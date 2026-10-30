@@ -27,7 +27,7 @@ import {
  * the API authenticates the session cookie, enforces the verified-email claim and derives the user, so
  * no user id ever comes from the browser.
  *
- * 2FA setup stays hidden until sign-in enforcement lands; disable and account deletion take a fresh ID
+ * 2FA setup stays hidden until a recovery path (backup codes) exists; sign-in already asks for the code. Disable and account deletion take a fresh ID
  * token from the browser's re-authentication dialog.
  */
 

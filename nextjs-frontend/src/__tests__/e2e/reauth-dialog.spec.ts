@@ -13,7 +13,7 @@ import {
 /**
  * account deletion and 2FA disable ask the user to re-authenticate (password re-entry here; OAuth users
  * get the provider popup, which cannot run in e2e) and pass the fresh Firebase ID token to the server action.
- * 2FA enrolment stays hidden until sign-in enforces 2FA (parked). Needs the FastAPI backend
+ * 2FA enrolment stays hidden (no backup codes yet, so enabling it could lock people out). Needs the FastAPI backend
  * (BACKEND_API_URL) and BACKEND_INTERNAL_KEY, like the organisation and billing specs.
  */
 
