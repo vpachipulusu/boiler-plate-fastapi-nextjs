@@ -160,14 +160,15 @@ brings it back.
   `src/proxy.ts` adds `Referrer-Policy: no-referrer` on those paths. The token is read from the address once,
   kept in memory and removed from the address bar; it is never rendered, so it is not echoed into the page.
 - **Home band.** `NewsletterBand` is now a link to `/alerts`. `/alerts` ignores `?email=`. Nothing puts an address
-  in a URL any more (finding N-07 of the checklist; the Sentry scrubber, FREEJ-31, is still worth having for old
-  links).
+  in a URL any more (finding N-07 of the checklist); the Sentry scrubber also filters `email` (FREEJ-31), for old
+  links and for anything typed into a search box.
 - **Alerts switch.** `/alerts` shows the form only when `ALERTS_FORM_LIVE=true` is set (server-only, read when
   the server starts; the page is dynamic); otherwise it shows a plain "Alerts aren't open yet" notice, no form, and stays noindex. The
   backend refuses sign-ups in production without a provider as a last line. Set it when a provider is live.
 - **Sentry.** The links must carry a token in the query string (a mail app POSTs to the one-click URL directly),
-  so `src/lib/sentry/scrub-token.ts` replaces `token=...` with `[Filtered]` in every URL, query string and
-  breadcrumb of an event (`beforeSend` and `beforeSendTransaction` in the client, server and edge configs).
+  so `src/lib/sentry/scrub-event.ts` replaces `token=...` with `[Filtered]` in every URL, query string and
+  breadcrumb of an event (`beforeSend` and `beforeSendTransaction` in the client, server and edge configs). It
+  filters `email` too; see [freejoy-frontend.md](freejoy-frontend.md#error-monitoring-and-addresses-freej-31).
 - **Known leaks.** Hosting platform request logs still record the full URL of the landing page load, token
   included, for as long as the platform keeps them (retention is the platform's setting: check it and shorten it
   before launch). A confirm token stops working once used or after 24 hours; an unsubscribe token can only
