@@ -200,7 +200,8 @@ Unit tests: `npm run test:unit` (route, wrapper, validation, CTA, proxy) and `uv
 successful click, no row for any refusal, the column set, hostile stored destinations and the allowlist.
 
 Playwright (`src/__tests__/e2e/go-redirect.spec.ts`) needs a production build, a running backend with seeded data and
-the offer ids, so it skips unless they are set:
+the offer ids, so it skips unless they are set. The slug is optional: with it the spec also clicks through from the
+real offer page (the frontend must use the catalogue API source, which is the default):
 
 ```bash
 # backend (fastapi_backend/), against a local *_test or dev database you own
@@ -211,7 +212,7 @@ psql ... -c "select id, slug, status from offers where slug in ('coffee-discover
 
 # frontend (nextjs-frontend/)
 npm run build && BACKEND_API_URL=http://127.0.0.1:8172 BACKEND_INTERNAL_KEY=<same key> npx next start -p 3190
-GO_E2E_LIVE_OFFER_ID=<id> GO_E2E_ENDED_OFFER_ID=<id> GO_E2E_DRAFT_OFFER_ID=<id> \
+GO_E2E_LIVE_OFFER_ID=<id> GO_E2E_LIVE_OFFER_SLUG=<slug> GO_E2E_ENDED_OFFER_ID=<id> GO_E2E_DRAFT_OFFER_ID=<id> \
   E2E_BASE_URL=http://localhost:3190 npm run test:e2e:go
 ```
 
