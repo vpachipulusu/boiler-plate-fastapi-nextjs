@@ -42,7 +42,7 @@ The **Filters** card narrows the list. Every filter you add must match (an entry
 | **Action** | Only entries with exactly this action, for example `admin.offers.update` |
 | **User ID** | Only entries made by this admin (their id, as shown in the **User ID** column) |
 | **Organisation ID** | Only entries about this organisation |
-| **From date** and **To date** | Only entries on or between these days. Dates are in UTC and each includes the whole day |
+| **From date** and **To date** (grouped as **Date range**) | Only entries on or between these days. Dates are in UTC and each includes the whole day. The pickers will not let the range run backwards |
 | **Entries per page** | 25, 50 (the default) or 100 |
 
 1. Fill in one or more controls and press **Apply filters**. The list reloads from the first page.
@@ -50,13 +50,20 @@ The **Filters** card narrows the list. Every filter you add must match (an entry
 3. The line above the table says which entries you are looking at, for example "Showing 51 to 100 of 250 entries
    (newest first)". If nothing matches, the page says "No entries match these filters" with a **Reset filters** button.
 4. When there is more than one page, **Previous** and **Next** appear under the table with "Page 2 of 5". They keep
-   your filters.
+   your filters. On a phone the page count sits on its own line above the two buttons. After you press **Apply
+   filters**, **Previous**, **Next** or **Reset filters**, keyboard focus moves to the **Recent Activity** heading, so a
+   screen reader or keyboard user lands on the new results instead of being sent back to the top or losing their place
+   when a button (such as **Next** on the last page) goes away.
+   If a page past the end has no entries, the page says "No entries on this page" and offers **Back to first page**,
+   which keeps your filters.
 5. The address of the page holds the filters, so you can bookmark it or send the link to another admin (who needs
    the audit-log permission to open it).
 
 If a value cannot be used (an action that is not written like `admin.offers.update`, an id with spaces, a date that
 does not exist, or a "To" date before the "From" date) it is ignored and a red note under the controls says which
-one.
+one. The unusable value is not put back in the box; the box is marked as having a problem for screen readers and the
+note is read out when the page reloads. If you only left boxes empty, or the address held the default page size, the
+page quietly tidies the address (for example to `?action=admin.offers.update`) and no note is shown.
 
 ### Step 3. What is recorded, and what is not
 
@@ -70,7 +77,9 @@ one.
 
 ### Limits of the screen
 
-- You can page back through at most the newest **10,000 entries** of any search. Beyond that, the page tells you to
+- You can page back through about the newest **10,000 entries** of any search (the cap is on where a page starts, so
+  the last page can reach a little past 10,000). When there are more, the page count shows a plus sign, such as
+  "Page 1 of 201+". Beyond that, the page tells you to
   narrow the filters or the date range (for example pick a month) to reach older entries.
 - You can filter by action, user, organisation and date. There is no free-text search, no filter by resource or by
   IP address, and no way to pick an action from a list: type it exactly.
