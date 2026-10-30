@@ -34,10 +34,10 @@ Admins sign in on the same page as everyone else.
    GitHub**. **Forgot password?** starts a reset.
 3. If your email address is not verified yet you are sent to **Verify your email**: open the link in the email
    Firebase sent you, then sign in again.
-4. Once you are in you land on your own **dashboard** (the account area), unless you were sent to the sign-in page
-   from another page of the site, such as `/admin` (see Step 2): then you return to that page. If you use two-factor
-   authentication, the code step comes first and the return still happens after it. Your sign-in lasts up to five days
-   (a cookie called `session`).
+4. Once you are in you land on your own **dashboard** (the account area), unless the site sent you to the sign-in
+   page from a page that needs sign-in, such as `/admin` or a dashboard page (see Step 2): then you return to that
+   page. If you use two-factor authentication, the code step comes first and the return still happens after it. Your
+   sign-in lasts up to five days (a cookie called `session`).
 
 ![The sign-in page on a desktop screen](images/login-d.png)
 
@@ -68,7 +68,7 @@ not use anyone's real credentials.
 The return address only works for pages of the Freejoy site. If the address in `?redirect=` is anything else (another
 website, the sign-in pages themselves, or a technical address), it is ignored and you land on your dashboard. Only the
 page path is remembered, not anything after a `?` such as a search or a page number. An ordinary account that returns to
-`/admin` is sent on to its own dashboard, and the site does not say whether the page exists.
+`/admin` is sent on to its own dashboard.
 
 *Screen pending: needs the Firebase test project (owner action).* The return after sign-in has no screenshot, for
 the same reason as the sign-in result above.

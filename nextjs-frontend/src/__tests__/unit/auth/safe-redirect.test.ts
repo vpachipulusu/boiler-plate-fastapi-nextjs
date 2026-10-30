@@ -35,6 +35,9 @@ describe('resolveSafeRedirect: accepted paths', () => {
     ['/javascript:alert(1)', '/javascript:alert(1)'],
     ['/admin?next=%2Fdashboard', '/admin?next=%2Fdashboard'],
     ['/x/./y', '/x/y'],
+    ['/admin/users/abc-123', '/admin/users/abc-123'],
+    ['/dashboard/billing/', '/dashboard/billing/'],
+    ['/admin/offers/caf%C3%A9/', '/admin/offers/caf%C3%A9/'],
   ])('keeps %s as %s', (raw, expected) => {
     expect(resolveSafeRedirect(raw)).toBe(expected);
   });
@@ -119,6 +122,37 @@ describe('resolveSafeRedirect: open-redirect corpus', () => {
     const result = resolveSafeRedirect(`/${FULLWIDTH_SOLIDUS}evil.com`);
     expect(new URL(result, 'http://localhost').origin).toBe('http://localhost');
     expect(result.startsWith('//')).toBe(false);
+  });
+
+  it.each([
+    ['dot segments hidden in escaped slashes', '/x%2f..%2f%2fevil.com'],
+    ['escaped dot segments then an escaped backslash', '/a%2f..%2f%5cevil'],
+    ['triple-encoded api', '/%252561pi/x'],
+    ['four layers of escapes', '/%25252561pi/x'],
+    ['escaped slash after the sign-in page', '/login%2f..'],
+    ['escaped slash after api', '/api%2f..'],
+    ['escaped slash after go', '/go%2f..'],
+    ['escaped slash after _next', '/_next%2f..'],
+    ['triple-encoded slash pair', '/%25252F%25252Fevil.com'],
+    ['a query that hides the sign-in page', '/login%3Fx'],
+  ])('refuses %s', (_name, raw) => {
+    expect(resolveSafeRedirect(raw)).toBe(DEFAULT_SIGN_IN_REDIRECT);
+  });
+
+  it('returns the same value when its own result is resolved again', () => {
+    for (const [, raw] of corpus) {
+      const once = resolveSafeRedirect(raw);
+      expect(resolveSafeRedirect(once)).toBe(once);
+    }
+    for (const raw of [
+      '/admin',
+      '/admin/users/abc-123/',
+      '/a b',
+      '/admin/offers/caf%C3%A9?x=1#y',
+    ]) {
+      const once = resolveSafeRedirect(raw);
+      expect(resolveSafeRedirect(once)).toBe(once);
+    }
   });
 
   it('never returns a value that could leave the origin, for any corpus entry', () => {

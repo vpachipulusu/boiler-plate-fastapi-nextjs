@@ -45,9 +45,20 @@ function hasPathShape(value: string): boolean {
   return value.length === 1 || (value[1] !== '/' && value.charCodeAt(1) !== BACKSLASH);
 }
 
+/** True when the URL parser's dot-segment resolution turns the value into a protocol-relative path. */
+function resolvesToProtocolRelative(value: string): boolean {
+  try {
+    return new URL(value, PARSE_BASE).pathname.startsWith('//');
+  } catch {
+    return true;
+  }
+}
+
 /** True for any form that could turn into another origin, a scheme, or a different request when decoded. */
 function hasForbiddenForm(value: string): boolean {
-  if (!hasPathShape(value) || value.includes('://')) return true;
+  if (!hasPathShape(value) || value.includes('://') || resolvesToProtocolRelative(value)) {
+    return true;
+  }
   for (const char of value) {
     if (isForbiddenCodePoint(char.codePointAt(0) ?? 0)) return true;
   }
@@ -62,11 +73,23 @@ function decodeOnce(value: string): string | null {
   }
 }
 
-/** The value, then decoded once and twice. Null when a decode fails: a malformed escape is never trusted. */
+/** How many times a value may be decoded before it must stop changing. */
+const MAX_DECODE_ROUNDS = 3;
+
+/**
+ * The value, then each further decoding of it, until decoding changes nothing. Null when a decode fails (a
+ * malformed escape, such as a literal "%", is never trusted) or when it is still changing after three rounds
+ * (an escape nested that deep is not a real path).
+ */
 function decodedForms(value: string): string[] | null {
-  const once = decodeOnce(value);
-  const twice = once === null ? null : decodeOnce(once);
-  return once === null || twice === null ? null : [value, once, twice];
+  const forms = [value];
+  for (let round = 0; round <= MAX_DECODE_ROUNDS; round += 1) {
+    const next = decodeOnce(forms[forms.length - 1]);
+    if (next === null) return null;
+    if (next === forms[forms.length - 1]) return forms;
+    forms.push(next);
+  }
+  return null;
 }
 
 /** Resolves "." and ".." segments, so "/x/../login" is seen as "/login". */
@@ -79,12 +102,20 @@ function resolveDotSegments(path: string): string {
   return `/${resolved.join('/')}`;
 }
 
+function matchesBlockedPath(path: string): boolean {
+  return BLOCKED_PATHS.some((blocked) => path === blocked || path.startsWith(`${blocked}/`));
+}
+
+/**
+ * Each decoded form is checked as it is and with its dot segments resolved, ignoring any query or fragment, so
+ * "/login%2f.." (which would resolve to "/") and "/%252561pi/x" (three layers of escapes) are both refused.
+ */
 function isBlockedPath(pathname: string): boolean {
   const forms = decodedForms(pathname);
   if (forms === null) return true;
   return forms.some((form) => {
-    const path = resolveDotSegments(form).toLowerCase();
-    return BLOCKED_PATHS.some((blocked) => path === blocked || path.startsWith(`${blocked}/`));
+    const path = form.split(/[?#]/)[0].toLowerCase();
+    return matchesBlockedPath(path) || matchesBlockedPath(resolveDotSegments(path));
   });
 }
 
@@ -113,7 +144,8 @@ function parseSafeRedirect(raw: unknown): string | null {
  *
  * Accepts only a string that is `/` or starts with one `/` and a character that is not `/` or `\`; at most
  * 512 characters; no control, separator or bidirectional characters, no backslash, no `://`; the same holds
- * after decoding it once and twice (a failed decode is refused); and it is not a sign-in page, an `/api` route
+ * after every decoding of it (at most three; a failed decode, or an escape nested deeper, is refused), and no form
+ * resolves to a protocol-relative path; and it is not a sign-in page, an `/api` route
  * handler, `/go`, the one-click unsubscribe handler or `/_next`. Anything else, including arrays, `null` and
  * `undefined`, gives the default.
  */

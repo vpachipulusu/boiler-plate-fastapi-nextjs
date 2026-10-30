@@ -21,8 +21,8 @@ interface LoginPanelProps {
 export function LoginPanel({ redirectTo }: LoginPanelProps = {}) {
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [notice, setNotice] = useState<AuthFormError | null>(null);
-  // Held here for the whole panel, so every path (password, provider, code step, and a second try after Back)
-  // ends at the same place.
+  // The code step's completion. The password form and provider buttons get the same `redirectTo` and resolve it
+  // themselves.
   const completeSignIn = useCompleteSignIn(redirectTo);
   const stepOneRef = useRef<HTMLDivElement>(null);
   const wasInCodeStep = useRef(false);
