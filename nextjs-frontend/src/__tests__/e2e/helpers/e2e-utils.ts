@@ -248,6 +248,16 @@ export const STRIPE_E2E_SKIP_REASON =
   'Needs Stripe Checkout and the Stripe webhook (stripe listen); set E2E_STRIPE=1 to run. Tracked in ';
 
 /**
+ * Pricing tests that assert real amounts are off unless E2E_PLAN_PRICES=1: the server reads prices from the backend's
+ * GET /v1/settings/plan-prices, and without a backend that answers non-zero prices every paid tier shows 0. The
+ * browser never calls the backend, so page.route() cannot stub it (docs/developer/local-e2e.md, "Plan prices").
+ * Independent of E2E_STRIPE: it needs no webhook forwarding. Only the value `1` enables them.
+ */
+export const PLAN_PRICES_E2E_ENABLED = process.env.E2E_PLAN_PRICES === '1';
+export const PLAN_PRICES_E2E_SKIP_REASON =
+  'Needs a backend that returns plan prices (E2E_PLAN_PRICES=1)';
+
+/**
  * Set a mock session cookie for authenticated tests.
  * This bypasses the Firebase auth flow for faster, more reliable tests.
  */

@@ -183,6 +183,21 @@ The spec reads the confirm and unsubscribe links from the outbox file, the way a
 closed-page tests run instead. `alerts-token-pages.spec.ts` needs neither a backend nor an outbox. The page reads
 `ALERTS_FORM_LIVE` when the server starts, so restart the server (not rebuild) to switch between open and closed runs.
 
+## Plan prices (`E2E_PLAN_PRICES=1`)
+
+The pricing page shows Pro and Enterprise amounts that the Next.js server reads from the backend (`GET /v1/settings/plan-prices`, minor units, see [backend-frontend-seams.md](backend-frontend-seams.md#get-v1settingsplan-prices)) and the currency from `GET /v1/settings/currency`. A backend that cannot read them (no Stripe test price ids, or no backend at all) makes every paid tier show 0, so the price-dependent tests in `pricing.spec.ts` are off unless `E2E_PLAN_PRICES=1`:
+
+- `Pricing Tiers > should display prices for each tier`, `Billing Period Toggle > should show the savings badge only when yearly billing is cheaper`, both `Price Display` groups and `Pricing Accuracy`. Without the flag they are reported as skipped ("Needs a backend that returns plan prices (E2E_PLAN_PRICES=1)"). The toggle tests (role, `aria-checked`, roving tabindex, arrow/Home/End keys) never need it.
+- **What the backend must provide:** a plan-prices route that answers **non-zero** amounts for Pro and Enterprise, monthly and yearly (the four `STRIPE_PRICE_ID_{PRO,ENTERPRISE}_{MONTHLY,YEARLY}` test prices from `.env.e2e.local` with a `STRIPE_SECRET_KEY` for the test account), plus a currency. Zero or `null` amounts fail the tests on purpose.
+- **Why it cannot be stubbed in the test:** the browser never calls FastAPI; the server component calls it, so `page.route()` cannot intercept the read. Point `BACKEND_API_URL` at a backend (or a local stand-in for the two routes) that returns the prices. The server caches a successful read for an hour, so restart `next start` after changing prices.
+- **Where it runs:** the spec is part of the Firebase-backed `chromium` project (it depends on the `setup` login project); it is not one of the no-login money-path projects, so a public run does not select it.
+- Independent of `E2E_STRIPE`: no webhook forwarding is needed.
+
+```bash
+export E2E_PLAN_PRICES=1 BACKEND_API_URL=http://127.0.0.1:8170 BACKEND_INTERNAL_KEY=<the same key>
+npm run test:e2e:local -- src/__tests__/e2e/pricing.spec.ts
+```
+
 ## Stripe webhooks
 
 Stripe cannot reach `localhost`, so a checkout completes at Stripe but the app never learns it ("Processing Your Subscription..." forever). The backend receives the events at `POST /webhooks/stripe` and verifies each one with `STRIPE_WEBHOOK_SECRET`. For e2e the Stripe CLI forwards test-mode events to your local uvicorn. The Stripe specs run only with `E2E_STRIPE=1` (`E2E_ENABLED` is unrelated and stays `false`).
