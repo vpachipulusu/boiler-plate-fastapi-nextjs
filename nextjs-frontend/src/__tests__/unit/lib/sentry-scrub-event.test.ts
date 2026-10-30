@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { FILTERED, scrubEvent } from '@/lib/sentry/scrub-token';
+import { FILTERED, scrubEvent as scrubOrNull } from '@/lib/sentry/scrub-event';
+
+function scrubEvent<T extends object>(event: T): T {
+  const scrubbed = scrubOrNull(event);
+  if (scrubbed === null) throw new Error('event was dropped');
+  return scrubbed;
+}
 
 const URL_WITH_TOKEN = 'https://freejoy.test/alerts/confirm?token=abc&x=1';
 
