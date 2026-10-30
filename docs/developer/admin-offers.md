@@ -28,9 +28,10 @@ of them.
   `archived`), `category` (an id), `page`. The search and category select are a plain GET form (no script needed),
   like `/admin/users`. The status chips are links; the current one carries `aria-current="page"`. Archived is a fifth
   chip next to the four in the design so an archived offer can be found; the offers there cannot be edited.
-* **Stats strip** (`offers-stats.tsx`): Total, Published, Drafts, Expired, Archived. Each number is the
-  `total_count` of a one-row list request to the API (one per status plus one unfiltered; `fetchOfferStatusCounts`).
-  Nothing is estimated or cached: if any of the five requests fails the strip shows an error and no numbers. The
+* **Stats strip** (`offers-stats.tsx`): Total, Published, Drafts, Expired, Archived. Each status number is the
+  `total_count` of a one-row list request to the API (four requests; `fetchOfferStatusCounts`) and Total is their sum,
+  so the strip always adds up. Nothing is estimated or cached: if any request fails the strip shows an error (a 429
+  says so) and no numbers. The
   design's "Needs review" card has no matching API count and is not shown.
 * **Table** (`offers-table.tsx`): Offer (title links to the editor, merchant and type underneath), Category,
   Status (`StatusPill`: good = Published, neutral = Draft, warn = Expired, info = Archived), Verified
@@ -53,11 +54,13 @@ of them.
 
 **Preview.** A draft has no public page, so the editor shows a card preview drawn from the form as it is typed
 (`offer-preview-card.tsx`), labelled "Not public". The link to the live page (`/freebies/<slug>`) appears only when the
-status is `PUBLISHED`; it opens in a new tab. Status actions use the last **saved** version, so save before publishing.
+status is `PUBLISHED`; it opens in a new tab. Status actions act on the last **saved** version, so while the form beside
+them holds unsaved edits they wait (`aria-disabled`, with the reason written out): save first.
 
-**Public pages refresh.** Every status action, a save of a published offer, and every category or merchant change
-calls `revalidateCatalogue(paths)` (`src/lib/catalogue/revalidate.ts`, from FREEJ-21) with `/freebies` and the
-offer's own path, plus `revalidatePath` for the admin pages. A failure of that refresh is logged and does not turn a
+**Public pages refresh.** Every status action and a save of a published offer call
+`revalidateCatalogue(paths)` (`src/lib/catalogue/revalidate.ts`, from FREEJ-21) with `/freebies` and the offer's own
+path; every category or merchant change calls it with `/freebies` only. All of them also call `revalidatePath` for the
+admin pages. A failure of that refresh is logged and does not turn a
 successful write into an error.
 
 ## Server actions
@@ -84,17 +87,34 @@ mid-request deploy) into the same curated failure, so a form or toast always ans
 names its unmet rules only from a fixed table. Unknown codes are ignored. Unexpected failures (5xx, unreachable) are
 logged with status and code only.
 
+## Pages check the admin too
+
+The `/admin` layout redirects a non-admin, but layout and page render in parallel, so a page cannot rely on that to
+keep it from fetching. Every page under `offers`, `categories` and `merchants` starts with `requireAdminPage()`
+(`_lib/require-admin-page.ts`), which asks the same gate as the actions and redirects exactly as the layout does:
+`/login` (no session), `/verify-email`, `/api/auth/clear-session` (a session the backend rejected), `/dashboard` (not
+an admin). An outage throws, so `error.tsx` renders. It costs two extra backend calls per page view; a unit test per
+page proves no wrapper is called after a refusal.
+
 ## Forms and accessibility
 
 Forms use react-hook-form with `zodResolver`. Every control has a visible label (`Field`,
-`_components/form-field.tsx`); hints and errors are tied to the control with `aria-describedby`, errors are
-`role="alert"` and the control gets `aria-invalid`. After a failed submit the first invalid field takes focus (a
-server `fieldErrors` entry is set on its field first); a failure that belongs to no field fills a summary that takes
-focus; a successful save focuses a "Changes saved." status message. Selects are native `<select>` elements, controls
+`_components/form-field.tsx`); hints and errors are tied to the control with `aria-describedby`, the control gets
+`aria-invalid` (and `aria-required` when it is required), and field errors are not also live regions. After a failed submit the first invalid field takes focus (a
+server `fieldErrors` entry is set on its field first); a failure that belongs to no field fills a named group ("Could not save") that takes
+focus (focused, not also `role="alert"`); a successful save focuses a "Changes saved." status message. While a form has unsaved edits it says "You have unsaved changes." and asks the browser to confirm before the tab is
+closed (`beforeunload`). Buttons that start work (the submit button, the row menu, the status buttons, the
+enable/disable toggles) use `aria-disabled` while busy rather than `disabled`, so they keep focus and stay announced,
+and ignore a second press; a polite status says what is happening. After the archive confirmation focus returns to the
+control that started it. Tables are named by their heading. Selects are native `<select>` elements, controls
 are at least 44px tall, and the layout is checked at 320, 390 and 1440 px (no horizontal scroll). Dates are entered
 in UTC (to the second, so an edit never rounds a stored time) and labelled so.
 
 ## Pick lists and limits
+
+(Truncation is shown, not hidden: the filter, the table ("Not in the first 100") and the offer pages each say when a
+list holds only the first 100 rows, and the editor always keeps the offer's own category and merchant selectable.)
+
 
 `_lib/pick-lists.ts` loads categories and merchants once per request (`React.cache`) for the offer form and the
 list's names and filter. The API caps a page at 100 rows, so the lists are the first 100; the categories and
@@ -140,7 +160,8 @@ uv run python -m tests.e2e_identity_server --port 8171
 ```
 
 It refuses to start unless `ENVIRONMENT` is `local` or `test`, the database host is loopback, the database name ends
-in `_test` and both values are long and different; it binds to 127.0.0.1; it lives under `tests/` and is never part of the application image. Then
+in `_test` and both values are long and different; it binds to 127.0.0.1; it lives under `tests/` and is never part of the application image: `fastapi_backend/.vercelignore` keeps `tests/`,
+`.env*` and caches out of the Vercel bundle (follow-up: the Dockerfile should install with `uv sync --no-dev` too). Then
 build and start the app on a production build (never `next dev`) with `BACKEND_API_URL`, `BACKEND_INTERNAL_KEY` and
 the same two cookie values, and run Playwright with `E2E_LIVE_CATALOGUE=1 E2E_ADMIN_SESSION_COOKIE=...
 E2E_PLAIN_SESSION_COOKIE=...`. The spec puts the value in the `session` cookie.
