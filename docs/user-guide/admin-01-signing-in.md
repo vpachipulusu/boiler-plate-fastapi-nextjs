@@ -66,8 +66,9 @@ not use anyone's real credentials.
 
 On a desktop screen (900 pixels wide or more) the shell has:
 
-1. A dark **sidebar** on the left with the heading "Your App" and the word **ADMIN**. ("Your App" is a leftover
-   placeholder name from the template; it does not change with the site name.)
+1. A dark **sidebar** on the left with the site name ("Freejoy") and the word **ADMIN**. The name is the one the
+   site is configured with, so it follows the site name. (The screenshots below were taken before the sidebar showed
+   the site name and still read "Your App".)
 2. The sidebar links, in this order: **Dashboard**, **Freebies**, **Categories**, **Merchants**, **Users**,
    **Subscriptions**, **Analytics**, **SEO**, **Settings**, **Audit Logs**. The page you are on is highlighted.
 3. A **header** with your **role badge** (for example "Super Admin") and a round **account button**.
