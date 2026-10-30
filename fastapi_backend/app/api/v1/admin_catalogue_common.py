@@ -88,6 +88,8 @@ INVALID_MESSAGES = {
     "invalid_window": "The end date must be after the start date",
     "unknown_category": "The category does not exist",
     "unknown_merchant": "The merchant does not exist",
+    "unknown_provider": "The provider is not recognised",
+    "destination_not_allowed": "Destination host is not allowed for this provider",
 }
 SLUG_TAKEN = "That slug is already in use"
 ILLEGAL_TRANSITION = "Operation not allowed in the current state"

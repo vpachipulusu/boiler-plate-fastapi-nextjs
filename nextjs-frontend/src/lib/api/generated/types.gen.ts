@@ -614,6 +614,68 @@ export type ClaimStep = {
 };
 
 /**
+ * ClickData
+ */
+export type ClickData = {
+    /**
+     * Destination Url
+     *
+     * Stored https destination; never logged
+     */
+    destination_url: string;
+};
+
+/**
+ * ClickRequest
+ *
+ * What the Next.js route may tell the backend about the click. Nothing else is accepted.
+ */
+export type ClickRequest = {
+    /**
+     * Referrer Host
+     *
+     * Host name of the referring page; anything else is dropped
+     */
+    referrer_host?: string | null;
+    /**
+     * Coarse device class; the raw user agent is never sent
+     */
+    user_agent_class?: UserAgentClass | null;
+};
+
+/**
+ * ClickResponse
+ */
+export type ClickResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data: ClickData;
+};
+
+/**
+ * ConfirmResponse
+ */
+export type ConfirmResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data?: ConfirmedData;
+};
+
+/**
+ * ConfirmedData
+ */
+export type ConfirmedData = {
+    /**
+     * Status
+     */
+    status?: 'confirmed';
+};
+
+/**
  * CreateCategoryRequest
  */
 export type CreateCategoryRequest = {
@@ -2677,6 +2739,61 @@ export type StepIn = {
 };
 
 /**
+ * SubscribeAccepted
+ */
+export type SubscribeAccepted = {
+    /**
+     * Status
+     */
+    status?: 'accepted';
+};
+
+/**
+ * SubscribeBody
+ */
+export type SubscribeBody = {
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Categories
+     */
+    categories: Array<string>;
+    /**
+     * Frequency
+     */
+    frequency: 'DAILY' | 'WEEKLY';
+    /**
+     * Consent
+     *
+     * The box was ticked; always true
+     */
+    consent: true;
+    /**
+     * Consent Text
+     *
+     * The exact wording shown
+     */
+    consent_text: string;
+    /**
+     * Consent Source
+     */
+    consent_source: 'alerts_page';
+};
+
+/**
+ * SubscribeResponse
+ */
+export type SubscribeResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data?: SubscribeAccepted;
+};
+
+/**
  * SubscriptionDetailData
  */
 export type SubscriptionDetailData = {
@@ -2943,6 +3060,16 @@ export type TierPricesData = {
 };
 
 /**
+ * TokenBody
+ */
+export type TokenBody = {
+    /**
+     * Token
+     */
+    token: string;
+};
+
+/**
  * TotpChangedResponse
  */
 export type TotpChangedResponse = {
@@ -2950,6 +3077,27 @@ export type TotpChangedResponse = {
      * Success
      */
     success?: true;
+};
+
+/**
+ * UnsubscribeResponse
+ */
+export type UnsubscribeResponse = {
+    /**
+     * Success
+     */
+    success?: true;
+    data?: UnsubscribedData;
+};
+
+/**
+ * UnsubscribedData
+ */
+export type UnsubscribedData = {
+    /**
+     * Status
+     */
+    status?: 'unsubscribed';
 };
 
 /**
@@ -3179,6 +3327,11 @@ export type UrlResponse = {
     success?: true;
     data: UrlData;
 };
+
+/**
+ * UserAgentClass
+ */
+export type UserAgentClass = 'DESKTOP' | 'MOBILE' | 'TABLET' | 'BOT' | 'OTHER';
 
 /**
  * UserDetailResponse
@@ -7501,6 +7654,214 @@ export type ListCategoriesResponses = {
 };
 
 export type ListCategoriesResponse = ListCategoriesResponses[keyof ListCategoriesResponses];
+
+export type RecordClickData = {
+    /**
+     * Body
+     */
+    body?: ClickRequest | null;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Offer Id
+         */
+        offer_id: string;
+    };
+    query?: never;
+    url: '/v1/catalogue/offers/{offer_id}/click';
+};
+
+export type RecordClickErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Not available
+     */
+    404: ErrorResponse;
+    /**
+     * The offer has ended
+     */
+    410: ExpiredOfferResponse;
+    /**
+     * Invalid request
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded
+     */
+    429: ErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type RecordClickError = RecordClickErrors[keyof RecordClickErrors];
+
+export type RecordClickResponses = {
+    /**
+     * Successful Response
+     */
+    200: ClickResponse;
+};
+
+export type RecordClickResponse = RecordClickResponses[keyof RecordClickResponses];
+
+export type SubscribeToAlertsData = {
+    body: SubscribeBody;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/v1/subscribers';
+};
+
+export type SubscribeToAlertsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded
+     */
+    429: ErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+    /**
+     * Rate limiter unavailable
+     */
+    503: ErrorResponse;
+};
+
+export type SubscribeToAlertsError = SubscribeToAlertsErrors[keyof SubscribeToAlertsErrors];
+
+export type SubscribeToAlertsResponses = {
+    /**
+     * Successful Response
+     */
+    202: SubscribeResponse;
+};
+
+export type SubscribeToAlertsResponse = SubscribeToAlertsResponses[keyof SubscribeToAlertsResponses];
+
+export type ConfirmAlertSubscriptionData = {
+    body: TokenBody;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/v1/subscribers/confirm';
+};
+
+export type ConfirmAlertSubscriptionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorResponse;
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded
+     */
+    429: ErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+    /**
+     * Service Unavailable
+     */
+    503: ErrorResponse;
+};
+
+export type ConfirmAlertSubscriptionError = ConfirmAlertSubscriptionErrors[keyof ConfirmAlertSubscriptionErrors];
+
+export type ConfirmAlertSubscriptionResponses = {
+    /**
+     * Successful Response
+     */
+    200: ConfirmResponse;
+};
+
+export type ConfirmAlertSubscriptionResponse = ConfirmAlertSubscriptionResponses[keyof ConfirmAlertSubscriptionResponses];
+
+export type UnsubscribeFromAlertsData = {
+    body: TokenBody;
+    headers?: {
+        /**
+         * X-Internal-Key
+         */
+        'X-Internal-Key'?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/v1/subscribers/unsubscribe';
+};
+
+export type UnsubscribeFromAlertsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorResponse;
+    /**
+     * Unauthorized
+     */
+    401: ErrorResponse;
+    /**
+     * Invalid request
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded
+     */
+    429: ErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+    /**
+     * Service Unavailable
+     */
+    503: ErrorResponse;
+};
+
+export type UnsubscribeFromAlertsError = UnsubscribeFromAlertsErrors[keyof UnsubscribeFromAlertsErrors];
+
+export type UnsubscribeFromAlertsResponses = {
+    /**
+     * Successful Response
+     */
+    200: UnsubscribeResponse;
+};
+
+export type UnsubscribeFromAlertsResponse = UnsubscribeFromAlertsResponses[keyof UnsubscribeFromAlertsResponses];
 
 export type AdminListSubscriptionsData = {
     body?: never;

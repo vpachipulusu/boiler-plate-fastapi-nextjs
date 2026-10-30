@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 
 const mocks = vi.hoisted(() => ({ search: vi.fn(), source: vi.fn() }));
 vi.mock('next/navigation', () => ({
@@ -53,44 +52,29 @@ beforeEach(() => {
 });
 
 describe('offer call to action for a real offer', () => {
-  it('opens an honest "coming soon" dialog, with no demo wording and no external link', async () => {
-    const user = userEvent.setup();
-    render(<OfferCta offerType="free_sample" demo={false} />);
+  it('links through the first-party redirect, with no demo wording and no external link', () => {
+    render(<OfferCta offerType="free_sample" demo={false} offerId="api-1" />);
 
-    await user.click(screen.getByRole('button', { name: /get this free sample/i }));
-
-    const dialog = await screen.findByRole('dialog', { name: 'Claim link coming soon' });
-    expect(dialog).toHaveTextContent(/nothing to claim here right now/i);
-    expect(document.body.textContent).not.toMatch(/design preview|sample data|demo/i);
-    for (const link of screen.queryAllByRole('link')) {
-      expect(link.getAttribute('href') ?? '').not.toMatch(/^https?:/);
+    const link = screen.getByRole('link', { name: 'Request this sample' });
+    expect(link).toHaveAttribute('href', '/go/api-1');
+    expect(link).toHaveAttribute('rel', 'sponsored nofollow noopener');
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/design preview|sample data|demo|coming soon/i);
+    for (const anchor of screen.getAllByRole('link')) {
+      expect(anchor.getAttribute('href') ?? '').not.toMatch(/^(https?:)?\/\//);
     }
-  });
-
-  it.each([
-    ['free_sample', 'Get this free sample'],
-    ['free_trial', 'Start the free trial'],
-    ['cashback', 'Get this cashback'],
-    ['voucher', 'Get this voucher'],
-    ['competition', 'Enter this competition'],
-  ] as const)('puts "coming soon" on the %s button face and in its name', (type, label) => {
-    render(<OfferCta offerType={type} demo={false} />);
-
-    const button = screen.getByRole('button', { name: `${label}, coming soon` });
-    expect(button).toHaveTextContent(label);
-    expect(button).toHaveTextContent('Coming soon');
   });
 
   it('leaves the demo button exactly as it was, with no coming-soon badge', () => {
     render(<OfferCta offerType="free_sample" demo />);
 
-    const button = screen.getByRole('button', { name: 'Get this free sample' });
+    const button = screen.getByRole('button', { name: 'Request this sample' });
     expect(button).not.toHaveTextContent(/coming soon/i);
     expect(button).not.toHaveAttribute('aria-label');
   });
 
-  it('keeps the affiliate disclosure link', () => {
-    render(<OfferCta offerType="voucher" demo={false} />);
+  it('keeps the affiliate disclosure link beside the real offer button', () => {
+    render(<OfferCta offerType="voucher" demo={false} offerId="api-1" />);
 
     expect(screen.getByRole('link', { name: /affiliate disclosure/i })).toHaveAttribute(
       'href',

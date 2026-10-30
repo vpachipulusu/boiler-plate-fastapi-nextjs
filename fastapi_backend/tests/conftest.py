@@ -16,6 +16,9 @@ os.environ.setdefault(
     "RATE_LIMIT_EMAIL_KEY", "test-only-email-hmac-key-not-for-deployment"
 )
 os.environ.setdefault(
+    "SUBSCRIBER_TOKEN_SECRET", "test-only-subscriber-token-secret-0123456789"
+)
+os.environ.setdefault(
     "DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test"
 )
 

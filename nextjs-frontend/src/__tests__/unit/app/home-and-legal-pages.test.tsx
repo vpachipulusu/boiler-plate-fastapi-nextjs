@@ -82,21 +82,20 @@ describe('homepage', () => {
 
     expect(screen.getByText('Design preview with sample listings')).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/every day|daily dose|checked daily/i);
-    const strip = screen.getByRole('region', { name: /our promises/i });
+    const strip = screen.getByRole('region', { name: /how we list offers/i });
     expect(within(strip).getAllByRole('listitem')).toHaveLength(4);
     expect(strip.textContent).not.toMatch(/\d/);
   });
 
-  it('submits the alerts form with GET to /alerts and a labelled email field', async () => {
+  it('links the sign-up band to /alerts without collecting an email address', async () => {
     const { container } = await renderHome();
 
-    const form = container.querySelector('form') as HTMLFormElement;
-    expect(form).toHaveAttribute('action', '/alerts');
-    expect(form.method).toBe('get');
-    const email = screen.getByLabelText('Your email address');
-    expect(email).toHaveAttribute('name', 'email');
-    expect(email).toHaveAttribute('type', 'email');
-    expect(within(form).getByRole('button', { name: 'Get free alerts' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Get free alerts' })).toHaveAttribute(
+      'href',
+      '/alerts'
+    );
+    expect(container.querySelector('form')).toBeNull();
+    expect(container.querySelector('input[type="email"]')).toBeNull();
     expect(screen.getByRole('link', { name: 'privacy details' })).toHaveAttribute(
       'href',
       '/privacy'
@@ -151,27 +150,45 @@ describe('cookies page', () => {
 });
 
 describe('affiliate disclosure page', () => {
-  it('says plainly that nothing earns commission today', () => {
-    render(<AffiliatePage />);
-
-    expect(screen.getByText(/no commission can be earned/i)).toBeInTheDocument();
-  });
-
-  it('describes the redirect, paid-link marking and Ad label as planned, not live', () => {
+  it('is true whether or not a real offer is live: no "no outbound links" or "planned" wording', () => {
     const { container } = render(<AffiliatePage />);
 
-    expect(screen.getByText(/none of this is live yet/i)).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/no outbound links/i);
+    expect(container.textContent).not.toMatch(/planned/i);
+    expect(container.textContent).not.toMatch(/none of this is live/i);
+    expect(container.textContent).not.toMatch(/no commission can be earned/i);
+    expect(container.textContent).not.toMatch(/nothing on the site earns/i);
+  });
+
+  it('explains the /go/ redirect, the paid-link marking and the Ad label', () => {
+    const { container } = render(<AffiliatePage />);
+
+    expect(container.textContent).toContain('/go/');
     expect(container.textContent).toMatch(/marked as a paid link for search engines/i);
     expect(container.textContent).toMatch(/“Ad”/);
-    expect(container.textContent).toMatch(/pay Freejoy a commission/i);
+    expect(container.textContent).toMatch(/pays Freejoy a commission/i);
+    expect(container.textContent).toMatch(/paid by the brand, not by you/i);
     expect(container.textContent).not.toMatch(/rel=|sponsored nofollow/i);
   });
 
-  it('does not state affiliate links exist or hedge with "may earn"', () => {
+  it('states what a click records and what it does not', () => {
     const { container } = render(<AffiliatePage />);
 
-    expect(container.textContent).not.toMatch(/some links on freejoy are affiliate links/i);
+    expect(container.textContent).toMatch(/name of the website you came from \(not the page\)/i);
+    expect(container.textContent).toMatch(/rough device type/i);
+    expect(container.textContent).toMatch(
+      /does not keep your IP address, set a cookie or store any identifier/i
+    );
+    expect(container.textContent).toMatch(/not a count of people who claimed or bought/i);
+  });
+
+  it('stays a draft for legal review and does not hedge with "may earn"', () => {
+    const { container } = render(<AffiliatePage />);
+
+    expect(screen.getByText(DRAFT_BANNER)).toBeInTheDocument();
+    expect(container.textContent).toMatch(/Not yet reviewed/);
     expect(container.textContent).not.toMatch(/may earn/i);
+    expect(container.textContent).not.toMatch(/some links on freejoy are affiliate links/i);
     expect(container.textContent).not.toMatch(/never changes the terms/i);
   });
 });
@@ -233,15 +250,34 @@ describe('draft status on every legal and editorial page', () => {
 });
 
 describe('privacy notice', () => {
-  it('discloses logs and the email-in-URL behaviour, and marks collection plans as plans', () => {
+  it('describes the alerts data, the double opt-in and the proposed retention, flagged for review', () => {
     const { container } = render(<PrivacyPage />);
 
     expect(container.textContent).toMatch(/IP address/);
-    expect(container.textContent).toMatch(/page address/);
     expect(container.textContent).toMatch(/error-monitoring provider/);
-    expect(container.textContent).toMatch(/If alerts go live/);
+    expect(container.textContent).toMatch(/double opt-in/);
+    expect(container.textContent).toMatch(/exact wording you saw/);
+    expect(container.textContent).toMatch(/deleted after 30 days/);
+    expect(container.textContent).toMatch(/12 months/);
+    expect(container.textContent).toMatch(/for legal review/);
     expect(container.textContent).toMatch(/not .* running today/i);
+    expect(container.textContent).not.toMatch(/carried to the alerts page/);
+    expect(screen.getByRole('heading', { name: 'Email alerts' })).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/does not save any information|saves nothing/i);
+  });
+
+  it('describes the outbound click record as live behaviour, with its retention period', () => {
+    const { container } = render(<PrivacyPage />);
+
+    expect(screen.getByRole('heading', { name: 'If you use an offer button' })).toBeInTheDocument();
+    expect(container.textContent).toMatch(
+      /no IP address, no cookie identifier and no account identifier/i
+    );
+    expect(container.textContent).toMatch(/redirect sets no cookie/i);
+    expect(container.textContent).toMatch(/deleted after 13 months \(395 days\)/i);
+    expect(container.textContent).not.toMatch(
+      /outbound-click counts are planned|we plan to count/i
+    );
   });
 
   it('describes account data held when someone creates an account', () => {

@@ -114,8 +114,8 @@ test.describe('Global Navigation', () => {
       'disabled',
       ''
     );
-    await expect(page.getByLabel('Email', { exact: true })).toBeDisabled();
-    await expect(page.getByLabel('Message', { exact: true })).toBeDisabled();
+    await expect(page.getByLabel(/^Email [(]/)).toBeDisabled();
+    await expect(page.getByLabel(/^Message [(]/)).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Send Message' })).toBeDisabled();
     await expect(page.getByText(/@example\.com|555|123 Business St/i)).toHaveCount(0);
     await expect(page.locator('a[href^="mailto:"]')).toHaveCount(0);

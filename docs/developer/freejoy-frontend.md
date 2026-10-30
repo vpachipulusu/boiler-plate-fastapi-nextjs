@@ -20,7 +20,7 @@ All public pages live in the `(public)` route group under `src/app/(public)/` an
 | `/freebies` | 02 / 06 | Search, category/type/postage filters, sort, pagination, empty and error states |
 | `/category/[slug]` | 02 | Category intro plus the same catalogue controls scoped to one category |
 | `/freebies/[slug]` | 03 / 07 | Hero, claim steps, "important bits", trust panel, related offers; the "offer has ended" page for an ended offer; 404 page for an unknown one |
-| `/alerts` | 04 | Preferences form; validates in the browser, never sends |
+| `/alerts` | 04 | Preferences form; starts a double opt-in through a server action ([backend-subscribers.md](backend-subscribers.md)); a plain "not open yet" notice until `ALERTS_FORM_LIVE=true` |
 | `/about`, `/contact`, `/privacy`, `/cookies`, `/terms`, `/affiliate-disclosure` | – | Editorial and legal scaffolding, each with a visible "draft, pending legal review" banner |
 | `not-found.tsx` | – | Freejoy-styled 404 |
 
@@ -141,11 +141,26 @@ the admin publish, unpublish and expire actions (FREEJ-22); nothing calls it yet
   badge or wording** (`offer.demo` is false; pages ask `getCatalogueSource()`).
 - "Last checked" and freshness labels come only from the offer's `lastVerifiedAt` and `freshness`. There
   are no visitor counts, testimonials, scarcity cues or verification claims.
-- No offer has a destination yet (the `/go/[id]` redirect is Phase 3). The offer CTA therefore opens a
-  dialog: "Demo offer" for fixtures, "Claim link coming soon" for real offers. No element on any page has
-  an external `href`.
-- The alerts form validates with Zod, requires consent, and ends in a plainly worded
-  "nothing was saved" state. There is no network call and nothing is logged.
+- A demo offer never says "Last checked": the trust panel calls its date a "Sample date" and says Freejoy has
+  not checked the offer.
+- `displayFreshness()` (`src/lib/catalogue/freshness.ts`) decides which freshness label a card may show. "Popular",
+  "Ends soon" and "Limited" are editor-set claims with no evidence behind them, so only a demo fixture shows
+  them; a real (API) offer shows "New today" and "Just added" only. To show one on a real offer, add a
+  documented rule there first (checklist C1, C2) and a test.
+- Buttons and chips do not call a sample or a trial "free" ("Request this sample", "Start the trial", chips
+  "SAMPLE" and "TRIAL"). `ctaConditions()` in `offer-format.ts` renders the postage (samples) or the card
+  requirement (trials) in a line right after the button, from the offer's own fields.
+- Site-wide copy (announcement bar, tagline, hero, trust strip) makes no zero-cost, "daily" or quality claim.
+  `public-copy.test.tsx` pins this. A `free_sample` card shows its postage on its own line under the title. Why each line reads as it does: `docs/compliance/uk-affiliate-checklist.md`
+  section I.3.
+- A demo (fixture) offer has no destination, so its CTA opens a "Demo offer" dialog. A real offer's CTA links
+  to the first-party `/go/<offerId>` redirect (FREEJ-23), preceded by the "Ad" label and followed by the
+  commission sentence. No element on any page has an external `href`.
+- The alerts form validates with Zod, requires consent, and submits through a server action
+  (FREEJ-24). It answers "check your inbox" the same way for every address, and nothing starts until
+  the visitor opens the emailed link and presses the button on `/alerts/confirm`. Until
+  `ALERTS_FORM_LIVE=true` it shows a plain "Alerts aren't open yet" notice instead. No address or token
+  is ever logged.
 - Legal pages carry a draft banner and a reviewer checklist instead of compliance claims.
 - Public pages set no cookies and use no browser storage (tests: `public-pages-privacy.test.tsx`;
   `catalogue-live.spec.ts` checks `context.cookies()`).
@@ -194,15 +209,15 @@ it. The filter drawer and sort control render outside the keyed Suspense boundar
 
 ## Known deviations
 
-- The newsletter band on the homepage is a GET form to `/alerts?email=`, so the address lands in
-  the URL. Phase 3 replaces this with a POST server action.
+- (Fixed in FREEJ-24.) The newsletter band used to be a GET form to `/alerts?email=`; it is now a
+  plain link to `/alerts` and `/alerts` ignores any `email` parameter, so an address never travels in a
+  page address.
 - The mobile filter drawer needs JavaScript; search, sort (Apply button), category chips and
   pagination work without it.
 - An outage answers HTTP 200 (error state, normal robots) for as long as it lasts; a 5xx is a follow-up.
 - The offer page has no route-level loading skeleton: a `loading.tsx` there would turn every unknown offer into
   a 200 soft 404. The root skeleton lives in `components/site/route-skeleton.tsx` and is re-exported by the
   admin, auth, dashboard and pricing segments.
-- Offers have no claim link yet (Phase 3), so the CTA button opens the "coming soon" dialog.
 
 ## Next phases
 

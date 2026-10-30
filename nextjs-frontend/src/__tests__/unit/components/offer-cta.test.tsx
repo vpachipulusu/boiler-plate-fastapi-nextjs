@@ -10,7 +10,7 @@ describe('OfferCta', () => {
     const user = userEvent.setup();
     render(<OfferCta offerType="free_sample" demo />);
 
-    await user.click(screen.getByRole('button', { name: /get this free sample/i }));
+    await user.click(screen.getByRole('button', { name: /request this sample/i }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Demo offer' });
     expect(dialog).toHaveTextContent(/design preview with sample data/i);
@@ -20,7 +20,7 @@ describe('OfferCta', () => {
   it('closes on Escape and returns focus to the call to action', async () => {
     const user = userEvent.setup();
     render(<OfferCta offerType="free_trial" demo />);
-    const trigger = screen.getByRole('button', { name: /start the free trial/i });
+    const trigger = screen.getByRole('button', { name: /start the trial/i });
 
     await user.click(trigger);
     await screen.findByRole('dialog', { name: 'Demo offer' });

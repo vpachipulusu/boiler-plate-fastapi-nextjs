@@ -13,7 +13,7 @@ export function HomeHero({ demo }: { demo: boolean }) {
         <div>
           <p className="inline-flex items-center gap-2 rounded-pill bg-card px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-accent-ink">
             <span aria-hidden="true" className="h-3 w-0.5 rounded-full bg-accent-ink" />
-            The good stuff, no spend
+            Samples, trials and offers
           </p>
           <h1
             id="home-hero-heading"
@@ -24,8 +24,8 @@ export function HomeHero({ demo }: { demo: boolean }) {
             Big free energy.
           </h1>
           <p className="mt-5 max-w-md text-base text-muted-foreground sm:text-lg">
-            Discover genuinely good freebies, samples and offers from brands you&apos;ll actually
-            love. All in one happy place.
+            Discover freebies, samples and offers from brands you might like. All in one happy
+            place.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link

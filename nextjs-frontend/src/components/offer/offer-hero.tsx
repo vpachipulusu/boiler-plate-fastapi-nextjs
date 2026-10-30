@@ -3,6 +3,7 @@ import { OfferArt } from '@/components/catalogue/offer-art';
 import { OfferTypeBadge } from '@/components/catalogue/offer-type-badge';
 import type { Category, Merchant, Offer } from '@/lib/catalogue/types';
 import { OfferCta } from './offer-cta';
+import { ctaConditions } from './offer-format';
 import { OfferEndedPanel } from './offer-ended-panel';
 import { OfferTrustPanel } from './offer-trust-panel';
 
@@ -37,7 +38,12 @@ export function OfferHero({ offer, merchant, category, ended }: OfferHeroProps) 
         {ended ? (
           <OfferEndedPanel categorySlug={category.slug} />
         ) : (
-          <OfferCta offerType={offer.offerType} demo={offer.demo} />
+          <OfferCta
+            offerType={offer.offerType}
+            demo={offer.demo}
+            offerId={offer.demo ? null : offer.id}
+            conditions={ctaConditions(offer)}
+          />
         )}
       </div>
     </section>

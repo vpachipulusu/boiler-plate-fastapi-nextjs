@@ -47,7 +47,7 @@ SQLAlchemy models for the platform database are in `fastapi_backend/app/models/p
 | `merchants` | Unique `slug`; `website` and `logo_url` are null until a licensed logo exists; `active` (default true). |
 | `offers` | Unique `slug`; `offer_type`, `status` (default `DRAFT`), `freshness` (editorial, nullable), `postage_kind`. Carries every field an offer page shows: image tint, label and alt, `steps`, `availability`, `eligibility`, `subscription_terms`, `requires_card`, `last_verified_at`. CHECKs: `postage_amount_minor` and `postage_currency` (an upper-case 3-letter code, `GBP`) are set exactly when `postage_kind` is `COST`; a `PUBLISHED` offer must have `last_verified_at` (the page always shows "Last checked"). `start_at` stays nullable: the Phase 2 mapper falls back to `created_at` for the frontend's `startAt`. `publisher_notes` is internal: the API never serialises it and it holds no personal contact data. Indexes `(status, end_at)`, `(category_id, status)` and `merchant_id`. |
 | `affiliate_links` | Per-offer destination and `tracking_id` for a `provider`; `destination_url` is read server-side only. Index `(offer_id, active)`. |
-| `click_events` | One row per outbound click. See the privacy rule below. Indexes `(offer_id, occurred_at)` and `affiliate_link_id` (the `SET NULL` delete runs on every link delete). |
+| `click_events` | One row per outbound click. See the privacy rule below. Indexes `(offer_id, occurred_at)`, `occurred_at` (migration `0003`, serves the retention job) and `affiliate_link_id` (the `SET NULL` delete runs on every link delete). |
 | `email_subscribers` | Double opt-in alert subscribers; see the email decision below. |
 
 ### Click events are anonymous
@@ -58,6 +58,12 @@ id or the raw user agent, so a click can be counted but never tied to a person. 
 `user_agent_class`); adding a column means changing that test and this section together, after asking whether it could
 identify a visitor.
 
+- `referrer_host` is **client-supplied and untrusted**: it is the host of the `Referer` header the visitor's browser
+  sent, which anyone can forge or omit. The route and the backend reduce it to a plain DNS host name (no path, port,
+  credentials or IP address), but a stored value says only what the browser claimed. Use it for rough traffic-source
+  counts, never for attribution, access decisions or anything that needs to be true.
+- Rows are deleted after 13 months (395 days) by `commands/prune_click_events.py`
+  (see [freejoy-affiliate.md](freejoy-affiliate.md)).
 - `occurred_at` is truncated to the minute by its server default (`date_trunc('minute', now())`), so a click cannot be
   joined to a microsecond-precise access-log line that carries an IP address.
 - `referrer_host` is reduced to the registrable domain and capped at 253 characters by the redirect service (a later
@@ -76,13 +82,15 @@ where.
 
 - **Token lifecycle.** Tokens are at least 128 bits of randomness, stored as a SHA-256 hash. `confirmation_sent_at`
   anchors the expiry: the service rejects tokens older than 24 hours and nulls `confirmation_token_hash` once the
-  subscriber is `CONFIRMED`.
+  subscriber is `CONFIRMED`. (Implemented in `app/services/subscribers.py`: the token also carries its own signed
+  expiry, and the service checks both.)
 - **Lower-casing.** Python `str.lower()` and Postgres `lower()` differ on some non-ASCII input (for example the dotted
   capital I), which would trip the CHECK. The Phase 2 service writes `func.lower(email)` or rejects non-ASCII local parts.
 - **Retention.** On `UNSUBSCRIBED` the service sets `categories` to `[]` and nulls `provider_subscriber_id` and
   `confirmation_token_hash`, keeping only the suppression row (`email`, `status`, `consent_at`, `unsubscribed_at`). A
-  scheduled purge of `UNSUBSCRIBED` rows older than 12 months is a later story (recorded on FREEJ-24).
-- **No enumeration.** The subscribe endpoint (a later story) returns the same response whether the row was created or
+  manual purge command (`commands.purge_subscribers`) removes `UNSUBSCRIBED` rows older than 12 months and `PENDING`
+  rows older than 30 days ([backend-subscribers.md](backend-subscribers.md)).
+- **No enumeration.** The subscribe endpoint (`POST /v1/subscribers`) returns the same response whether the row was created or
   already existed, and is rate limited.
 
 ### Sample data

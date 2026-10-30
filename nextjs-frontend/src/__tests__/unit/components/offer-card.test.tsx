@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { OfferCard, OfferGrid } from '@/components/catalogue/offer-card';
 import { MERCHANTS, OFFERS } from '@/lib/catalogue/fixtures';
+import type { Offer } from '@/lib/catalogue/types';
 
 const offer = OFFERS[0];
 const merchant = MERCHANTS.find((item) => item.slug === offer.merchantSlug)!;
@@ -26,10 +27,105 @@ describe('OfferCard', () => {
   });
 });
 
+describe('OfferCard postage for samples', () => {
+  const sample = OFFERS.find((item) => item.offerType === 'free_sample');
+  if (!sample) throw new Error('The fixtures must contain a free_sample offer');
+  const sampleMerchant = MERCHANTS.find((item) => item.slug === sample.merchantSlug)!;
+  const withPostage = (postage: Offer['postage'], over: Partial<Offer> = {}) => ({
+    ...sample,
+    postage,
+    ...over,
+  });
+
+  it.each([
+    [{ kind: 'free' }, 'Postage: Free'],
+    [{ kind: 'cost', amountMinor: 299, currency: 'GBP' }, 'Postage: £2.99'],
+    [{ kind: 'check_terms' }, 'Postage: Check terms'],
+  ] as const)('shows the postage for a free sample (%j)', (postage, text) => {
+    render(<OfferCard offer={withPostage(postage)} merchant={sampleMerchant} />);
+
+    expect(screen.getByText(text)).toBeInTheDocument();
+  });
+
+  it('shows it for a real (API) sample too', () => {
+    render(
+      <OfferCard
+        offer={withPostage(
+          { kind: 'cost', amountMinor: 150, currency: 'GBP' },
+          { source: 'api', demo: false }
+        )}
+        merchant={sampleMerchant}
+      />
+    );
+
+    expect(screen.getByText('Postage: £1.50')).toBeInTheDocument();
+  });
+
+  it.each(['free_trial', 'cashback', 'voucher', 'competition'] as const)(
+    'shows no postage line for %s',
+    (offerType) => {
+      render(
+        <OfferCard offer={withPostage({ kind: 'free' }, { offerType })} merchant={sampleMerchant} />
+      );
+
+      expect(screen.queryByText(/^Postage:/)).toBeNull();
+    }
+  );
+
+  it('keeps the type badge wording and puts the postage in its own line, outside the footer row', () => {
+    const { container } = render(
+      <OfferCard offer={withPostage({ kind: 'free' })} merchant={sampleMerchant} />
+    );
+
+    expect(screen.getByText('Free sample')).toBeInTheDocument();
+    const line = screen.getByText('Postage: Free');
+    expect(line.tagName).toBe('P');
+    expect(container.querySelector('.border-t')?.contains(line)).toBe(false);
+  });
+});
+
 describe('OfferGrid', () => {
   it('renders one list item per offer', () => {
     render(<OfferGrid offers={OFFERS.slice(0, 4)} merchants={MERCHANTS} />);
 
     expect(screen.getAllByRole('listitem')).toHaveLength(4);
+  });
+});
+
+describe('OfferCard urgency and popularity labels', () => {
+  const withLabel = (freshness: 'popular' | 'ends_soon' | 'limited', over = {}) => ({
+    ...offer,
+    freshness,
+    ...over,
+  });
+
+  it.each([
+    ['popular', 'Popular'],
+    ['ends_soon', 'Ends soon'],
+    ['limited', 'Limited'],
+  ] as const)('does not show "%s" on a real API offer', (freshness, text) => {
+    render(
+      <OfferCard offer={withLabel(freshness, { source: 'api', demo: false })} merchant={merchant} />
+    );
+
+    expect(screen.queryByText(text)).toBeNull();
+  });
+
+  it('still shows the label on a demo fixture offer, next to the demo badge', () => {
+    render(<OfferCard offer={withLabel('ends_soon')} merchant={merchant} />);
+
+    expect(screen.getByText('Ends soon')).toBeInTheDocument();
+    expect(screen.getByText('Demo')).toBeInTheDocument();
+  });
+
+  it('keeps a recency label on a real API offer', () => {
+    render(
+      <OfferCard
+        offer={{ ...offer, freshness: 'just_added', source: 'api', demo: false }}
+        merchant={merchant}
+      />
+    );
+
+    expect(screen.getByText('Just added')).toBeInTheDocument();
   });
 });

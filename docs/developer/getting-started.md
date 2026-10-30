@@ -55,6 +55,8 @@ uv run fastapi dev app/main.py --host 127.0.0.1 --port 8000 --reload
 | `FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL`, `FIREBASE_ADMIN_PRIVATE_KEY` | Yes, to sign in | ID token and session cookie verification. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RATE_LIMIT_EMAIL_KEY` | Outside local/test | Rate limiting (ADR-007). Unset locally: the limiter is disabled. |
 | `TOTP_ENCRYPTION_KEY` | To enable 2FA | Fernet key for TOTP secrets at rest. |
+| `SUBSCRIBER_TOKEN_SECRET` | Outside local/test | 32+ character HMAC secret for the alerts confirm and unsubscribe tokens. |
+| `EMAIL_PROVIDER`, `EMAIL_PROVIDER_API_KEY`, `EMAIL_PROVIDER_LIST_ID`, `EMAIL_FROM`, `EMAIL_FROM_NAME`, `PUBLIC_SITE_URL` | To send alerts email | Backend only ([ADR-012](../adr/0012-email-provider.md), [backend-subscribers.md](backend-subscribers.md)). `EMAIL_PROVIDER` unset: nothing is ever sent, and production refuses sign-ups. `fake` records messages for tests (local/test only). |
 | `SENTRY_DSN` | No | Unset disables Sentry. |
 | `APP_NAME`, `LOG_LEVEL` | No | Brand and log level. |
 | `STRIPE_*`, `BILLING_RETURN_URL_ORIGINS` | Billing module | See [modules.md](modules.md). |

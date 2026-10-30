@@ -23,6 +23,8 @@ vi.mock('@/lib/catalogue', async (importOriginal) => {
 });
 
 import { CatalogueUnavailableError } from '@/lib/catalogue/errors';
+import { OFFERS } from '@/lib/catalogue/fixtures';
+import { formatIsoDate } from '@/components/offer/offer-format';
 import OfferPage, * as offerRoute from '@/app/(public)/freebies/[slug]/page';
 import AlertsPage from '@/app/(public)/alerts/page';
 
@@ -55,7 +57,10 @@ describe('offer detail page', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Glow-boosting face cream sample' })
     ).toBeInTheDocument();
-    expect(screen.getByText('Last checked 27 October 2026')).toBeInTheDocument();
+    const sampleOffer = OFFERS.find((offer) => offer.slug === SAMPLE)!;
+    expect(
+      screen.getByText(`Sample date ${formatIsoDate(sampleOffer.lastVerifiedAt)}`)
+    ).toBeInTheDocument();
     expect(screen.getByText('POSTAGE: FREE')).toBeInTheDocument();
     expect(screen.getByText('UK OFFER')).toBeInTheDocument();
     expect(screen.queryByText('CARD REQUIRED')).toBeNull();
@@ -63,7 +68,7 @@ describe('offer detail page', () => {
     expect(within(steps).getAllByRole('listitem')).toHaveLength(3);
     const related = screen.getByRole('region', { name: 'You might also love' });
     expect(within(related).getAllByRole('article').length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: /get this free sample/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /request this sample/i })).toBeInTheDocument();
   });
 
   it('links the breadcrumb trail to home and the category', async () => {
@@ -104,10 +109,10 @@ describe('offer detail page', () => {
     await renderOffer(TRIAL);
 
     expect(screen.getByText('CARD REQUIRED')).toBeInTheDocument();
-    expect(screen.getByText('FREE TRIAL')).toBeInTheDocument();
+    expect(screen.getByText('TRIAL')).toBeInTheDocument();
     expect(screen.getByText('Cancellation')).toBeInTheDocument();
     expect(screen.getByText('Trial terms:')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /start the free trial/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /start the trial/i })).toBeInTheDocument();
   });
 
   it.each([SAMPLE, TRIAL, EXPIRED])('has no external href on %s', async (slug) => {
@@ -132,25 +137,20 @@ describe('offer detail page', () => {
 });
 
 describe('alerts page', () => {
-  async function renderAlerts(email?: string | string[]) {
-    render(await AlertsPage({ searchParams: Promise.resolve({ email }) }));
+  async function renderAlerts() {
+    render(await AlertsPage());
   }
 
-  it('shows the promise heading, the form and one checkbox per category', async () => {
+  it('shows the promise heading and, until alerts are open, a plain notice and no form', async () => {
     await renderAlerts();
 
     expect(
       screen.getByRole('heading', { level: 1, name: 'Good things. Straight to you.' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Create your free alerts' })).toBeInTheDocument();
-    const group = screen.getByRole('group', { name: /interested in/i });
-    expect(within(group).getAllByRole('checkbox')).toHaveLength(6);
-  });
-
-  it('prefills a valid email from the query string', async () => {
-    await renderAlerts('sam@example.com');
-
-    expect(screen.getByLabelText(/email address/i)).toHaveValue('sam@example.com');
+    expect(screen.getByText(/alerts aren.t open yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /interested in/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /send me free alerts/i })).toBeNull();
+    expect(screen.queryByText(/something went wrong/i)).toBeNull();
   });
 
   it('shows a retryable alert instead of the form when the categories cannot be read', async () => {
@@ -165,13 +165,4 @@ describe('alerts page', () => {
       screen.getByRole('heading', { level: 1, name: 'Good things. Straight to you.' })
     ).toBeInTheDocument();
   });
-
-  it.each(['not an email', ['a@b.co', 'c@d.co'], undefined])(
-    'ignores an unusable email parameter: %j',
-    async (value) => {
-      await renderAlerts(value as string | string[] | undefined);
-
-      expect(screen.getByLabelText(/email address/i)).toHaveValue('');
-    }
-  );
 });

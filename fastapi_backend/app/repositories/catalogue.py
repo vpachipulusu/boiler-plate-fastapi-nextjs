@@ -220,9 +220,16 @@ class CatalogueRepository(BaseRepository):
 
         The caller decides what the status means; this never filters on it.
         """
+        return await self._find_visible(Offer.slug == slug)
+
+    async def find_visible_offer_by_id(self, offer_id: str) -> OfferRecord | None:
+        """``find_visible_offer`` keyed by the offer id (the outbound redirect knows no slug)."""
+        return await self._find_visible(Offer.id == offer_id)
+
+    async def _find_visible(self, match: ColumnElement[bool]) -> OfferRecord | None:
         statement = (
             _joined(select(*_OFFER_COLUMNS))
-            .where(Offer.slug == slug, *_visible_conditions())
+            .where(match, *_visible_conditions())
             .limit(1)
         )
         row = (await self._session.execute(statement)).mappings().first()

@@ -54,7 +54,7 @@ for (const viewport of VIEWPORTS) {
     });
 
     test('shows the heading, the search and a grid of offers', async ({ page }) => {
-      await expect(page.getByRole('heading', { level: 1 })).toContainText('little free thing.');
+      await expect(page.getByRole('heading', { level: 1 })).toContainText('little treat.');
       await expect(page.locator('#catalogue-search')).toBeVisible();
       await expect(page.getByRole('heading', { level: 2, name: 'All freebies' })).toBeVisible();
       await expect(page.getByText(/\d+ freebies in this collection/)).toBeVisible();

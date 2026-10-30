@@ -170,6 +170,12 @@ class AdminOfferRepository(BaseRepository):
             .with_for_update(read=True)
         )
 
+    async def merchant_website(self, merchant_id: str) -> str | None:
+        """The merchant's stored website, used to judge ``direct`` links."""
+        return await self._session.scalar(
+            select(Merchant.website).where(Merchant.id == merchant_id)
+        )
+
     async def list_links(self, offer_id: str) -> list[AffiliateLinkRecord]:
         rows = await self._session.scalars(
             select(AffiliateLink)

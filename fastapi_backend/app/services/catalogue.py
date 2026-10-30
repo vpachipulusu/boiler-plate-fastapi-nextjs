@@ -16,6 +16,8 @@ class CatalogueReader(Protocol):
 
     async def find_visible_offer(self, slug: str) -> OfferRecord | None: ...
 
+    async def find_visible_offer_by_id(self, offer_id: str) -> OfferRecord | None: ...
+
     async def list_enabled_categories(
         self, now: datetime
     ) -> Sequence[CategoryRecord]: ...
@@ -85,7 +87,22 @@ class CatalogueService:
         None, so a visitor cannot probe for unpublished content.
         """
         now = self._clock()
-        offer = await self._repository.find_visible_offer(slug)
+        return self._as_public(await self._repository.find_visible_offer(slug), now)
+
+    async def get_offer_by_id(self, offer_id: str) -> OfferRecord | ExpiredOffer | None:
+        """``get_offer`` for a caller that holds the offer id (the outbound redirect).
+
+        Same rule, same answers: unknown, draft, archived and never-live offers are None.
+        """
+        now = self._clock()
+        return self._as_public(
+            await self._repository.find_visible_offer_by_id(offer_id), now
+        )
+
+    @staticmethod
+    def _as_public(
+        offer: OfferRecord | None, now: datetime
+    ) -> OfferRecord | ExpiredOffer | None:
         if offer is None:
             return None
         if is_live(offer.status, offer.end_at, now):

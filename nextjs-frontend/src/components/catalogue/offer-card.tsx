@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { ArrowRight, Clock } from 'lucide-react';
+import { postageText } from '@/components/offer/offer-format';
 import { cn } from '@/lib/utils';
-import { FRESHNESS_LABELS, type Merchant, type Offer } from '@/lib/catalogue/types';
+import { displayFreshness } from '@/lib/catalogue/freshness';
+import type { Merchant, Offer } from '@/lib/catalogue/types';
 import { DemoBadge } from './demo-badge';
 import { OfferArt } from './offer-art';
 import { OfferTypeBadge } from './offer-type-badge';
@@ -18,12 +20,12 @@ export function offerHref(offer: Offer): string {
 
 /**
  * Image-led card (design screens 01, 02, 05, 06): type badge over the art, merchant eyebrow,
- * title, freshness label from the fixture and a "View freebie" link. The whole card is one link
+ * title, a freshness label (see `displayFreshness`) and a "View freebie" link. The whole card is one link
  * target; the demo badge is visible on fixture offers.
  */
 export function OfferCard({ offer, merchant, className }: OfferCardProps) {
   const href = offerHref(offer);
-  const freshness = offer.freshness ? FRESHNESS_LABELS[offer.freshness] : null;
+  const freshness = displayFreshness(offer);
   return (
     <article
       className={cn(
@@ -45,6 +47,10 @@ export function OfferCard({ offer, merchant, className }: OfferCardProps) {
           {offer.title}
         </Link>
       </h3>
+      {/* Strict CAP 3.23 reading (checklist D-07): a "Free sample" badge never appears without its postage. */}
+      {offer.offerType === 'free_sample' && (
+        <p className="mt-1 text-xs text-muted-foreground">Postage: {postageText(offer.postage)}</p>
+      )}
       <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-3 text-xs">
         {/* The mobile design (screens 05/06) keeps only the link on narrow cards. */}
         {freshness ? (

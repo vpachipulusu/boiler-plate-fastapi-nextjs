@@ -72,6 +72,16 @@ PUBLIC_SETTINGS_POLICY = RateLimitPolicy(
 PUBLIC_CATALOGUE_POLICY = RateLimitPolicy(
     "public_catalogue", limit=120, window_seconds=60, fail_closed=False
 )
+# Outbound redirect clicks (/go/[id]): keyed by client IP. A click writes a row, so the limit is
+# tighter than the read-only catalogue. Fails open: an outage must not stop a visitor reaching the offer.
+OUTBOUND_CLICK_POLICY = RateLimitPolicy(
+    "outbound_click", limit=60, window_seconds=60, fail_closed=False
+)
+# The same click endpoint, keyed by offer id: a flood of distinct clients cannot inflate one offer's click count
+# faster than this (a viral offer stays well under it). One place to tune it.
+OUTBOUND_OFFER_POLICY = RateLimitPolicy(
+    "outbound_offer", limit=600, window_seconds=60, fail_closed=False
+)
 # Bulk Stripe subscription reconciliation: up to 20 Stripe calls per run, so a
 # few runs a minute per admin are plenty. Fail closed: an outage must not lift the limit.
 ADMIN_SYNC_POLICY = RateLimitPolicy(
@@ -288,6 +298,21 @@ class UpstashRateLimiter:
                 if not can_retry:
                     raise RateLimiterUnavailable("rate limit check failed") from exc
 
+
+# Alerts sign-up (POST /v1/subscribers): each call can send an email to an address the caller chose, so it
+# is capped per client IP (a shared network may hold several visitors) and, tighter, per address.
+# Fail closed: an outage must not open a mail relay.
+SUBSCRIBE_IP_POLICY = RateLimitPolicy(
+    "subscribe", limit=20, window_seconds=60 * 60, fail_closed=True
+)
+SUBSCRIBE_EMAIL_POLICY = RateLimitPolicy(
+    "subscribe_email", limit=5, window_seconds=60 * 60, fail_closed=True
+)
+# Confirm and unsubscribe by signed token (unguessable). Unsubscribes arrive from mailbox providers'
+# servers, so the per-IP limit is generous. Fail open: a Redis outage must not stop an unsubscribe.
+SUBSCRIBER_TOKEN_POLICY = RateLimitPolicy(
+    "subscriber_token", limit=120, window_seconds=60, fail_closed=False
+)
 
 # Personal data export: assembles every row the user owns, so it is capped hard
 # per user. Fail closed: an outage must not lift the limit on an expensive read.

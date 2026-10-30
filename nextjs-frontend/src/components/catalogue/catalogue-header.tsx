@@ -40,7 +40,7 @@ export function CatalogueHeader({ query, demo }: CatalogueHeaderProps) {
           <h1 className="mt-4 font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-foreground sm:text-5xl lg:text-[56px]">
             Find your next
             <br />
-            little free thing.
+            little treat.
           </h1>
           <p className="mt-4 max-w-xl text-sm text-muted-foreground sm:text-base">
             Discover samples, trials and lovely surprises.
