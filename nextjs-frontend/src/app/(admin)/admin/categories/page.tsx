@@ -102,7 +102,7 @@ function CategoriesTable({
                 </Link>
                 <div className="text-muted-foreground">{category.description}</div>
               </TableCell>
-              <TableCell label="Slug" className="break-all text-muted-foreground">
+              <TableCell label="Slug" className="break-words text-muted-foreground">
                 {category.slug}
               </TableCell>
               <TableCell label="Order" numeric>
