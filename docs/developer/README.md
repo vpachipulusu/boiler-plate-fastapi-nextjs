@@ -50,4 +50,6 @@ Start here, then follow the links. Root-level overview: [`../../README.md`](../.
 | [backend-admin-subscriptions.md](backend-admin-subscriptions.md) | Admin subscription list and grants |
 | [backend-admin-analytics.md](backend-admin-analytics.md) | Admin analytics and Stripe sync |
 
+End-user guide (what each screen does, with screenshots): [`../user-guide/README.md`](../user-guide/README.md).
+
 Decisions: [`../adr/README.md`](../adr/README.md).
