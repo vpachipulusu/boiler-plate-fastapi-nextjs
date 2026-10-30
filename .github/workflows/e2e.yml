@@ -18,7 +18,7 @@
 # fake email provider, and a production build with placeholder Firebase values (scripts/e2e-public-mode.cjs). Both jobs
 # sit behind the same E2E_ENABLED switch, so neither runs until the owner turns E2E on (the Firebase test project does not
 # exist yet). `money-paths` has not been executed on GitHub; the same steps were run by hand locally (see
-# docs/developer/local-e2e.md). The `paths` filter below does not include fastapi_backend/**: add it when this job is enabled.
+# docs/developer/local-e2e.md). The `paths` filter includes fastapi_backend/** because this job builds, migrates and seeds the backend.
 #
 # Stripe-dependent specs run only when the repository variable E2E_STRIPE is "true" (and E2E_ENABLED is
 # "true"; this job never runs otherwise). Stripe cannot reach a CI runner, so the job runs the Stripe CLI, which
@@ -32,6 +32,7 @@ on:
   pull_request:
     paths: &paths
       - 'nextjs-frontend/**'
+      - 'fastapi_backend/**'
       - '.github/**'
       - '.pre-commit-config.yaml'
       - 'package.json'
@@ -267,8 +268,10 @@ jobs:
       EMAIL_PROVIDER: fake
       EMAIL_FAKE_OUTBOX: /tmp/freejoy-outbox.jsonl
       E2E_EMAIL_OUTBOX: /tmp/freejoy-outbox.jsonl
-      # The database seam: click rows and subscriber status are read through psql (helpers/db-seam.ts).
-      E2E_PSQL: psql postgresql://postgres:postgres@127.0.0.1:5432/freejoy_money_test
+      # The database seam: click rows and subscriber status are read through psql (helpers/db-seam.ts). The password
+      # goes through PGPASSWORD, not the command line; the seam refuses a database not ending in _test.
+      E2E_PSQL: psql -h 127.0.0.1 -U postgres -d freejoy_money_test
+      PGPASSWORD: postgres
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

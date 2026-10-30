@@ -35,6 +35,8 @@ const PROVIDER_ORIGIN = 'https://example.com';
 const CATEGORY_SLUG = 'beauty';
 const ENDED_SLUG = process.env.E2E_ENDED_OFFER_SLUG ?? 'laundry-sheets-sample';
 const OUTBOUND_REL = 'sponsored nofollow noopener';
+// The click is committed before the redirect answers, so a row would already be there; this only bounds the wait.
+const NO_CLICK_POLL_MS = 2_000;
 const PHONE_WIDTHS = [390, 320] as const;
 
 test.use({ launchOptions: { args: BLOCK_EXTERNAL_HOSTS } });
@@ -163,7 +165,12 @@ test.describe('Money path: browse, offer, tracked outbound click', () => {
     await expect(page.locator('a[href^="/go/"]')).toHaveCount(0);
 
     if (DB_SEAM && endedId) {
-      expect(clickCount(endedId), 'an ended offer never records a click').toBe(clicksBefore);
+      await expect
+        .poll(() => clickCount(endedId), {
+          message: 'an ended offer never records a click',
+          timeout: NO_CLICK_POLL_MS,
+        })
+        .toBe(clicksBefore);
     }
   });
 
@@ -183,7 +190,11 @@ test.describe('Money path: browse, offer, tracked outbound click', () => {
       await cta.scrollIntoViewIfNeeded();
       const box = await cta.boundingBox();
       expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
-      expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= width).toBe(true);
+      expect(box?.x ?? -1, 'the CTA starts inside the viewport').toBeGreaterThanOrEqual(0);
+      expect(
+        (box?.x ?? width) + (box?.width ?? width),
+        'the CTA ends inside the viewport'
+      ).toBeLessThanOrEqual(width);
     });
   }
 });

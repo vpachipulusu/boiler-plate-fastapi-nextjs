@@ -106,6 +106,8 @@ no `setup` dependency (`playwright.local.config.ts`). When every spec on the com
 `E2E_PUBLIC=1`), `test:e2e:local` switches to a **public run** (`scripts/e2e-public-mode.cjs`): no `.env.e2e.local`
 needed, placeholder Firebase values for the build (nothing signs in), the live catalogue (`CATALOGUE_SOURCE=api`), the
 alerts form open (`ALERTS_FORM_LIVE=true`), and only those two projects. Write other Playwright options as `--name=value`.
+The backend must be local (`BACKEND_API_URL` host `localhost`, `127.0.0.1` or `[::1]`, or only `BACKEND_PORT`); a run with
+`--project`/`-p` is never a public run.
 
 ```bash
 # 1. A backend on a TEST database you own (the name must end in _test), the fake email provider and the seed
@@ -127,7 +129,10 @@ npm run test:e2e:local -- outbound alerts-lifecycle
 - **The database seam (`E2E_PSQL`).** The browser and the Next.js server never read the database, so a click row or a
   subscriber's status can only be checked from the test process. `E2E_PSQL` is a `psql` command up to and including the
   connection, split on spaces (`psql postgresql://...` works as well as `docker exec <container> psql -U ... -d ...`).
-  `helpers/db-seam.ts` appends `-X -tA -F | -c <read-only SQL>`; only point it at a `*_test` database. With it, the specs
+  `helpers/db-seam.ts` appends `-X -tA -F | -c <SQL>` and makes the session read-only (`PGOPTIONS=-c
+  default_transaction_read_only=on`, passed with `-e` for `docker exec`). It **refuses** a connection whose database
+  name (`-d`, `--dbname`, `dbname=` or a `postgres://` URL path) does not end in `_test`. Keep the password out of the
+  command line: use `PGPASSWORD` (or `~/.pgpass`) with `psql -h ... -U ... -d ...`. With it, the specs
   assert that exactly one `click_events` row (device class and referrer host only) is written for the click, that an
   ended offer writes none, and each subscriber status along the lifecycle (`PENDING`, `CONFIRMED`, `UNSUBSCRIBED`, and
   that an unsubscribed address stays `UNSUBSCRIBED` after a new submission). Without it those assertions are skipped

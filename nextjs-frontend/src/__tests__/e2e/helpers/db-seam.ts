@@ -9,7 +9,8 @@ import { execFileSync } from 'node:child_process';
  * E2E_PSQL is the command up to and including the connection, split on spaces (no quoting). Examples:
  *   docker exec freejoy-test-pg psql -U postgres -d freejoy_dev3_test
  *   psql postgresql://postgres:<password>@127.0.0.1:5433/freejoy_dev3_test
- * `-X -tA -F | -c <sql>` is appended here. Only ever point it at a database whose name ends in `_test`.
+ * `-X -tA -F | -c <sql>` is appended here, and the session is made read-only. A command whose connection does not name a
+ * database ending in `_test` is refused.
  */
 
 export const DB_SEAM = process.env.E2E_PSQL;
@@ -18,10 +19,58 @@ const FIELD_SEPARATOR = '|';
 const MAX_SQL_VALUE_LENGTH = 320;
 const SQL_VALUE = /^[A-Za-z0-9@._+-]+$/;
 
-/** The command words of an E2E_PSQL value: [executable, ...arguments]. Throws on an empty value. */
+const TEST_DATABASE_SUFFIX = '_test';
+const READ_ONLY_OPTION = '-c default_transaction_read_only=on';
+
+/** Database names a postgres:// URL points at: its path and an explicit `dbname` parameter. */
+function urlDatabases(word: string): string[] {
+  try {
+    const url = new URL(word);
+    const names = [decodeURIComponent(url.pathname.replace(/^\//, ''))];
+    const explicit = url.searchParams.get('dbname');
+    return explicit === null ? names : [...names, explicit];
+  } catch {
+    return [''];
+  }
+}
+
+/** Every database a psql command line names: `-d x`, `-dx`, `--dbname x`, `--dbname=x`, `dbname=x`, or a URL. */
+function databaseNames(words: string[]): string[] {
+  const names: string[] = [];
+  words.forEach((word, index) => {
+    if (word === '-d' || word === '--dbname') names.push(words[index + 1] ?? '');
+    else if (word.startsWith('--dbname=')) names.push(word.slice('--dbname='.length));
+    else if (/^-d[^-]/.test(word)) names.push(word.slice(2));
+    else if (word.startsWith('dbname=')) names.push(word.slice('dbname='.length));
+    else if (/^postgres(ql)?:\/\//i.test(word)) names.push(...urlDatabases(word));
+  });
+  return names;
+}
+
+/**
+ * The command words of an E2E_PSQL value: [executable, ...arguments]. Throws on an empty value, and unless the
+ * connection names a database ending in `_test` (and no other): the seam must never be pointed at a dev or real database.
+ */
 export function parseSeamCommand(raw: string): string[] {
   const words = raw.split(/\s+/).filter(Boolean);
   if (words.length === 0) throw new Error('E2E_PSQL is empty');
+  const names = databaseNames(words);
+  if (names.length === 0 || !names.every((name) => name.endsWith(TEST_DATABASE_SUFFIX))) {
+    throw new Error(
+      `E2E_PSQL must name a database ending in ${TEST_DATABASE_SUFFIX} (-d <name>, --dbname=<name> or a postgres:// URL), and no other`
+    );
+  }
+  return words;
+}
+
+/**
+ * The same command made read-only for the session. Locally PGOPTIONS does it; `docker exec` does not pass the caller's
+ * environment into the container, so the option is handed over with `-e`.
+ */
+export function readOnlyCommand(words: string[]): string[] {
+  if (/^docker(\.exe)?$/i.test(words[0]) && words[1] === 'exec') {
+    return [words[0], 'exec', '-e', `PGOPTIONS=${READ_ONLY_OPTION}`, ...words.slice(2)];
+  }
   return words;
 }
 
@@ -45,13 +94,15 @@ export function parseRows(output: string): string[][] {
     .map((line) => line.split(FIELD_SEPARATOR));
 }
 
-/** Runs one read-only query through the seam. Throws when the seam is off or the command fails. */
+/** Runs one query through the seam in a read-only session. Throws when the seam is off or the command fails. */
 export function queryRows(sql: string, seam: string | undefined = DB_SEAM): string[][] {
   if (!seam) throw new Error('E2E_PSQL is not set');
-  const [command, ...args] = parseSeamCommand(seam);
+  const [command, ...args] = readOnlyCommand(parseSeamCommand(seam));
+  const pgOptions = [process.env.PGOPTIONS, READ_ONLY_OPTION].filter(Boolean).join(' ');
   const output = execFileSync(command, [...args, '-X', '-tA', '-F', FIELD_SEPARATOR, '-c', sql], {
     encoding: 'utf-8',
     timeout: 15_000,
+    env: { ...process.env, PGOPTIONS: pgOptions },
   });
   return parseRows(output);
 }

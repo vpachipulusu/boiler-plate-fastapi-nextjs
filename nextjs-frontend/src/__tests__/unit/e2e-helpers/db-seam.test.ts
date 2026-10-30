@@ -7,6 +7,7 @@ import {
   parseRows,
   parseSeamCommand,
   queryRows,
+  readOnlyCommand,
   sqlLiteral,
 } from '../../e2e/helpers/db-seam';
 
@@ -19,7 +20,7 @@ async function loadSeam(): Promise<SeamModule> {
 }
 
 const FAKE_PSQL = path.resolve(__dirname, 'fake-psql.mjs');
-const SEAM = `node ${FAKE_PSQL}`;
+const SEAM = `node ${FAKE_PSQL} -d freejoy_unit_test`;
 
 let logDir: string;
 let logFile: string;
@@ -47,14 +48,37 @@ const loggedSql = () =>
 
 describe('parseSeamCommand', () => {
   it('splits on any run of whitespace', () => {
-    expect(parseSeamCommand('docker  exec box\tpsql -U postgres')).toEqual([
+    expect(parseSeamCommand('docker  exec box\tpsql -d x_test')).toEqual([
       'docker',
       'exec',
       'box',
       'psql',
-      '-U',
-      'postgres',
+      '-d',
+      'x_test',
     ]);
+  });
+
+  it.each([
+    'psql postgresql://u:p@h/freejoy',
+    'psql postgres://u@h:5432/freejoy_test_backup',
+    'psql -U postgres',
+    'docker exec c psql -U postgres -d freejoy',
+    'docker exec c psql -d freejoy_test -d freejoy',
+    'psql postgresql://u@h/freejoy_test?dbname=freejoy',
+  ])('refuses %j: the connection must name a database ending in _test', (raw) => {
+    expect(() => parseSeamCommand(raw)).toThrow('_test');
+  });
+
+  it.each([
+    'docker exec c psql -U postgres -d freejoy_dev3_test',
+    'psql --dbname=freejoy_dev3_test -h 127.0.0.1',
+    'psql --dbname freejoy_dev3_test',
+    'psql -dfreejoy_dev3_test',
+    'psql postgresql://u:p@127.0.0.1:5433/freejoy_dev3_test',
+    'psql postgres://u@h/freejoy_test?sslmode=disable',
+    'psql dbname=freejoy_test host=127.0.0.1',
+  ])('accepts %j', (raw) => {
+    expect(parseSeamCommand(raw)[0]).toBeTruthy();
   });
 
   it('refuses an empty command', () => {
@@ -101,6 +125,8 @@ describe('queryRows', () => {
 
     const [call] = readFileSync(logFile, 'utf-8').split('\n').filter(Boolean);
     expect((JSON.parse(call) as { args: string[] }).args).toEqual([
+      '-d',
+      'freejoy_unit_test',
       '-X',
       '-tA',
       '-F',
@@ -108,6 +134,41 @@ describe('queryRows', () => {
       '-c',
       'select 1',
     ]);
+  });
+
+  it('makes the session read-only through PGOPTIONS, keeping any options already set', () => {
+    process.env.FAKE_PSQL_OUT = '1';
+
+    queryRows('select 1', SEAM);
+    process.env.PGOPTIONS = '-c statement_timeout=5000';
+    try {
+      queryRows('select 2', SEAM);
+    } finally {
+      delete process.env.PGOPTIONS;
+    }
+
+    const calls = readFileSync(logFile, 'utf-8')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { pgoptions: string | null });
+    expect(calls[0].pgoptions).toBe('-c default_transaction_read_only=on');
+    expect(calls[1].pgoptions).toBe(
+      '-c statement_timeout=5000 -c default_transaction_read_only=on'
+    );
+  });
+
+  it('hands the read-only option to the container when the seam is docker exec', () => {
+    expect(readOnlyCommand(['docker', 'exec', 'box', 'psql', '-d', 'x_test'])).toEqual([
+      'docker',
+      'exec',
+      '-e',
+      'PGOPTIONS=-c default_transaction_read_only=on',
+      'box',
+      'psql',
+      '-d',
+      'x_test',
+    ]);
+    expect(readOnlyCommand(['psql', '-d', 'x_test'])).toEqual(['psql', '-d', 'x_test']);
   });
 
   it('throws when the seam is off', () => {

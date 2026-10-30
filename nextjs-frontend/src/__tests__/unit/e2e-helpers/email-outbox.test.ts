@@ -9,7 +9,7 @@ afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-function outboxFile(lines: object[]): string {
+function outboxFile(lines: unknown[]): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'outbox-'));
   dirs.push(dir);
   const file = path.join(dir, 'outbox.jsonl');
@@ -29,6 +29,24 @@ describe('outboxFor', () => {
 
     expect(outboxFor('a@example.com', file).map((mail) => mail.text)).toEqual(['1', '2']);
     expect(outboxFor('nobody@example.com', file)).toEqual([]);
+  });
+
+  it('skips a half-written last line instead of throwing, and reads it once it is complete', () => {
+    const complete = JSON.stringify(message('a@example.com', 'whole'));
+    const file = outboxFile([]);
+    const torn = '{"to": "a@example.com", "subject": "Sub';
+    writeFileSync(file, complete + '\n' + torn);
+
+    expect(outboxFor('a@example.com', file).map((mail) => mail.text)).toEqual(['whole']);
+
+    writeFileSync(file, complete + '\n' + JSON.stringify(message('a@example.com', 'next')) + '\n');
+    expect(outboxFor('a@example.com', file).map((mail) => mail.text)).toEqual(['whole', 'next']);
+  });
+
+  it('ignores lines that are valid JSON but not a message', () => {
+    const file = outboxFile([{ unrelated: true }, 42, message('a@example.com', 'ok')]);
+
+    expect(outboxFor('a@example.com', file).map((mail) => mail.text)).toEqual(['ok']);
   });
 
   it('is empty when the outbox is not configured or does not exist yet', () => {

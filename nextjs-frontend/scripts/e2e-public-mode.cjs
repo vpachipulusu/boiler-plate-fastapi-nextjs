@@ -40,12 +40,46 @@ const FIREBASE_PLACEHOLDERS = {
   FIREBASE_ADMIN_PRIVATE_KEY: 'e2e-public-placeholder',
 };
 
-/** True when `args` (the arguments after `--`) select only public specs, or E2E_PUBLIC=1 asks for it. */
+/** True when the user picked Playwright projects themselves (`--project`, `-p`): their run is not ours to reshape. */
+function hasProjectArg(args) {
+  return args.some((arg) => /^(--project|-p)(=|$)/.test(arg));
+}
+
+/**
+ * True when `args` (the arguments after `--`) select only public specs, or E2E_PUBLIC=1 asks for it. Never true when
+ * the user passed `--project`/`-p`: a project such as `chromium` depends on the Firebase `setup` project, and the
+ * public run would add ours next to it.
+ */
 function isPublicRun(args, env = process.env) {
+  if (env.E2E_PUBLIC === '0' || hasProjectArg(args)) return false;
   if (env.E2E_PUBLIC === '1') return true;
-  if (env.E2E_PUBLIC === '0') return false;
   const specs = args.filter((arg) => !arg.startsWith('-'));
   return specs.length > 0 && specs.every((arg) => PUBLIC_SPEC_ARG.test(arg));
+}
+
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * Throws unless the backend a public run talks to is on this machine. The run seeds nothing itself, but it creates
+ * subscribers and click rows through the Next.js server, so it must never be pointed at a deployed backend.
+ * BACKEND_API_URL wins; with only BACKEND_PORT (or nothing) the target is http://127.0.0.1:<port>, which is local.
+ */
+function assertLocalBackend(env = process.env) {
+  const target = env.BACKEND_API_URL;
+  if (!target) return;
+  let url;
+  try {
+    url = new URL(target);
+  } catch {
+    throw new Error(
+      'BACKEND_API_URL is not a URL: a public run needs a local backend (localhost or 127.0.0.1).'
+    );
+  }
+  if (!LOCAL_HOSTS.has(url.hostname) || url.username || url.password) {
+    throw new Error(
+      `A public run needs a local backend (localhost, 127.0.0.1 or [::1]), but BACKEND_API_URL points at ${url.hostname}.`
+    );
+  }
 }
 
 /** Playwright `--project=` arguments that select the public projects. */
@@ -72,6 +106,7 @@ module.exports = {
   PUBLIC_PROJECTS,
   FIREBASE_PLACEHOLDERS,
   isPublicRun,
+  assertLocalBackend,
   publicProjectArgs,
   publicRunEnv,
 };

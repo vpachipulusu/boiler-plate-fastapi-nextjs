@@ -300,13 +300,18 @@ function printSummary() {
   console.log(`  ${'total'.padEnd(10)} ${total.toFixed(1).padStart(7)} s`);
 }
 
-/** A public run reaches the backend through the environment only: never through a dev file. */
+/** A public run reaches the backend through the environment only (never a dev file), and only a local one. */
 function requirePublicRunEnv() {
   if (!process.env.BACKEND_INTERNAL_KEY) {
     die(
       'A public run (outbound, alerts-lifecycle) needs BACKEND_INTERNAL_KEY in the environment, the same value as the ' +
-        'seeded test backend, and BACKEND_API_URL (or BACKEND_PORT). See docs/developer/local-e2e.md.'
+        'seeded test backend. See docs/developer/local-e2e.md.'
     );
+  }
+  try {
+    publicMode.assertLocalBackend(process.env);
+  } catch (error) {
+    die(error.message);
   }
 }
 

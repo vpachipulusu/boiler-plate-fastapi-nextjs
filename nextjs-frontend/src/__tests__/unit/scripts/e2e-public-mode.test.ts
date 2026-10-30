@@ -11,6 +11,7 @@ const publicMode = rawPublicMode as unknown as {
   PUBLIC_PROJECTS: string[];
   FIREBASE_PLACEHOLDERS: Record<string, string>;
   isPublicRun(args: string[], env?: Env): boolean;
+  assertLocalBackend(env?: Env): void;
   publicProjectArgs(): string[];
   publicRunEnv(env?: Env): Env;
 };
@@ -45,6 +46,15 @@ describe('isPublicRun', () => {
   it('treats a bare option value as a spec name, so the run is not public', () => {
     expect(publicMode.isPublicRun(['outbound', '--workers', '2'], {})).toBe(false);
   });
+
+  it.each([['--project=chromium'], ['--project', 'chromium'], ['-p', 'chromium'], ['-p=chromium']])(
+    'is not public when a project is given: %j',
+    (...projectArgs) => {
+      expect(publicMode.isPublicRun(['outbound', ...projectArgs], {})).toBe(false);
+      // Even when forced: the user's project would pull in the Firebase setup project next to ours.
+      expect(publicMode.isPublicRun(['outbound', ...projectArgs], { E2E_PUBLIC: '1' })).toBe(false);
+    }
+  );
 
   it('lets E2E_PUBLIC force the mode either way', () => {
     expect(publicMode.isPublicRun(['dashboard'], { E2E_PUBLIC: '1' })).toBe(true);
@@ -106,5 +116,29 @@ describe('the public spec list', () => {
   it('matches the specs the local Playwright config routes to the money-path projects', () => {
     expect(publicMode.PUBLIC_SPECS).toEqual(['outbound', 'alerts-lifecycle']);
     expect(publicMode.PUBLIC_PROJECTS).toEqual(['money-desktop', 'money-mobile']);
+  });
+});
+
+describe('assertLocalBackend', () => {
+  it.each([
+    {},
+    { BACKEND_PORT: '8271' },
+    { BACKEND_API_URL: 'http://127.0.0.1:8000' },
+    { BACKEND_API_URL: 'http://localhost:8271' },
+    { BACKEND_API_URL: 'http://[::1]:8271' },
+    { BACKEND_API_URL: '' },
+  ])('accepts a local backend: %j', (env) => {
+    expect(() => publicMode.assertLocalBackend(env)).not.toThrow();
+  });
+
+  it.each([
+    'https://api.example.net',
+    'http://10.0.0.5:8000',
+    'http://localhost.evil.example:8000',
+    'http://127.0.0.1.evil.example',
+    'http://user@evil.example/',
+    'not a url',
+  ])('refuses %j: a public run seeds data and must not point at a deployed backend', (url) => {
+    expect(() => publicMode.assertLocalBackend({ BACKEND_API_URL: url })).toThrow('local backend');
   });
 });

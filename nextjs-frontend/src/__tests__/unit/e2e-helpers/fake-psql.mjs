@@ -7,7 +7,10 @@ import fs from 'node:fs';
 const args = process.argv.slice(2);
 const sql = args[args.indexOf('-c') + 1];
 if (process.env.FAKE_PSQL_LOG) {
-  fs.appendFileSync(process.env.FAKE_PSQL_LOG, `${JSON.stringify({ args, sql })}\n`);
+  fs.appendFileSync(
+    process.env.FAKE_PSQL_LOG,
+    `${JSON.stringify({ args, sql, pgoptions: process.env.PGOPTIONS ?? null })}\n`
+  );
 }
 if (process.env.FAKE_PSQL_FAIL) {
   console.error('psql: error');

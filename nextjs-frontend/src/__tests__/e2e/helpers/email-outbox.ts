@@ -16,7 +16,23 @@ export interface OutboxMessage {
   headers: Record<string, string>;
 }
 
-/** Messages addressed to `email`, oldest first. Empty when the outbox file does not exist yet. */
+/** One outbox line as a message, or null for a line that is not (yet) one: the backend may be mid-write. */
+function parseLine(line: string): OutboxMessage | null {
+  try {
+    const parsed: unknown = JSON.parse(line);
+    const candidate = parsed as Partial<OutboxMessage> | null;
+    return typeof parsed === 'object' && candidate !== null && typeof candidate.to === 'string'
+      ? (candidate as OutboxMessage)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Messages addressed to `email`, oldest first. Empty when the outbox file does not exist yet. A half-written last
+ * line is skipped (and read on the next poll), so polling the outbox never throws on a message being appended.
+ */
 export function outboxFor(
   email: string,
   outbox: string | undefined = EMAIL_OUTBOX
@@ -25,8 +41,8 @@ export function outboxFor(
   return readFileSync(outbox, 'utf-8')
     .split('\n')
     .filter(Boolean)
-    .map((line) => JSON.parse(line) as OutboxMessage)
-    .filter((message) => message.to === email);
+    .map(parseLine)
+    .filter((message): message is OutboxMessage => message !== null && message.to === email);
 }
 
 /** The path and query of a link, so it opens on the origin under test whatever the email says. */
