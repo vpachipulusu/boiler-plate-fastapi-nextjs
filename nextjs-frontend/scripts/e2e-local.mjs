@@ -10,6 +10,10 @@
  *   test     Playwright, chromium + setup projects only, a sane worker count (playwright.local.config.ts)
  *   cleanup  the server process tree is always stopped on exit/Ctrl+C
  *
+ * Public runs (outbound, alerts-lifecycle; see scripts/e2e-public-mode.cjs) skip the Firebase parts: no
+ * .env.e2e.local, placeholder Firebase values, the live catalogue, and only the money-desktop and money-mobile
+ * projects, so no login happens. They need BACKEND_INTERNAL_KEY and a seeded backend (docs/developer/local-e2e.md).
+ *
  * Production build + start is used instead of `next dev`: dev compiles each route on first request (40-58 s for `/`
  * and `/login`), which broke the auth setup and caused hydration timeouts under parallel workers.
  * The developer's own `.next` and dev server are never touched.
@@ -31,6 +35,7 @@ import {
 import net from 'node:net';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
+import publicMode from './e2e-public-mode.cjs';
 
 const IS_WINDOWS = process.platform === 'win32';
 const ENV_FILES = ['.env', '.env.local', '.env.e2e.local'];
@@ -188,9 +193,11 @@ async function pickPort() {
 // ---- build -----------------------------------------------------------------------------------------------------
 
 /** Changes with the committed tree (not the commit id), uncommitted edits (tracked or untracked) and the port, which is baked into the build. */
-function sourceFingerprint(port) {
+function sourceFingerprint(port, isPublic) {
   const hash = createHash('sha1');
-  hash.update(`${git(['rev-parse', 'HEAD^{tree}'])}\n${port}\n${git(['diff', 'HEAD'])}`);
+  hash.update(
+    `${git(['rev-parse', 'HEAD^{tree}'])}\n${port}\n${isPublic ? 'public' : 'firebase'}\n${git(['diff', 'HEAD'])}`
+  );
   for (const file of git(['ls-files', '-o', '--exclude-standard', '-z'])
     .split('\0')
     .filter(Boolean)) {
@@ -201,12 +208,12 @@ function sourceFingerprint(port) {
       // Deleted between listing and reading: the next run sees the new state.
     }
   }
-  hash.update(readFileSync(REQUIRED_ENV_FILE));
+  if (!isPublic) hash.update(readFileSync(REQUIRED_ENV_FILE));
   return hash.digest('hex');
 }
 
-function ensureBuild(port, serverEnv) {
-  const fingerprint = sourceFingerprint(port);
+function ensureBuild(port, serverEnv, isPublic) {
+  const fingerprint = sourceFingerprint(port, isPublic);
   const hasBuild = existsSync(path.join(E2E_DIST_DIR, 'BUILD_ID'));
   if (
     hasBuild &&
@@ -293,6 +300,16 @@ function printSummary() {
   console.log(`  ${'total'.padEnd(10)} ${total.toFixed(1).padStart(7)} s`);
 }
 
+/** A public run reaches the backend through the environment only: never through a dev file. */
+function requirePublicRunEnv() {
+  if (!process.env.BACKEND_INTERNAL_KEY) {
+    die(
+      'A public run (outbound, alerts-lifecycle) needs BACKEND_INTERNAL_KEY in the environment, the same value as the ' +
+        'seeded test backend, and BACKEND_API_URL (or BACKEND_PORT). See docs/developer/local-e2e.md.'
+    );
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes('--help') || args.includes('-h')) {
@@ -302,8 +319,14 @@ async function main() {
     return 0;
   }
 
+  const isPublic = publicMode.isPublicRun(args);
+  if (isPublic) {
+    requirePublicRunEnv();
+    log('public run: no Firebase project, no login, live catalogue');
+  }
+
   await timed('setup', async () => {
-    ensureEnvFiles();
+    if (!isPublic) ensureEnvFiles();
     ensureDependencies();
     await ensureChromium();
   });
@@ -311,9 +334,10 @@ async function main() {
   const port = await pickPort();
   const baseUrl = `http://localhost:${port}`;
   log(`using ${baseUrl}`);
-  const serverEnv = { ...process.env, E2E_PORT: String(port), E2E_BASE_URL: baseUrl };
+  const runEnv = { ...process.env, E2E_PORT: String(port), E2E_BASE_URL: baseUrl };
+  const serverEnv = isPublic ? publicMode.publicRunEnv(runEnv) : runEnv;
 
-  await timed('build', async () => ensureBuild(port, serverEnv));
+  await timed('build', async () => ensureBuild(port, serverEnv, isPublic));
   await timed('serve+warm', async () => {
     startServer(serverEnv);
     await waitForServer(baseUrl);
@@ -324,7 +348,13 @@ async function main() {
   await timed('test', async () => {
     const result = run(
       'npx',
-      ['playwright', 'test', '--config=playwright.local.config.ts', ...args],
+      [
+        'playwright',
+        'test',
+        '--config=playwright.local.config.ts',
+        ...(isPublic ? publicMode.publicProjectArgs() : []),
+        ...args,
+      ],
       {
         env: serverEnv,
       }
