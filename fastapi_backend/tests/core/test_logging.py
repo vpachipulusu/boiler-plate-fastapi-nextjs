@@ -75,3 +75,22 @@ def test_formatter_includes_request_id_when_set() -> None:
         request_id_var.reset(token)
 
     assert payload["request_id"] == "req-123"
+
+
+def test_configure_logging_keeps_http_client_request_lines_out_of_the_logs() -> None:
+    # httpx logs "GET https://.../contacts/<email>" at INFO; the Brevo calls put an address in the path.
+    root = logging.getLogger()
+    saved_handlers, saved_level = root.handlers, root.level
+    httpx_logger = logging.getLogger("httpx")
+    saved_httpx = httpx_logger.level
+    httpx_logger.setLevel(logging.NOTSET)
+    try:
+        configure_logging("debug")
+
+        assert not logging.getLogger("httpx").isEnabledFor(logging.INFO)
+        assert not logging.getLogger("httpcore").isEnabledFor(logging.INFO)
+    finally:
+        root.handlers = saved_handlers
+        root.setLevel(saved_level)
+        httpx_logger.setLevel(saved_httpx)
+        logging.getLogger("httpcore").setLevel(logging.NOTSET)

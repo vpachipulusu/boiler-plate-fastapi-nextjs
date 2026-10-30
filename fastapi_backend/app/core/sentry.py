@@ -28,6 +28,11 @@ SENSITIVE_NAME = re.compile(
 FILTERED = "[Filtered]"
 SERVER_NAME = "yourapp-api"
 
+# A path segment, query value or header word holding an email address, plain or
+# percent-encoded (also twice). The Brevo contact calls put the address in the path
+# (``/contacts/<email>``) and the SDK's httpx integration records that URL as a breadcrumb.
+EMAIL_SEGMENT = re.compile(r"[^\s/?#&=;]*(?:@|%(?:25)*40)[^\s/?#&=;]*", re.IGNORECASE)
+
 
 def _redact_keys(value: Any) -> Any:
     """Return a copy of ``value`` with sensitive dict keys' values filtered."""
@@ -41,10 +46,17 @@ def _redact_keys(value: Any) -> Any:
     return value
 
 
+def _redact_addresses(value: Any) -> Any:
+    """Return ``value`` with any email address replaced; non-strings pass through."""
+    if not isinstance(value, str):
+        return value
+    return EMAIL_SEGMENT.sub(FILTERED, value)
+
+
 def _strip_query(url: Any) -> Any:
     if not isinstance(url, str):
         return url
-    return url.split("?", 1)[0].split("#", 1)[0]
+    return _redact_addresses(url.split("?", 1)[0].split("#", 1)[0])
 
 
 def scrub_event(event: Any, _hint: Any = None) -> Any:
@@ -75,7 +87,10 @@ def scrub_breadcrumb(crumb: Any, _hint: Any = None) -> Any:
     data = crumb.get("data")
     if isinstance(data, dict):
         crumb["data"] = _redact_keys(
-            {k: _strip_query(v) if k == "url" else v for k, v in data.items()}
+            {
+                k: _strip_query(v) if k == "url" else _redact_addresses(v)
+                for k, v in data.items()
+            }
         )
     return crumb
 

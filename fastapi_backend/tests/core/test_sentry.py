@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 from typing import Any
 
@@ -237,3 +238,39 @@ async def test_unhandled_exception_is_captured_once_with_context() -> None:
     assert "hunter2" not in str(event)
     assert "tok" not in event["request"]["headers"].values()
     assert event["server_name"] == "yourapp-api"
+
+
+ADDRESS = "victim@example.com"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://api.brevo.com/v3/contacts/victim%40example.com",
+        "https://api.brevo.com/v3/contacts/victim@example.com",
+        "https://api.brevo.com/v3/contacts/victim%2540example.com",
+        "https://api.brevo.com/v3/contacts/victim%40example.com?identifierType=email_id",
+    ],
+)
+def test_breadcrumbs_drop_an_email_address_held_in_a_url_path(url: str) -> None:
+    crumb = scrub_breadcrumb(
+        {
+            "category": "httplib",
+            "data": {"url": url, "http.query": f"email={ADDRESS}", "reason": "OK"},
+        }
+    )
+
+    text = json.dumps(crumb)
+    assert "victim" not in text
+    assert "example.com" not in text
+    assert "%40" not in text
+    assert crumb["data"]["url"].startswith("https://api.brevo.com/v3/contacts/")
+    assert crumb["data"]["reason"] == "OK"
+
+
+def test_scrub_drops_an_email_address_held_in_the_request_path() -> None:
+    event = {"request": {"url": f"http://test/v1/x/{ADDRESS}?token=abc"}}
+
+    request = scrub_event(event)["request"]
+
+    assert request["url"] == f"http://test/v1/x/{FILTERED}"
