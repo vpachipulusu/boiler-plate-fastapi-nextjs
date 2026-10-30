@@ -24,10 +24,14 @@ export const INTERNAL_KEY_HEADER = 'X-Internal-Key';
 export const BACKEND_UNAVAILABLE_MESSAGE = 'Backend unavailable';
 export const BACKEND_ERROR_MESSAGE = 'Request failed';
 
-/** `status` is the backend HTTP status when the backend answered (absent when it was unreachable). */
+/**
+ * `status` is the backend HTTP status when the backend answered (absent when it was unreachable). `code` is the
+ * stable machine-readable code some routes add to their error body (the admin catalogue's `slug_taken`, ...);
+ * branch on it, never on `error`.
+ */
 export type ApiResult<T> =
   | { success: true; data: T }
-  | { success: false; error: string; status?: number };
+  | { success: false; error: string; status?: number; code?: string };
 
 type SdkResult<TData> = { data?: TData; error?: unknown; response?: Response };
 
@@ -161,6 +165,11 @@ function errorMessage(error: unknown): string {
   return BACKEND_ERROR_MESSAGE;
 }
 
+/** The stable `code` of an error body, when it is a string. */
+function errorCode(error: unknown): string | undefined {
+  return isRecord(error) && typeof error.code === 'string' ? error.code : undefined;
+}
+
 /** Unwrap `{ success: true, data }` bodies; pass other success bodies through. */
 function unwrap<T>(body: unknown): BackendData<T> {
   if (isRecord(body) && body.success === true && 'data' in body) {
@@ -186,7 +195,13 @@ export async function callBackend<TData>(
     return { success: false, error: BACKEND_UNAVAILABLE_MESSAGE };
   }
   if (result.error !== undefined || (result.response && !result.response.ok)) {
-    return { success: false, error: errorMessage(result.error), status: result.response?.status };
+    const code = errorCode(result.error);
+    return {
+      success: false,
+      error: errorMessage(result.error),
+      status: result.response?.status,
+      ...(code ? { code } : {}),
+    };
   }
   return { success: true, data: unwrap<TData>(result.data) };
 }
