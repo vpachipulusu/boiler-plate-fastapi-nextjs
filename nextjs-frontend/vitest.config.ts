@@ -24,22 +24,20 @@ export default defineConfig({
         'src/**/*.spec.{ts,tsx}',
         'src/**/__tests__/e2e/**',
       ],
-      // Coverage ratchet: the thresholds are the
-      // measured baseline, so CI fails if coverage drops. Raise them towards the
-      // 80% target as tests are added, and never lower them. To raise them to the
-      // current values in one step, run:
+      // Coverage ratchet: the thresholds sit about 2 points under the measured
+      // coverage (FREEJ-36: 89.36 statements, 88.33 branches, 87.06 functions, 90.25 lines),
+      // so CI fails when coverage drops. Raise them when measured coverage rises and
+      // never lower them; the project minimum is 80%. To raise them to the current
+      // values in one step, run:
       //   COVERAGE_RATCHET=1 npm run test:coverage
-      // (Vitest rewrites the numbers below when coverage is higher.)
+      // (Vitest rewrites the numbers below when coverage is higher; then leave a
+      // margin of about 2 points under the measured values.)
       thresholds: {
         autoUpdate: process.env.COVERAGE_RATCHET === '1',
-        // Re-baselined for Vitest 5: its AST-based V8 remapping counts
-        // every function and branch in a file, not only the ones that ran. The same
-        // 50 tests give 29.87% branches / 6.33% functions on Vitest 2 and
-        // 3.2% / 2.15% on Vitest 5. This is a change of measurement, not lost coverage.
-        branches: 3.2,
-        functions: 2.15,
-        lines: 5.35,
-        statements: 5.34,
+        branches: 86,
+        functions: 85,
+        lines: 88,
+        statements: 87,
       },
     },
   },
