@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 from typing import Any
 
@@ -237,3 +238,118 @@ async def test_unhandled_exception_is_captured_once_with_context() -> None:
     assert "hunter2" not in str(event)
     assert "tok" not in event["request"]["headers"].values()
     assert event["server_name"] == "yourapp-api"
+
+
+ADDRESS = "victim@example.com"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://api.brevo.com/v3/contacts/victim%40example.com",
+        "https://api.brevo.com/v3/contacts/victim@example.com",
+        "https://api.brevo.com/v3/contacts/victim%2540example.com",
+        "https://api.brevo.com/v3/contacts/victim%40example.com?identifierType=email_id",
+    ],
+)
+def test_breadcrumbs_drop_an_email_address_held_in_a_url_path(url: str) -> None:
+    crumb = scrub_breadcrumb(
+        {
+            "category": "httplib",
+            "data": {"url": url, "http.query": f"email={ADDRESS}", "reason": "OK"},
+        }
+    )
+
+    text = json.dumps(crumb)
+    assert "victim" not in text
+    assert "example.com" not in text
+    assert "%40" not in text
+    assert crumb["data"]["url"].startswith("https://api.brevo.com/v3/contacts/")
+    assert crumb["data"]["reason"] == "OK"
+
+
+def test_breadcrumbs_redact_addresses_in_nested_data_at_any_depth() -> None:
+    crumb = scrub_breadcrumb(
+        {
+            "category": "httplib",
+            "data": {
+                "extra": {"url": "https://api.brevo.com/v3/contacts/a%40b.com"},
+                "items": [{"to": "victim@example.com"}, "x"],
+            },
+        }
+    )
+
+    text = json.dumps(crumb)
+    assert "a%40b.com" not in text
+    assert "victim" not in text
+    assert (
+        crumb["data"]["extra"]["url"] == f"https://api.brevo.com/v3/contacts/{FILTERED}"
+    )
+    assert crumb["data"]["items"] == [{"to": FILTERED}, "x"]
+
+
+def test_scrub_redacts_addresses_in_contexts_extra_and_headers_at_any_depth() -> None:
+    event = {
+        "contexts": {"app": {"deep": {"url": "https://x/contacts/a%40b.com"}}},
+        "extra": {"rows": [{"email": "victim@example.com"}], "n": 3},
+        "request": {"headers": {"referer": "https://x/c/a%40b.com"}},
+    }
+
+    text = json.dumps(scrub_event(event))
+
+    assert "a%40b.com" not in text
+    assert "victim" not in text
+
+
+def test_redaction_survives_a_self_referencing_dict() -> None:
+    data: dict[str, Any] = {"to": "victim@example.com"}
+    data["self"] = data
+    data["list"] = [data, {"again": data}]
+
+    crumb = scrub_breadcrumb({"category": "x", "data": data})
+
+    text = json.dumps(crumb)
+    assert "victim" not in text
+    assert FILTERED in text
+
+
+def test_redaction_survives_a_very_deep_nest() -> None:
+    nested: Any = {"url": "https://x/contacts/a%40b.com"}
+    for _ in range(5000):
+        nested = {"next": nested}
+
+    scrubbed = scrub_event({"extra": nested})
+
+    assert "a%40b.com" not in json.dumps(scrubbed)
+
+
+def test_redaction_is_quick_when_a_child_is_shared_many_times() -> None:
+    node: Any = {"url": "https://x/contacts/a%40b.com"}
+    for _ in range(18):
+        node = {"left": node, "right": node}
+
+    assert "a%40b.com" not in json.dumps(scrub_event({"extra": node}))
+
+
+def test_redaction_covers_tuples_and_sets() -> None:
+    event = {
+        "extra": {
+            "pair": ("victim@example.com", "ok"),
+            "tags": {"victim@example.com"},
+            "frozen": frozenset({"a%40b.com"}),
+        }
+    }
+
+    extra = scrub_event(event)["extra"]
+
+    assert "victim" not in json.dumps(extra)
+    assert "a%40b.com" not in json.dumps(extra)
+    assert extra["pair"] == [FILTERED, "ok"]
+
+
+def test_scrub_drops_an_email_address_held_in_the_request_path() -> None:
+    event = {"request": {"url": f"http://test/v1/x/{ADDRESS}?token=abc"}}
+
+    request = scrub_event(event)["request"]
+
+    assert request["url"] == f"http://test/v1/x/{FILTERED}"

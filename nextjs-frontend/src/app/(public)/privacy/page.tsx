@@ -34,7 +34,10 @@ export default function PrivacyPage() {
         The email address you give for alerts is sent to us in the body of a request, never in the
         page address. The links in our emails do carry a single-use code in the page address, so
         that code can appear in request logs of our host; it stops working once it has been used.
-        Error reports sent to our error-monitoring provider have that code removed first.
+        The search box is different: your search words travel in the page address, so an email
+        address typed there can appear in request logs of our host and in your browser history. Any
+        email address found in a page address, and that single-use code, is removed before an error
+        or timing report is sent to our error-monitoring provider.
       </p>
       <h2>If you create an account</h2>
       <p>
@@ -46,8 +49,8 @@ export default function PrivacyPage() {
       <p>
         We use a double opt-in. After you submit the alerts form we email you a confirmation link,
         and you are added to the alert list only when you open it and press the button. The link
-        works for {CONFIRM_WINDOW_TEXT} and once. Until then we send nothing else. We keep the details above so
-        that we can send the alerts you asked for and show that you asked.
+        works for {CONFIRM_WINDOW_TEXT} and once. Until then we send nothing else. We keep the
+        details above so that we can send the alerts you asked for and show that you asked.
       </p>
       <p>
         Every alert email carries an unsubscribe link, and mail apps that offer a one-click

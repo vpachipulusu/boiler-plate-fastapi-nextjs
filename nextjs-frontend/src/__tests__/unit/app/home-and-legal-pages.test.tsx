@@ -266,6 +266,17 @@ describe('privacy notice', () => {
     expect(container.textContent).not.toMatch(/does not save any information|saves nothing/i);
   });
 
+  it('says exactly where an address can and cannot appear in a page address (FREEJ-31)', () => {
+    const { container } = render(<PrivacyPage />);
+    const text = container.textContent ?? '';
+
+    expect(text).toMatch(/never in the page address/);
+    expect(text).toMatch(/single-use code in the page address/);
+    expect(text).toMatch(/search words travel in the page address/i);
+    expect(text).toMatch(/email address.*removed before an error or timing report/i);
+    expect(text).not.toMatch(/never reaches (our )?(logs|error)/i);
+  });
+
   it('describes the outbound click record as live behaviour, with its retention period', () => {
     const { container } = render(<PrivacyPage />);
 

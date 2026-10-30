@@ -211,13 +211,79 @@ it. The filter drawer and sort control render outside the keyed Suspense boundar
 
 - (Fixed in FREEJ-24.) The newsletter band used to be a GET form to `/alerts?email=`; it is now a
   plain link to `/alerts` and `/alerts` ignores any `email` parameter, so an address never travels in a
-  page address.
+  page address. What is still true, and what Sentry does about it, is in
+  [Error monitoring and addresses](#error-monitoring-and-addresses-freej-31).
 - The mobile filter drawer needs JavaScript; search, sort (Apply button), category chips and
   pagination work without it.
 - An outage answers HTTP 200 (error state, normal robots) for as long as it lasts; a 5xx is a follow-up.
 - The offer page has no route-level loading skeleton: a `loading.tsx` there would turn every unknown offer into
   a 200 soft 404. The root skeleton lives in `components/site/route-skeleton.tsx` and is re-exported by the
   admin, auth, dashboard and pricing segments.
+
+## Error monitoring and addresses (FREEJ-31)
+
+Goal: a visitor's email address never reaches logs, history or Sentry through a URL, so the privacy notice is true.
+
+**Audit (code, FREEJ-31).** No component, link, redirect, server action, auth flow or test puts an address in a
+URL. The newsletter band is a link to `/alerts`; `/alerts` ignores `?email=` (the e2e spec `alerts.spec.ts` loads
+`/alerts?email=...` on purpose and asserts nothing is prefilled); subscribe, confirm and unsubscribe go through
+server actions with the token or address in a body. Sign-in, reset-password and verify-email read no query
+parameter (sign-up reads only `plan`; the billing success handler reads `upgrade`). Firebase's
+`sendPasswordResetEmail` and `sendEmailVerification` are called without action-code settings, so their links point
+at Firebase's own handler, and the app has no `oobCode` or `continueUrl` page (`verifyEmailAction(oobCode)` exists
+but nothing calls it).
+Two GET forms do take free text and can therefore carry an address if someone types one: the public search box
+(`/freebies?q=`) and the admin user search by name or email (`/admin/users?q=`). They are left as GET forms
+(shareable, no-JS search); Sentry is scrubbed of the value (below), but hosting request logs and browser history keep
+it. The privacy notice says so for the search box.
+
+**Scrubber.** `src/lib/sentry/scrub-event.ts` (`scrubEvent`) is the `beforeSend` and `beforeSendTransaction` hook of
+the client (`src/instrumentation-client.ts`), server (`sentry.server.config.ts`) and edge (`sentry.edge.config.ts`)
+configs. It walks the whole event (request url and query string, headers such as `referer`, transaction and span
+names, span data and attributes, breadcrumb `to`, `from` and `url`, `extra`, `contexts`) and removes:
+
+| What | Why it is listed |
+| --- | --- |
+| `token` parameter (exact name) | one-use alert tokens in the confirm and unsubscribe links |
+| any parameter whose name contains `email` or `e-mail` (`email`, `Email`, `newsletter_email`, `emailAddress`, `EMAIL%5B%5D`), in the query or after a `#` | the parameter FREEJ-24 removed; kept as defence in depth |
+| any parameter whose value contains an email address (`?q=a%40b.com`) | the two search boxes above |
+| any address-shaped token (`name@domain.tld`, plain, `%40` or `%2540`) in any string: path segments, userinfo, nameless queries, fragments, free text | defence for places an address could land that no parameter name catches |
+| the `next-router-state-tree` header (whole) and cookie headers | the router state can embed the query as JSON |
+
+Each is handled in plain, percent-encoded (also nested in another URL and encoded twice), JSON, escaped-JSON and
+percent-encoded-JSON form, and for a query held as a string, an object or a list of name/value pairs. It is pure
+(never mutates), bounded, and never throws: a cycle becomes `[Circular]`, a shared child is walked once, an object nested
+more than 12 deep becomes `[Filtered]`, and an event of more than 100 000 objects is dropped (`null`, as is any event it
+cannot walk; keep Sentry's `sendClientReports` on so the drop is counted). Sentry's own `normalizeDepth` is the first line of
+defence. The address pass needs a dotted domain ending in a label that starts with a letter, so stack-frame
+file names (`node_modules/@sentry/core/...`, `@radix-ui/react-dialog`), decorators (`@Injectable()`), `user@host` and
+`pkg@8.1.0` are left alone. Parameters such as
+`oobCode`, `apiKey` (Firebase's public key appears as `?key=` on `googleapis.com` fetch breadcrumbs), `e` and `mail`
+are deliberately **not** listed: they do not appear in any URL of this app, and adding names that never occur only
+hides real findings. Add a name to `SENSITIVE_NAME` in `scrub-event.ts` (and a test) when a flow starts using one.
+Letters of any script count in an address, also percent-encoded (`victim@b%C3%BCcher.example`). The memo that makes a
+shared child cheap ignores depth and ancestry, so it can only over-filter, never leak. **Known false positives** (lossy,
+not leaky): `logo@2x.png`, `icon@3x.webp`, `app@latest.js` and `version@1.0.beta` become `[Filtered]`.
+**Not covered** (the part of the address before the stop leaks): a local part with a character outside letters, digits
+and `_.+!%-` (`o'brien@x.test`, `victim#1@x.test`, `victim&x@x.test`, `victim=x@x.test`, a quoted part with a space);
+a local part longer than 256 characters (only its last 256 are replaced); other spellings of `@` (full-width, `&#64;`, a
+literal `@`); an IP-literal domain (`victim@192.168.0.1`); percent-encoded letters in a parameter name
+(`?%65mail=`, `?t%6Fken=`; bracket escapes such as `%5B` are handled).
+Tests: `src/__tests__/unit/lib/sentry-scrub-event.test.ts` (token), `sentry-scrub-email.test.ts` (hostile URLs,
+every shape above), `sentry-scrub-hardening.test.ts` (cycles, shared references, depth, fragments, encoded names,
+address tokens, false-positive guards) and `sentry-configs.test.ts` (the three configs register the hooks). They run on constructed events; **nothing here has been checked against a live Sentry project**.
+
+**Backend.** `app/core/sentry.py` already dropped query strings, bodies and cookies; FREEJ-31 also redacts an email
+address from the request path and from every string in breadcrumb data, `contexts`, `extra` and headers (to 20 levels; a cycle or anything deeper becomes `[Filtered]`, tuples and sets come back as lists),
+because the Brevo contact lookup and delete calls put
+the subscriber's address in the path (`/contacts/<email>`) and the SDK's httpx integration records that URL.
+`configure_logging` now holds the `httpx` and `httpcore` loggers at WARNING for the same reason (httpx logs each
+request line, URL included, at INFO). The uvicorn access log still prints the request line, so keep running the
+backend with `--no-access-log` (see [backend-catalogue.md](backend-catalogue.md#operations-notes)).
+
+**Request-log retention (owner).** Hosting platform request logs record the full URL of every page load, so the
+alert token of a confirm or unsubscribe link and the text of any search stay there for as long as the platform keeps
+them. Check the retention setting and shorten it before launch; the privacy notice does not state a period.
 
 ## Next phases
 

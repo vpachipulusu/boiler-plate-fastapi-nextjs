@@ -8,6 +8,11 @@ from datetime import UTC, datetime
 
 request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
 
+# HTTP client libraries log every request line at INFO, URL included. The Brevo contact
+# calls carry a subscriber's address in the path, so these stay at WARNING and above
+# whatever the root level is.
+_QUIET_LOGGERS = ("httpx", "httpcore")
+
 # Extra fields copied from a log record into the JSON payload when present.
 _EXTRA_FIELDS = ("request_id", "method", "path", "status", "duration_ms")
 
@@ -40,3 +45,5 @@ def configure_logging(level: str = "INFO") -> None:
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(level.upper())
+    for name in _QUIET_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
