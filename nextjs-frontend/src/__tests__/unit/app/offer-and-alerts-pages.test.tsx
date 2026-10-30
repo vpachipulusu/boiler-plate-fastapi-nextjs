@@ -23,6 +23,8 @@ vi.mock('@/lib/catalogue', async (importOriginal) => {
 });
 
 import { CatalogueUnavailableError } from '@/lib/catalogue/errors';
+import { OFFERS } from '@/lib/catalogue/fixtures';
+import { formatIsoDate } from '@/components/offer/offer-format';
 import OfferPage, * as offerRoute from '@/app/(public)/freebies/[slug]/page';
 import AlertsPage from '@/app/(public)/alerts/page';
 
@@ -55,7 +57,10 @@ describe('offer detail page', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Glow-boosting face cream sample' })
     ).toBeInTheDocument();
-    expect(screen.getByText('Sample date 27 October 2026')).toBeInTheDocument();
+    const sampleOffer = OFFERS.find((offer) => offer.slug === SAMPLE)!;
+    expect(
+      screen.getByText(`Sample date ${formatIsoDate(sampleOffer.lastVerifiedAt)}`)
+    ).toBeInTheDocument();
     expect(screen.getByText('POSTAGE: FREE')).toBeInTheDocument();
     expect(screen.getByText('UK OFFER')).toBeInTheDocument();
     expect(screen.queryByText('CARD REQUIRED')).toBeNull();

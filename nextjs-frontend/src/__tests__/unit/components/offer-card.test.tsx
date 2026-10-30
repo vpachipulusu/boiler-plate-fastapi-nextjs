@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { OfferCard, OfferGrid } from '@/components/catalogue/offer-card';
 import { MERCHANTS, OFFERS } from '@/lib/catalogue/fixtures';
+import type { Offer } from '@/lib/catalogue/types';
 
 const offer = OFFERS[0];
 const merchant = MERCHANTS.find((item) => item.slug === offer.merchantSlug)!;
@@ -23,6 +24,63 @@ describe('OfferCard', () => {
 
     expect(screen.getByText('Demo')).toBeInTheDocument();
     expect(container.querySelector('a[href^="http"]')).toBeNull();
+  });
+});
+
+describe('OfferCard postage for samples', () => {
+  const sample = OFFERS.find((item) => item.offerType === 'free_sample');
+  if (!sample) throw new Error('The fixtures must contain a free_sample offer');
+  const sampleMerchant = MERCHANTS.find((item) => item.slug === sample.merchantSlug)!;
+  const withPostage = (postage: Offer['postage'], over: Partial<Offer> = {}) => ({
+    ...sample,
+    postage,
+    ...over,
+  });
+
+  it.each([
+    [{ kind: 'free' }, 'Postage: Free'],
+    [{ kind: 'cost', amountMinor: 299, currency: 'GBP' }, 'Postage: £2.99'],
+    [{ kind: 'check_terms' }, 'Postage: Check terms'],
+  ] as const)('shows the postage for a free sample (%j)', (postage, text) => {
+    render(<OfferCard offer={withPostage(postage)} merchant={sampleMerchant} />);
+
+    expect(screen.getByText(text)).toBeInTheDocument();
+  });
+
+  it('shows it for a real (API) sample too', () => {
+    render(
+      <OfferCard
+        offer={withPostage(
+          { kind: 'cost', amountMinor: 150, currency: 'GBP' },
+          { source: 'api', demo: false }
+        )}
+        merchant={sampleMerchant}
+      />
+    );
+
+    expect(screen.getByText('Postage: £1.50')).toBeInTheDocument();
+  });
+
+  it.each(['free_trial', 'cashback', 'voucher', 'competition'] as const)(
+    'shows no postage line for %s',
+    (offerType) => {
+      render(
+        <OfferCard offer={withPostage({ kind: 'free' }, { offerType })} merchant={sampleMerchant} />
+      );
+
+      expect(screen.queryByText(/^Postage:/)).toBeNull();
+    }
+  );
+
+  it('keeps the type badge wording and puts the postage in its own line, outside the footer row', () => {
+    const { container } = render(
+      <OfferCard offer={withPostage({ kind: 'free' })} merchant={sampleMerchant} />
+    );
+
+    expect(screen.getByText('Free sample')).toBeInTheDocument();
+    const line = screen.getByText('Postage: Free');
+    expect(line.tagName).toBe('P');
+    expect(container.querySelector('.border-t')?.contains(line)).toBe(false);
   });
 });
 

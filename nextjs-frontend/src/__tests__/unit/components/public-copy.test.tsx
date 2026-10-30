@@ -13,6 +13,7 @@ import { AnnouncementBar } from '@/components/site/announcement-bar';
 import { SiteFooter } from '@/components/site/site-footer';
 import { HomeHero } from '@/components/home/home-hero';
 import { TrustStrip } from '@/components/home/trust-strip';
+import { NewsletterBand } from '@/components/home/newsletter-band';
 import { CatalogueHeader } from '@/components/catalogue/catalogue-header';
 import { OfferCta } from '@/components/offer/offer-cta';
 import { OfferTrustPanel } from '@/components/offer/offer-trust-panel';
@@ -20,8 +21,11 @@ import { siteConfig } from '@/config/site';
 import { DEFAULT_QUERY } from '@/lib/catalogue/offer-url';
 import { OFFERS } from '@/lib/catalogue/fixtures';
 
+// "genuine" is listed because the old description said "genuine UK free samples", which implies a
+// verification the site cannot evidence (CAP 3.7).
 const ABSOLUTES = /zero spend|for £0|no spend|genuine|daily dose|hidden surprises|freebies only/i;
-const SAMPLE = OFFERS.find((offer) => offer.offerType === 'free_sample')!;
+const SAMPLE = OFFERS.find((offer) => offer.offerType === 'free_sample');
+if (!SAMPLE) throw new Error('The fixtures must contain a free_sample offer');
 
 describe('site-wide slogans', () => {
   it('announcement bar does not say everything costs nothing or refreshes daily', () => {
@@ -35,8 +39,8 @@ describe('site-wide slogans', () => {
   it('the tagline and description (footer, metadata, manifest) make no zero-cost or quality claim', () => {
     expect(siteConfig.tagline).not.toMatch(ABSOLUTES);
     expect(siteConfig.description).not.toMatch(ABSOLUTES);
-    render(<SiteFooter />);
-    expect(screen.getByText(new RegExp(siteConfig.tagline.replace('.', '\.')))).toBeInTheDocument();
+    const { container } = render(<SiteFooter />);
+    expect(container).toHaveTextContent(siteConfig.tagline);
   });
 
   it.each([true, false])('the home hero makes no zero-cost or quality claim (demo=%s)', (demo) => {
@@ -58,6 +62,20 @@ describe('site-wide slogans', () => {
     const { container } = render(<CatalogueHeader query={DEFAULT_QUERY} demo={false} />);
 
     expect(container.textContent).not.toMatch(/free thing/i);
+  });
+});
+
+describe('alerts promises on the home page', () => {
+  it('promises no cadence, no "no spam" and no "anytime", and says how to stop', () => {
+    const { container } = render(<NewsletterBand />);
+
+    expect(container.textContent).not.toMatch(/regular|no spam|anytime|good stuff/i);
+    expect(container).toHaveTextContent('Alerts about offers in the categories you choose.');
+    expect(container).toHaveTextContent('Only the alerts you choose. Unsubscribe from any email.');
+    expect(screen.getByRole('link', { name: 'privacy details' })).toHaveAttribute(
+      'href',
+      '/privacy'
+    );
   });
 });
 
@@ -89,6 +107,32 @@ describe('call to action conditions line', () => {
     expect(screen.getByText('Postage: £2.99.')).toBeInTheDocument();
   });
 
+  it('ties the line to the demo button as its accessible description, without renaming the button', () => {
+    render(<OfferCta offerType="free_sample" demo conditions="Postage: £2.99." />);
+
+    const button = screen.getByRole('button', { name: 'Request this sample' });
+    expect(button).toHaveAccessibleDescription('Postage: £2.99.');
+    expect(button).not.toHaveAttribute('aria-label');
+  });
+
+  it('ties the line to the real offer link as its accessible description, without renaming the link', () => {
+    render(
+      <OfferCta offerType="free_sample" demo={false} offerId="api-1" conditions="Postage: £2.99." />
+    );
+
+    const link = screen.getByRole('link', { name: 'Request this sample' });
+    expect(link).toHaveAccessibleDescription('Postage: £2.99.');
+    expect(link).not.toHaveAttribute('aria-label');
+  });
+
+  it('sets no description when there is no line', () => {
+    render(<OfferCta offerType="cashback" demo />);
+
+    expect(screen.getByRole('button', { name: 'Get this cashback' })).not.toHaveAttribute(
+      'aria-describedby'
+    );
+  });
+
   it('shows the generated line after a real offer button, before the commission sentence', () => {
     const { container } = render(
       <OfferCta
@@ -118,6 +162,6 @@ describe('call to action conditions line', () => {
     const { container } = render(<OfferCta offerType="voucher" demo />);
 
     expect(container.textContent).not.toMatch(/may earn|if you qualify/i);
-    expect(container.textContent).toMatch(/Ad/);
+    expect(container.textContent).toMatch(/marked "Ad"/);
   });
 });

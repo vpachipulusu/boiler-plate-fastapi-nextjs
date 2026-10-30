@@ -128,7 +128,7 @@ export function AlertsForm({ categories, live }: AlertsFormProps) {
         Create your free alerts
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Choose what you&apos;d like to hear about. You can change this anytime.
+        Choose what you&apos;d like to hear about. Unsubscribe from any email to stop them.
       </p>
 
       <form
@@ -308,9 +308,7 @@ export function AlertsForm({ categories, live }: AlertsFormProps) {
         ) : null}
       </form>
 
-      <p className="mt-4 text-xs text-muted-foreground">
-        No spam · no sold email lists · unsubscribe in one click
-      </p>
+      <p className="mt-4 text-xs text-muted-foreground">Unsubscribe in one click from any email</p>
     </div>
   );
 }

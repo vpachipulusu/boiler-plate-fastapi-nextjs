@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ArrowRight, Clock } from 'lucide-react';
+import { postageText } from '@/components/offer/offer-format';
 import { cn } from '@/lib/utils';
 import { displayFreshness } from '@/lib/catalogue/freshness';
 import type { Merchant, Offer } from '@/lib/catalogue/types';
@@ -46,6 +47,10 @@ export function OfferCard({ offer, merchant, className }: OfferCardProps) {
           {offer.title}
         </Link>
       </h3>
+      {/* Strict CAP 3.23 reading (checklist D-07): a "Free sample" badge never appears without its postage. */}
+      {offer.offerType === 'free_sample' && (
+        <p className="mt-1 text-xs text-muted-foreground">Postage: {postageText(offer.postage)}</p>
+      )}
       <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-3 text-xs">
         {/* The mobile design (screens 05/06) keeps only the link on narrow cards. */}
         {freshness ? (

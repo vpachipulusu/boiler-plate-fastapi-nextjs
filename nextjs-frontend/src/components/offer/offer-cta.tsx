@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ interface OfferCtaProps {
  * (server) hero instead of this client component.
  */
 export function OfferCta({ offerType, demo, offerId = null, conditions = null }: OfferCtaProps) {
+  const conditionsId = useId();
   if (offerId && !demo) {
     return <AffiliateCta offerId={offerId} offerType={offerType} conditions={conditions} />;
   }
@@ -43,6 +45,7 @@ export function OfferCta({ offerType, demo, offerId = null, conditions = null }:
           <Button
             type="button"
             variant="accent"
+            aria-describedby={conditions ? conditionsId : undefined}
             className="h-14 w-full justify-between rounded-pill px-7 text-base font-bold shadow-sm"
           >
             {CTA_LABELS[offerType]}
@@ -69,7 +72,9 @@ export function OfferCta({ offerType, demo, offerId = null, conditions = null }:
         </DialogContent>
       </Dialog>
       {conditions && (
-        <p className="mt-3 px-3 text-xs font-semibold text-foreground">{conditions}</p>
+        <p id={conditionsId} className="mt-3 px-3 text-xs font-semibold text-foreground">
+          {conditions}
+        </p>
       )}
       <p className="mt-3 px-3 text-xs text-muted-foreground">
         Demo offer: this button stays on Freejoy. A real offer will take you to the brand&apos;s

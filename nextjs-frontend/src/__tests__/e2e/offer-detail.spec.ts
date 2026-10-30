@@ -1,5 +1,7 @@
 import { test, expect } from './helpers/fixtures';
 import { waitForPageReady } from './helpers/e2e-utils';
+import { formatIsoDate } from '../../components/offer/offer-format';
+import { OFFERS } from '../../lib/catalogue/fixtures';
 
 /**
  * Offer detail (`/freebies/[slug]`) journey on the FIXTURE catalogue (the e2e server runs with
@@ -13,7 +15,9 @@ test.skip(
   'Fixture specs: the server is on the live catalogue'
 );
 
-const SAMPLE = '/freebies/glow-boosting-face-cream-sample';
+const SAMPLE_SLUG = 'glow-boosting-face-cream-sample';
+const SAMPLE = `/freebies/${SAMPLE_SLUG}`;
+const SAMPLE_DATE = OFFERS.find((offer) => offer.slug === SAMPLE_SLUG)?.lastVerifiedAt;
 const TRIAL = '/freebies/overnight-sheet-mask-trial';
 const EXPIRED = '/freebies/laundry-sheets-sample';
 
@@ -33,7 +37,8 @@ for (const viewport of VIEWPORTS) {
       await expect(
         page.getByRole('heading', { level: 1, name: 'Glow-boosting face cream sample' })
       ).toBeVisible();
-      await expect(page.getByText('Sample date 27 October 2026')).toBeVisible();
+      if (!SAMPLE_DATE) throw new Error('Fixture sample offer not found');
+      await expect(page.getByText(`Sample date ${formatIsoDate(SAMPLE_DATE)}`)).toBeVisible();
       await expect(page.getByText('POSTAGE: FREE', { exact: true })).toBeVisible();
       await expect(page.getByText('UK OFFER')).toBeVisible();
       await expect(

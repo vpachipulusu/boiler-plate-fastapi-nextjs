@@ -151,11 +151,11 @@ the admin publish, unpublish and expire actions (FREEJ-22); nothing calls it yet
   "SAMPLE" and "TRIAL"). `ctaConditions()` in `offer-format.ts` renders the postage (samples) or the card
   requirement (trials) in a line right after the button, from the offer's own fields.
 - Site-wide copy (announcement bar, tagline, hero, trust strip) makes no zero-cost, "daily" or quality claim.
-  `public-copy.test.tsx` pins this. Why each line reads as it does: `docs/compliance/uk-affiliate-checklist.md`
+  `public-copy.test.tsx` pins this. A `free_sample` card shows its postage on its own line under the title. Why each line reads as it does: `docs/compliance/uk-affiliate-checklist.md`
   section I.3.
-- No offer has a destination yet (the `/go/[id]` redirect is Phase 3). The offer CTA therefore opens a
-  dialog: "Demo offer" for fixtures, "Claim link coming soon" for real offers. No element on any page has
-  an external `href`.
+- A demo (fixture) offer has no destination, so its CTA opens a "Demo offer" dialog. A real offer's CTA links
+  to the first-party `/go/<offerId>` redirect (FREEJ-23), preceded by the "Ad" label and followed by the
+  commission sentence. No element on any page has an external `href`.
 - The alerts form validates with Zod, requires consent, and submits through a server action
   (FREEJ-24). It answers "check your inbox" the same way for every address, and nothing starts until
   the visitor opens the emailed link and presses the button on `/alerts/confirm`. Until
@@ -218,7 +218,6 @@ it. The filter drawer and sort control render outside the keyed Suspense boundar
 - The offer page has no route-level loading skeleton: a `loading.tsx` there would turn every unknown offer into
   a 200 soft 404. The root skeleton lives in `components/site/route-skeleton.tsx` and is re-exported by the
   admin, auth, dashboard and pricing segments.
-- Offers have no claim link yet (Phase 3), so the CTA button opens the "coming soon" dialog.
 
 ## Next phases
 
