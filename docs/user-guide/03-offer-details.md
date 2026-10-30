@@ -40,7 +40,7 @@ On a phone the same content is stacked in one column:
 2. The button is named for the kind of offer: **Request this sample**, **Start the trial**, **Get this cashback**,
    **Get this voucher** or **Enter this competition**.
 3. Directly below the button is a line of conditions that travels with it:
-   - for a free sample, "Postage: £2.99." (or "Postage: free." or "Postage: check the brand's terms.");
+   - for a free sample, "Postage: £2.99." (or "Postage: Free." or "Postage: Check the brand's terms.");
    - for a free trial that needs a card, "A payment card is required to start."
 4. Under that, in smaller type: "Freejoy is paid a commission by the brand if you take up this offer through this
    link." and "This takes you to the brand's website to request your sample." with a link to the
