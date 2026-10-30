@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { adminErrorMessage } from '@/lib/api/admin-errors';
 import { fetchAdminAuditLogs } from '@/lib/api/admin-audit-logs';
 import { logger } from '@/lib/logger';
@@ -12,31 +13,39 @@ import {
   AUDIT_LOGS_PATH,
   auditLogsHref,
   auditLogsRangeText,
+  entryCount,
   hasAuditLogFilters,
+  isCanonicalAuditLogsUrl,
   parseAuditLogsQuery,
   toAuditLogListParams,
   type AuditLogsQuery,
 } from './audit-logs-query';
 import { AuditLogsTable } from './audit-logs-table';
+import { ResultsFocus } from './results-focus';
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata = { title: 'Audit Logs' };
 
-function EmptyState({ query }: { query: AuditLogsQuery }) {
-  const filtered = hasAuditLogFilters(query);
-  if (!filtered && query.page === 1) {
+function EmptyState({ query, total }: { query: AuditLogsQuery; total: number }) {
+  if (total > 0 && query.page > 1) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-8 text-center">
+        <p className="text-sm text-muted-foreground">No entries on this page</p>
+        <Button variant="outline" asChild>
+          <Link href={auditLogsHref({ ...query, page: 1 })}>Back to first page</Link>
+        </Button>
+      </div>
+    );
+  }
+  if (!hasAuditLogFilters(query)) {
     return <p className="py-8 text-center text-sm text-muted-foreground">No audit logs found</p>;
   }
   return (
     <div className="flex flex-col items-center gap-3 py-8 text-center">
-      <p className="text-sm text-muted-foreground">
-        {filtered ? 'No entries match these filters' : 'No entries on this page'}
-      </p>
+      <p className="text-sm text-muted-foreground">No entries match these filters</p>
       <Button variant="outline" asChild>
-        <Link href={filtered ? AUDIT_LOGS_PATH : auditLogsHref({ ...query, page: 1 })}>
-          {filtered ? 'Reset filters' : 'Back to first page'}
-        </Link>
+        <Link href={AUDIT_LOGS_PATH}>Reset filters</Link>
       </Button>
     </div>
   );
@@ -44,7 +53,14 @@ function EmptyState({ query }: { query: AuditLogsQuery }) {
 
 export default async function AdminAuditLogsPage({ searchParams }: { searchParams: SearchParams }) {
   await requireAdminPage();
-  const { query, notices } = parseAuditLogsQuery(await searchParams);
+  const rawParams = await searchParams;
+  const parsed = parseAuditLogsQuery(rawParams);
+  const { query, notices } = parsed;
+  // A clean but untidy URL (blank fields, the default size) becomes its canonical link. With notices the URL stays
+  // so the admin sees what was ignored.
+  if (notices.length === 0 && !isCanonicalAuditLogsUrl(rawParams, query)) {
+    redirect(auditLogsHref(query));
+  }
   const result = await fetchAdminAuditLogs(toAuditLogListParams(query));
   if (!result.success) {
     logger.error('Admin audit logs page: list failed', { status: result.status });
@@ -54,7 +70,7 @@ export default async function AdminAuditLogsPage({ searchParams }: { searchParam
   const summary =
     logs.length > 0
       ? `${auditLogsRangeText(query, logs.length, totalCount)} (newest first)`
-      : `${totalCount} entries`;
+      : entryCount(totalCount);
 
   return (
     <div className="space-y-6">
@@ -65,17 +81,17 @@ export default async function AdminAuditLogsPage({ searchParams }: { searchParam
 
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <h2 className="font-semibold leading-none tracking-tight">Filters</h2>
           <CardDescription>All filters combine: an entry must match every one.</CardDescription>
         </CardHeader>
         <CardContent>
-          <AuditLogsFilters query={query} notices={notices} />
+          <AuditLogsFilters query={query} notices={notices} invalid={parsed.invalid} />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
+          <ResultsFocus focusKey={auditLogsHref(query)}>Recent Activity</ResultsFocus>
           <CardDescription role="status">
             {result.success ? summary : 'Audit log entries'}
           </CardDescription>
@@ -89,7 +105,7 @@ export default async function AdminAuditLogsPage({ searchParams }: { searchParam
               <AuditLogsPagination query={query} total={totalCount} />
             </>
           ) : (
-            <EmptyState query={query} />
+            <EmptyState query={query} total={totalCount} />
           )}
         </CardContent>
       </Card>

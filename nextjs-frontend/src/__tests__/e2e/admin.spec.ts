@@ -345,7 +345,7 @@ test.describe('Admin Dashboard', () => {
     test('should display recent activity section', async ({ page }) => {
       await expect(page.getByText('Recent Activity')).toBeVisible();
       await expect(
-        page.getByText(/showing \d+ to \d+ of \d+ entries|^\d+ entries$/i)
+        page.getByText(/showing \d+ to \d+ of \d+ entr(?:y|ies)|^\d+ entr(?:y|ies)$/i)
       ).toBeVisible();
       await expect(page.getByRole('search', { name: /filter audit log entries/i })).toBeVisible();
     });

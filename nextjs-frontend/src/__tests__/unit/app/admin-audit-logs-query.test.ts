@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   auditLogsHref,
   auditLogsRangeText,
+  auditNoticeId,
+  auditNoticeItemId,
+  entryCount,
   hasAuditLogFilters,
+  isCanonicalAuditLogsUrl,
   maxAuditLogPage,
   parseAuditLogsQuery,
   toAuditLogListParams,
@@ -73,6 +77,8 @@ describe('parseAuditLogsQuery', () => {
     ['from', '2026-13-01', '"From" date'],
     ['from', '01/02/2026', '"From" date'],
     ['from', '2026-01-01T00:00:00Z', '"From" date'],
+    ['from', '0000-01-01', '"From" date'],
+    ['to', '0000-12-31', '"To" date'],
     ['to', 'tomorrow', '"To" date'],
   ])('drops an invalid %s (%s) with a curated notice that never echoes it', (key, value, text) => {
     const { query, notices } = parse({ [key]: value });
@@ -96,6 +102,24 @@ describe('parseAuditLogsQuery', () => {
     expect(query.from).toBeUndefined();
     expect(query.to).toBeUndefined();
     expect(notices).toEqual(['Both dates were ignored because "To" is before "From".']);
+  });
+
+  it('keeps year 1, the earliest date the API can hold', () => {
+    expect(parse({ from: '0001-01-01' }).query.from).toBe('0001-01-01');
+  });
+
+  it('reports no invalid fields for a clean query', () => {
+    expect(parse({ action: 'admin.users.ban', from: '2026-01-01' }).invalid.size).toBe(0);
+  });
+
+  it('reports each rejected field, and both dates for an inverted range', () => {
+    expect(
+      [...parse({ action: 'x', user: '!', org: 'a b', from: 'no', to: 'no' }).invalid].sort()
+    ).toEqual(['action', 'from', 'org', 'to', 'user']);
+    expect([...parse({ from: '2026-03-02', to: '2026-03-01' }).invalid].sort()).toEqual([
+      'from',
+      'to',
+    ]);
   });
 
   it('keeps a one-day range', () => {
@@ -181,7 +205,7 @@ describe('toAuditLogListParams', () => {
       userId: 'u1',
       organizationId: 'o1',
       createdFrom: '2026-01-05T00:00:00Z',
-      createdTo: '2026-01-06T23:59:59.999Z',
+      createdTo: '2026-01-06T23:59:59.999999Z',
       limit: 25,
       offset: 75,
     });
@@ -242,11 +266,64 @@ describe('auditLogsHref', () => {
   });
 });
 
+describe('auditNoticeId', () => {
+  it('points a rejected field at its own notice, and an inverted range at the range notice', () => {
+    const bad = parse({ action: 'Bad Value' });
+    expect(auditNoticeId('action', bad)).toBe('audit-notice-action');
+    expect(auditNoticeId('user', bad)).toBeUndefined();
+
+    const range = parse({ from: '2026-03-02', to: '2026-03-01' });
+    expect(auditNoticeId('from', range)).toBe('audit-notice-range');
+    expect(auditNoticeId('to', range)).toBe('audit-notice-range');
+  });
+
+  it('gives every notice a list item id matching its field', () => {
+    const { notices } = parse({ action: 'x', org: '!', from: '2026-03-02', to: '2026-03-01' });
+
+    expect(notices.map(auditNoticeItemId)).toEqual([
+      'audit-notice-action',
+      'audit-notice-org',
+      'audit-notice-range',
+    ]);
+    expect(auditNoticeItemId('something else')).toBe('audit-notice-other');
+  });
+});
+
+describe('entryCount', () => {
+  it('uses the singular only for exactly one', () => {
+    expect(entryCount(0)).toBe('0 entries');
+    expect(entryCount(1)).toBe('1 entry');
+    expect(entryCount(2)).toBe('2 entries');
+  });
+});
+
+describe('isCanonicalAuditLogsUrl', () => {
+  const canonical = (raw: Record<string, string | string[] | undefined>) =>
+    isCanonicalAuditLogsUrl(raw, parse(raw).query);
+
+  it('accepts the bare URL and a tidy one', () => {
+    expect(canonical({})).toBe(true);
+    expect(canonical({ action: 'admin.users.ban', size: '25', page: '2' })).toBe(true);
+  });
+
+  it.each([
+    ['a blank field', { user: '' }],
+    ['the default size', { size: '50' }],
+    ['page 1', { page: '1' }],
+    ['an unknown parameter', { utm: 'x' }],
+    ['untrimmed text', { action: ' admin.users.ban ' }],
+    ['a repeated parameter', { action: ['a.b', 'c.d'] }],
+    ['a clamped page', { page: '9999' }],
+  ])('rejects %s', (_name, raw) => {
+    expect(canonical(raw)).toBe(false);
+  });
+});
+
 describe('auditLogsRangeText', () => {
   it('names the first and last entry on the page', () => {
     const { query } = parse({ page: '3', size: '25' });
 
     expect(auditLogsRangeText(query, 25, 120)).toBe('Showing 51 to 75 of 120 entries');
-    expect(auditLogsRangeText({ ...query, page: 1 }, 1, 1)).toBe('Showing 1 to 1 of 1 entries');
+    expect(auditLogsRangeText({ ...query, page: 1 }, 1, 1)).toBe('Showing 1 to 1 of 1 entry');
   });
 });

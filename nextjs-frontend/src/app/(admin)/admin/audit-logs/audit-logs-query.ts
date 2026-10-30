@@ -31,10 +31,14 @@ export type AuditLogsQuery = {
   page: number;
 };
 
+export type AuditField = 'action' | 'user' | 'org' | 'from' | 'to';
+
 export type AuditLogsParseResult = {
   query: AuditLogsQuery;
   /** Curated, fixed notices for filters that were dropped. Never contains the rejected value. */
   notices: string[];
+  /** The fields whose submitted value was rejected, so the form can mark them invalid. */
+  invalid: Set<AuditField>;
 };
 
 type RawParams = Record<string, string | string[] | undefined>;
@@ -48,9 +52,36 @@ const NOTICES = {
   range: 'Both dates were ignored because "To" is before "From".',
 } as const;
 
+/** A real calendar day from year 1 (the API's datetime type has no year 0). */
 function isRealDate(value: string): boolean {
   const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().startsWith(value) &&
+    parsed.getUTCFullYear() >= 1
+  );
+}
+
+/** The id of the notice that explains a rejected field, for `aria-describedby`. Undefined when it was accepted. */
+export function auditNoticeId(
+  field: AuditField,
+  { notices, invalid }: Pick<AuditLogsParseResult, 'notices' | 'invalid'>
+): string | undefined {
+  if (!invalid.has(field)) return undefined;
+  return notices.includes(NOTICES[field]) ? `audit-notice-${field}` : 'audit-notice-range';
+}
+
+/** The id of a notice's list item, matching `auditNoticeId`. */
+export function auditNoticeItemId(notice: string): string {
+  const field = (Object.keys(NOTICES) as (keyof typeof NOTICES)[]).find(
+    (key) => NOTICES[key] === notice
+  );
+  return `audit-notice-${field ?? 'other'}`;
+}
+
+/** "1 entry", "250 entries". */
+export function entryCount(count: number): string {
+  return `${count} ${count === 1 ? 'entry' : 'entries'}`;
 }
 
 const actionSchema = z.string().trim().min(3).max(100).regex(ACTION_PATTERN);
@@ -78,16 +109,17 @@ function present(value: string | string[] | undefined): string | string[] | unde
 
 function parseField<T>(
   raw: RawParams,
-  key: string,
+  key: AuditField,
   schema: z.ZodType<T>,
-  notice: string,
-  notices: string[]
+  notices: string[],
+  invalid: Set<AuditField>
 ): T | undefined {
   const value = present(raw[key]);
   if (value === undefined) return undefined;
   const parsed = schema.safeParse(value);
   if (parsed.success) return parsed.data;
-  notices.push(notice);
+  notices.push(NOTICES[key]);
+  invalid.add(key);
   return undefined;
 }
 
@@ -100,34 +132,36 @@ function parseSilently<T>(raw: RawParams, key: string, schema: z.ZodType<T>): T 
 
 export function parseAuditLogsQuery(raw: RawParams): AuditLogsParseResult {
   const notices: string[] = [];
-  const action = parseField(raw, 'action', actionSchema, NOTICES.action, notices);
-  const user = parseField(raw, 'user', idSchema, NOTICES.user, notices);
-  const org = parseField(raw, 'org', idSchema, NOTICES.org, notices);
-  let from = parseField(raw, 'from', dateSchema, NOTICES.from, notices);
-  let to = parseField(raw, 'to', dateSchema, NOTICES.to, notices);
+  const invalid = new Set<AuditField>();
+  const action = parseField(raw, 'action', actionSchema, notices, invalid);
+  const user = parseField(raw, 'user', idSchema, notices, invalid);
+  const org = parseField(raw, 'org', idSchema, notices, invalid);
+  let from = parseField(raw, 'from', dateSchema, notices, invalid);
+  let to = parseField(raw, 'to', dateSchema, notices, invalid);
   if (from && to && from > to) {
     notices.push(NOTICES.range);
+    invalid.add('from').add('to');
     from = undefined;
     to = undefined;
   }
   const size = parseSilently(raw, 'size', sizeSchema) ?? DEFAULT_AUDIT_LOG_PAGE_SIZE;
   const page = Math.min(parseSilently(raw, 'page', pageSchema) ?? 1, maxAuditLogPage(size));
 
-  return { query: { action, user, org, from, to, size, page }, notices };
+  return { query: { action, user, org, from, to, size, page }, notices, invalid };
 }
 
 export function hasAuditLogFilters(query: AuditLogsQuery): boolean {
   return Boolean(query.action || query.user || query.org || query.from || query.to);
 }
 
-/** The values for the API wrapper. A date becomes the whole UTC day: 00:00:00 to 23:59:59.999 inclusive. */
+/** The values for the API wrapper. A date becomes the whole UTC day: 00:00:00 to the last microsecond, inclusive. */
 export function toAuditLogListParams(query: AuditLogsQuery): AuditLogListParams {
   return {
     action: query.action,
     userId: query.user,
     organizationId: query.org,
     createdFrom: query.from ? `${query.from}T00:00:00Z` : undefined,
-    createdTo: query.to ? `${query.to}T23:59:59.999Z` : undefined,
+    createdTo: query.to ? `${query.to}T23:59:59.999999Z` : undefined,
     limit: query.size,
     offset: (query.page - 1) * query.size,
   };
@@ -151,5 +185,18 @@ export function auditLogsHref(query: Partial<AuditLogsQuery>): string {
 /** Which entries are on screen, for example "Showing 51 to 100 of 250 entries". */
 export function auditLogsRangeText(query: AuditLogsQuery, shown: number, total: number): string {
   const first = (query.page - 1) * query.size + 1;
-  return `Showing ${first} to ${first + shown - 1} of ${total} entries`;
+  return `Showing ${first} to ${first + shown - 1} of ${entryCount(total)}`;
+}
+
+/**
+ * True when the URL is already the canonical form of the parsed query: no blank or unknown parameters, no default
+ * size or page, trimmed values. Anything else is redirected to the canonical link.
+ */
+export function isCanonicalAuditLogsUrl(raw: RawParams, query: AuditLogsQuery): boolean {
+  const canonical = new URL(auditLogsHref(query), 'http://localhost').searchParams;
+  const keys = Object.keys(raw);
+  return (
+    keys.length === [...canonical.keys()].length &&
+    keys.every((key) => typeof raw[key] === 'string' && raw[key] === canonical.get(key))
+  );
 }

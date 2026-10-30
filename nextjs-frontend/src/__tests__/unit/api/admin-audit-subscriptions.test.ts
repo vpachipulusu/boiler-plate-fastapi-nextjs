@@ -64,7 +64,7 @@ describe('admin audit log and subscription wrappers', () => {
       userId: 'u1',
       organizationId: 'o1',
       createdFrom: '2026-01-05T00:00:00Z',
-      createdTo: '2026-01-06T23:59:59.999Z',
+      createdTo: '2026-01-06T23:59:59.999999Z',
       limit: 25,
       offset: 50,
     });
@@ -76,7 +76,7 @@ describe('admin audit log and subscription wrappers', () => {
       user_id: 'u1',
       organization_id: 'o1',
       created_from: '2026-01-05T00:00:00Z',
-      created_to: '2026-01-06T23:59:59.999Z',
+      created_to: '2026-01-06T23:59:59.999999Z',
       limit: '25',
       offset: '50',
     });

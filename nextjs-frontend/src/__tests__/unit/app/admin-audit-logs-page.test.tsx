@@ -1,6 +1,7 @@
 /**
  * The admin audit log page: the admin gate runs before anything else, the URL is validated before it reaches the
- * API wrapper, the filters and paging links carry each other, and every failure is a curated message.
+ * API wrapper (and tidied by a redirect when it is clean but untidy), the filters and paging links carry each
+ * other, and every failure is a curated message.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
@@ -9,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   fetchAdminAuditLogs: vi.fn(),
   requireAdminPage: vi.fn(),
   logError: vi.fn(),
+  redirect: vi.fn((url: string) => {
+    throw new Error(`REDIRECT:${url}`);
+  }),
 }));
 
 vi.mock('@/app/(admin)/admin/_lib/require-admin-page', () => ({
@@ -19,6 +23,7 @@ vi.mock('@/lib/api/admin-audit-logs', () => ({
   fetchAdminAuditLogs: mocks.fetchAdminAuditLogs,
 }));
 vi.mock('@/lib/logger', () => ({ logger: { error: mocks.logError } }));
+vi.mock('next/navigation', () => ({ redirect: mocks.redirect }));
 
 import type { AuditLogEntry } from '@/lib/api/generated';
 import AdminAuditLogsPage from '@/app/(admin)/admin/audit-logs/page';
@@ -77,7 +82,7 @@ describe('admin audit logs page', () => {
       expect(order).toEqual(['gate', 'params', 'fetch']);
     });
 
-    it('does not read the params or the API when the gate refuses', async () => {
+    it('does not read the params, redirect or call the API when the gate refuses', async () => {
       mocks.requireAdminPage.mockRejectedValue(new Error('NEXT_REDIRECT'));
       const params = vi.fn();
       const searchParams = { then: params } as unknown as Promise<Raw>;
@@ -85,7 +90,55 @@ describe('admin audit logs page', () => {
       await expect(AdminAuditLogsPage({ searchParams })).rejects.toThrow('NEXT_REDIRECT');
 
       expect(params).not.toHaveBeenCalled();
+      expect(mocks.redirect).not.toHaveBeenCalled();
       expect(mocks.fetchAdminAuditLogs).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('tidy URLs', () => {
+    it('redirects a clean query with blank fields and the default size to its canonical link, before any fetch', async () => {
+      await expect(
+        renderPage({ action: 'admin.users.ban', user: '', org: '', from: '', to: '', size: '50' })
+      ).rejects.toThrow('REDIRECT:/admin/audit-logs?action=admin.users.ban');
+
+      expect(mocks.redirect).toHaveBeenCalledWith('/admin/audit-logs?action=admin.users.ban');
+      expect(mocks.fetchAdminAuditLogs).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a default page', { page: '1' }, '/admin/audit-logs'],
+      ['an unknown parameter', { utm: 'x' }, '/admin/audit-logs'],
+      [
+        'untrimmed text',
+        { action: ' admin.users.ban ' },
+        '/admin/audit-logs?action=admin.users.ban',
+      ],
+      ['a page past the cap', { page: '500', size: '100' }, '/admin/audit-logs?size=100&page=101'],
+    ])('redirects %s', async (_name, raw, target) => {
+      await expect(renderPage(raw)).rejects.toThrow(`REDIRECT:${target}`);
+    });
+
+    it('does not redirect a query that is already canonical', async () => {
+      await renderPage({ action: 'admin.users.ban', size: '25', page: '2' });
+
+      expect(mocks.redirect).not.toHaveBeenCalled();
+      expect(mocks.fetchAdminAuditLogs).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not redirect when there are notices, so the admin still sees what was ignored', async () => {
+      await renderPage({ action: 'Bad Value', user: '' });
+
+      expect(mocks.redirect).not.toHaveBeenCalled();
+      expect(screen.getByText(/The action filter was ignored/)).toBeInTheDocument();
+    });
+
+    it('only ever redirects to the audit log path with validated values', async () => {
+      await expect(renderPage({ action: 'admin.users.ban', page: '0' })).rejects.toThrow(
+        'REDIRECT'
+      );
+
+      const [url] = mocks.redirect.mock.calls[0];
+      expect(url).toMatch(/^\/admin\/audit-logs(\?[a-z0-9._=&-]+)?$/);
     });
   });
 
@@ -120,7 +173,7 @@ describe('admin audit logs page', () => {
         userId: 'u1',
         organizationId: 'o-2',
         createdFrom: '2026-01-05T00:00:00Z',
-        createdTo: '2026-01-06T23:59:59.999Z',
+        createdTo: '2026-01-06T23:59:59.999999Z',
         limit: 25,
         offset: 50,
       });
@@ -170,11 +223,30 @@ describe('admin audit logs page', () => {
       expect(screen.getByText('Showing 1 to 1 of 250 entries (newest first)')).toBeInTheDocument();
     });
 
-    it('announces the count as a polite status for assistive technology', async () => {
+    it('puts the count line in a status region, so a change to it can be announced', async () => {
       await renderPage({ page: '2' });
 
       const status = screen.getByText(/Showing 51 to 51 of 250 entries/);
       expect(status).toHaveAttribute('role', 'status');
+    });
+
+    it('uses the singular for a single entry', async () => {
+      mocks.fetchAdminAuditLogs.mockResolvedValue(auditPage([ENTRY], 1));
+
+      await renderPage();
+
+      expect(screen.getByText('Showing 1 to 1 of 1 entry (newest first)')).toBeInTheDocument();
+    });
+
+    it('titles the results with a focusable h2 and the filters with an h2 too', async () => {
+      await renderPage();
+
+      expect(screen.getByRole('heading', { level: 1, name: 'Audit Logs' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: 'Filters' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: 'Recent Activity' })).toHaveAttribute(
+        'tabindex',
+        '-1'
+      );
     });
 
     it('labels timestamps as UTC and leaves an unparsable one empty', async () => {
@@ -264,10 +336,10 @@ describe('admin audit logs page', () => {
     it('explains the offset cap instead of linking past it', async () => {
       mocks.fetchAdminAuditLogs.mockResolvedValue(auditPage([ENTRY], 50_000, 10_000));
 
-      await renderPage({ page: '999', size: '100' });
+      await renderPage({ page: '101', size: '100' });
 
       expect(screen.queryByRole('link', { name: 'Next' })).not.toBeInTheDocument();
-      expect(screen.getByText('Page 101 of 101')).toBeInTheDocument();
+      expect(screen.getByText('Page 101 of 101+')).toBeInTheDocument();
       expect(screen.getByText(/Narrow the filters or the date range/)).toBeInTheDocument();
     });
   });
@@ -293,12 +365,29 @@ describe('admin audit logs page', () => {
       for (const link of reset) expect(link).toHaveAttribute('href', '/admin/audit-logs');
     });
 
-    it('points an empty page past the data back to the first page', async () => {
+    it('says "No entries match these filters" for a filtered empty result even on a later page with no total', async () => {
+      mocks.fetchAdminAuditLogs.mockResolvedValue(auditPage([], 0, 400));
+
+      await renderPage({ action: 'admin.users.ban', page: '9' });
+
+      expect(screen.getByText('No entries match these filters')).toBeInTheDocument();
+      expect(screen.queryByText('No entries on this page')).not.toBeInTheDocument();
+    });
+
+    it('points an empty page past the data back to the first page, keeping the filters', async () => {
+      mocks.fetchAdminAuditLogs.mockResolvedValue(auditPage([], 30, 400));
+
+      await renderPage({ action: 'admin.users.ban', page: '9' });
+
+      expect(screen.getByText('No entries on this page')).toBeInTheDocument();
+      expect(linkHref('Back to first page')).toBe('/admin/audit-logs?action=admin.users.ban');
+    });
+
+    it('keeps the page size when sending an empty later page back to the first', async () => {
       mocks.fetchAdminAuditLogs.mockResolvedValue(auditPage([], 10, 50));
 
       await renderPage({ page: '2', size: '25' });
 
-      expect(screen.getByText('No entries on this page')).toBeInTheDocument();
       expect(linkHref('Back to first page')).toBe('/admin/audit-logs?size=25');
     });
 
@@ -347,6 +436,15 @@ describe('admin audit logs page', () => {
       expect(screen.getByLabelText('Action')).toHaveValue('admin.users.ban');
       expect(screen.getByLabelText('From date')).toHaveValue('2026-01-05');
       expect(screen.getByLabelText('Entries per page')).toHaveValue('100');
+    });
+
+    it('marks a rejected filter invalid and describes it with its notice', async () => {
+      await renderPage({ action: 'Bad Value' });
+
+      const action = screen.getByLabelText('Action');
+      expect(action).toHaveAttribute('aria-invalid', 'true');
+      expect(action).toHaveValue('');
+      expect(action).toHaveAccessibleDescription(/The action filter was ignored/);
     });
   });
 });
