@@ -105,7 +105,8 @@ describe('SecurityPage redesign', () => {
     expect(screen.getAllByLabelText('Authenticator code')).toHaveLength(1);
     expect(code).toHaveAttribute('autocomplete', 'one-time-code');
     expect(code).toHaveAttribute('inputmode', 'numeric');
-    expect(code).toHaveAttribute('maxlength', '6');
+    // No maxlength: it would cut a pasted "123 456" before the digit filter runs.
+    expect(code).not.toHaveAttribute('maxlength');
     expect(code).toHaveClass('h-14');
     await user.type(code, '12a3456789');
     expect(code).toHaveValue('123456');

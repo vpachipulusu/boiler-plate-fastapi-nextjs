@@ -4,7 +4,7 @@ import { cookies, headers } from 'next/headers';
 import { z } from 'zod';
 import { auth } from '@/lib/firebase/client';
 import { applyActionCode } from 'firebase/auth';
-import { emailSchema, passwordSchema } from '@/lib/utils/validation';
+import { emailSchema, passwordSchema, totpCodeSchema } from '@/lib/utils/validation';
 import { logger } from '@/lib/logger';
 import {
   SIGN_IN_RATE_LIMITED_ERROR,
@@ -178,7 +178,7 @@ export async function verifyTokenAction(
 ): Promise<AuthActionResponse> {
   // Anything but a string (a tampered call) is treated as "no code": the API then asks for one.
   const code = typeof totpCode === 'string' ? totpCode : undefined;
-  if (code !== undefined && !TOTP_CODE_PATTERN.test(code)) return totpInvalidResult();
+  if (code !== undefined && !totpCodeSchema.safeParse(code).success) return totpInvalidResult();
   return establishSession(idToken, { isExplicitSignIn: true, totpCode: code });
 }
 
@@ -193,7 +193,6 @@ export async function refreshSessionAction(idToken: string): Promise<AuthActionR
 }
 
 const GENERIC_SIGN_IN_ERROR = 'Token verification failed';
-const TOTP_CODE_PATTERN = /^\d{6}$/;
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 5; // 5 days, matches the backend session lifetime
 
 /** The one outage result: display text plus the typed flag the forms act on. */
@@ -301,13 +300,13 @@ async function establishSession(
     // Refresh: needs the current session and the same uid; the API records no login history.
     const userAgent = isExplicitSignIn ? (await headers()).get('user-agent') : null;
     const session = isExplicitSignIn
-      ? await createBackendSession(idToken, userAgent, ...(totpCode ? [totpCode] : []))
+      ? await createBackendSession(idToken, userAgent, totpCode)
       : await refreshBackendSession(idToken);
     if (!session.success) {
       const refusal = isExplicitSignIn ? explicitSignInRefusal(session) : null;
       if (refusal) {
         // totp_required is the normal first answer for a 2FA account, not a failure worth logging.
-        if (refusal.error !== TOTP_REQUIRED_ERROR) {
+        if (!refusal.data || !('totpRequired' in refusal.data)) {
           logger.warn('Sign-in refused:', { status: session.status, code: session.code });
         }
         return refusal;

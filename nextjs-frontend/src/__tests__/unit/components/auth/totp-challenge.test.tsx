@@ -1,12 +1,13 @@
 /** two-factor sign-in: the code step of the login panel, from the first step to the dashboard. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const mocks = vi.hoisted(() => ({
   signInWithEmail: vi.fn(),
   signInWithGoogle: vi.fn(),
   signInWithGitHub: vi.fn(),
+  signOut: vi.fn(),
   verifyTokenAction: vi.fn(),
   toast: vi.fn(),
   push: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('@/lib/firebase/auth-helpers', () => ({
   signInWithEmail: mocks.signInWithEmail,
   signInWithGoogle: mocks.signInWithGoogle,
   signInWithGitHub: mocks.signInWithGitHub,
+  signOut: mocks.signOut,
 }));
 vi.mock('@/app/actions/auth-actions', () => ({ verifyTokenAction: mocks.verifyTokenAction }));
 
@@ -65,7 +67,10 @@ async function submitCode(user: User, code: string) {
 }
 
 describe('two-factor code step', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.signOut.mockResolvedValue({ error: null });
+  });
   afterEach(cleanup);
 
   it('opens when the password step answers totpRequired, forwarding the same ID token later', async () => {
@@ -88,7 +93,9 @@ describe('two-factor code step', () => {
 
     expect(field).toHaveAttribute('inputmode', 'numeric');
     expect(field).toHaveAttribute('autocomplete', 'one-time-code');
-    expect(field).toHaveAttribute('maxlength', '6');
+    // No maxlength: it would cut a pasted "123 456" before the digit filter runs.
+    expect(field).not.toHaveAttribute('maxlength');
+    expect(field).toHaveAttribute('name', 'totpCode');
     expect(field).not.toHaveAttribute('aria-invalid');
     expect(field).toHaveAccessibleDescription(/six-digit code from your authenticator app/i);
     expect(field.closest('form')).toHaveAttribute('aria-busy', 'false');
@@ -125,8 +132,11 @@ describe('two-factor code step', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('That code did not work');
     expect(alert).not.toHaveTextContent(TOTP_INVALID_ERROR);
-    await waitFor(() => expect(alert).toHaveFocus());
+    // Still announced (role=alert, linked by aria-describedby), but the cursor stays in the field so a phone
+    // keypad does not close.
     const field = screen.getByLabelText('Authenticator code');
+    await waitFor(() => expect(field).toHaveFocus());
+    expect(alert).not.toHaveFocus();
     expect(field).toHaveValue('');
     expect(field).toHaveAttribute('aria-invalid', 'true');
     expect(field).toHaveAccessibleDescription(/did not work/i);
@@ -180,7 +190,7 @@ describe('two-factor code step', () => {
     expect(alert).not.toHaveTextContent(/code did not work/i);
   });
 
-  it('points back to the first step when the sign-in is too old to finish', async () => {
+  it('closes the code step, signed out, with a notice when the sign-in is too old to finish', async () => {
     const user = userEvent.setup();
     await openCodeStep(user);
     mocks.verifyTokenAction.mockResolvedValueOnce({
@@ -191,8 +201,70 @@ describe('two-factor code step', () => {
     await submitCode(user, CODE);
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(/timed out.*sign in again/i);
+    expect(alert).toHaveTextContent(/your sign-in timed out/i);
+    expect(alert).toHaveTextContent(/sign in again/i);
     expect(alert).not.toHaveTextContent(/token/i);
+    expect(screen.queryByLabelText('Authenticator code')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/email/i)).toBeVisible();
+    expect(mocks.signOut).toHaveBeenCalledTimes(1);
+    // The password step plus the one code call: nothing retries after the step is closed.
+    expect(mocks.verifyTokenAction).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows the timed-out notice until the next sign-in attempt', async () => {
+    const user = userEvent.setup();
+    await openCodeStep(user);
+    mocks.verifyTokenAction.mockResolvedValueOnce({
+      success: false,
+      error: 'Token verification failed',
+    });
+    await submitCode(user, CODE);
+    await screen.findByRole('alert');
+    mocks.signInWithEmail.mockReturnValue(new Promise(() => {}));
+
+    await user.type(screen.getByLabelText(/^password$/i), 'secret123');
+    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
+  it('keeps only digits from a paste and takes the first six', async () => {
+    const user = userEvent.setup();
+    const field = await openCodeStep(user);
+
+    await user.click(field);
+    await user.paste('123 456');
+    expect(field).toHaveValue('123456');
+
+    await user.clear(field);
+    await user.paste('123-456');
+    expect(field).toHaveValue('123456');
+
+    await user.clear(field);
+    await user.paste('1234567');
+    expect(field).toHaveValue('123456');
+  });
+
+  it('announces a second short code again (a new alert, not the same one)', async () => {
+    const user = userEvent.setup();
+    await openCodeStep(user);
+
+    await submitCode(user, '123');
+    const first = await screen.findByRole('alert');
+    await user.click(screen.getByRole('button', { name: /verify and sign in/i }));
+
+    const second = screen.getByRole('alert');
+    expect(second).toHaveTextContent('Enter the six-digit code');
+    expect(second).not.toBe(first);
+    expect(first).not.toBeInTheDocument();
+  });
+
+  it('empties the password field when the code step opens', async () => {
+    const user = userEvent.setup();
+    await openCodeStep(user);
+
+    expect(screen.getByLabelText(/^password$/i)).toHaveValue('');
+    expect(screen.getByLabelText(/email/i)).toHaveValue('a@b.com');
   });
 
   it('treats a thrown network error as a connection problem, without echoing it', async () => {
@@ -221,23 +293,25 @@ describe('two-factor code step', () => {
     expect(await screen.findByRole('alert')).not.toHaveTextContent(/postgres/);
   });
 
-  it('submits once on a double submit and shows the loading state', async () => {
+  it('checks the code once when the form is submitted twice before the first answer', async () => {
     const user = userEvent.setup();
-    await openCodeStep(user);
+    const field = await openCodeStep(user);
     mocks.verifyTokenAction.mockReturnValueOnce(new Promise(() => {}));
+    await user.type(field, CODE);
+    const form = field.closest('form') as HTMLFormElement;
 
-    await submitCode(user, CODE);
-    const button = await screen.findByRole('button', { name: /verifying/i });
-    expect(button).toBeDisabled();
-    await user.click(button);
-    await user.keyboard('{Enter}');
+    // Two submits in the same tick: only the ref guard can stop the second one.
+    fireEvent.submit(form);
+    fireEvent.submit(form);
 
     // One call for the password step, one for the code.
     expect(mocks.verifyTokenAction).toHaveBeenCalledTimes(2);
-    expect(button.closest('form')).toHaveAttribute('aria-busy', 'true');
+    const button = await screen.findByRole('button', { name: /verifying/i });
+    expect(button).toBeDisabled();
+    expect(form).toHaveAttribute('aria-busy', 'true');
   });
 
-  it('Back returns to the sign-in form with the email kept', async () => {
+  it('Back returns to the sign-in form with the email kept, focus on the password, signed out once', async () => {
     const user = userEvent.setup();
     await openCodeStep(user);
 
@@ -246,6 +320,31 @@ describe('two-factor code step', () => {
     expect(screen.queryByLabelText('Authenticator code')).not.toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toHaveValue('a@b.com');
     expect(screen.getByLabelText(/email/i)).toBeVisible();
+    await waitFor(() => expect(screen.getByLabelText(/^password$/i)).toHaveFocus());
+    expect(screen.getByLabelText(/^password$/i)).toHaveValue('');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(mocks.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('signs in again after Back with a new ID token, with no old alert or code', async () => {
+    const user = userEvent.setup();
+    await openCodeStep(user);
+    mocks.verifyTokenAction.mockResolvedValueOnce(totpInvalid);
+    await submitCode(user, '000000');
+    await screen.findByRole('alert');
+    await user.click(screen.getByRole('button', { name: /back to sign in/i }));
+    mocks.signInWithEmail.mockResolvedValue({ user: {}, idToken: 'id-token-2', error: null });
+    mocks.verifyTokenAction.mockResolvedValueOnce(totpRequired);
+
+    await user.type(screen.getByLabelText(/^password$/i), 'secret123');
+    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+
+    const field = await screen.findByLabelText('Authenticator code');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(field).toHaveValue('');
+    mocks.verifyTokenAction.mockResolvedValueOnce({ success: true, data: {} });
+    await submitCode(user, CODE);
+    expect(mocks.verifyTokenAction).toHaveBeenLastCalledWith('id-token-2', CODE);
   });
 
   it('hides the provider buttons and the password form while the code step is open', async () => {
@@ -283,7 +382,10 @@ describe('two-factor code step', () => {
 });
 
 describe('TotpChallengeForm', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.signOut.mockResolvedValue({ error: null });
+  });
   afterEach(cleanup);
 
   it('calls onSignedIn after a successful code, submitted with Enter, and stays locked', async () => {
@@ -300,7 +402,7 @@ describe('TotpChallengeForm', () => {
     expect(screen.getByRole('button', { name: /verifying/i })).toBeDisabled();
   });
 
-  it('calls onCancel from Back', async () => {
+  it('calls onCancel from Back, after signing out', async () => {
     const user = userEvent.setup();
     const onCancel = vi.fn();
     render(<TotpChallengeForm idToken={ID_TOKEN} onSignedIn={vi.fn()} onCancel={onCancel} />);
@@ -308,5 +410,42 @@ describe('TotpChallengeForm', () => {
     await user.click(screen.getByRole('button', { name: /back to sign in/i }));
 
     expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(mocks.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('signs out when it is unmounted without a successful sign-in', () => {
+    const { unmount } = render(
+      <TotpChallengeForm idToken={ID_TOKEN} onSignedIn={vi.fn()} onCancel={vi.fn()} />
+    );
+
+    unmount();
+
+    expect(mocks.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not throw to the UI when signing out fails', async () => {
+    mocks.signOut.mockRejectedValue(new Error('network'));
+    const { unmount } = render(
+      <TotpChallengeForm idToken={ID_TOKEN} onSignedIn={vi.fn()} onCancel={vi.fn()} />
+    );
+
+    expect(() => unmount()).not.toThrow();
+    await waitFor(() => expect(mocks.signOut).toHaveBeenCalled());
+  });
+
+  it('keeps the Firebase sign-in after a successful code, even when unmounted', async () => {
+    const user = userEvent.setup();
+    const onSignedIn = vi.fn();
+    mocks.verifyTokenAction.mockResolvedValue({ success: true, data: {} });
+    const { unmount } = render(
+      <TotpChallengeForm idToken={ID_TOKEN} onSignedIn={onSignedIn} onCancel={vi.fn()} />
+    );
+    await user.type(screen.getByLabelText('Authenticator code'), CODE);
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+
+    unmount();
+
+    expect(mocks.signOut).not.toHaveBeenCalled();
   });
 });

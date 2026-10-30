@@ -1,22 +1,24 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { verifyTokenAction } from '@/app/actions/auth-actions';
+import { totpCodeSchema } from '@/lib/utils/validation';
 import { AuthFormAlert } from './auth-form-alert';
 import {
   classifyThrownAuthError,
   classifyTotpResult,
   REDIRECT_RECOVERY_MS,
+  SIGN_IN_TIMED_OUT,
   type AuthFormError,
 } from './auth-form-errors';
+import { signOutQuietly } from './sign-out-quietly';
 import { TwoFactorCodeField } from './two-factor-code-field';
 
 const CODE_FIELD_ID = 'sign-in-totp-code';
 const HELP_ID = 'sign-in-totp-help';
 const ERROR_ID = 'sign-in-totp-error';
-const CODE_PATTERN = /^\d{6}$/;
 
 const INCOMPLETE_CODE: AuthFormError = {
   kind: 'totp-invalid',
@@ -29,62 +31,105 @@ interface TotpChallengeFormProps {
   idToken: string;
   /** Called once the session cookie is set. */
   onSignedIn: () => void;
-  /** Back to the first step (to start the sign-in again). */
-  onCancel: () => void;
+  /**
+   * Back to the first step (to start the sign-in again), with an optional notice for it to show. The Firebase
+   * client has been signed out by then.
+   */
+  onCancel: (notice?: AuthFormError) => void;
 }
 
 /**
  * Second sign-in step for an account with two-factor authentication: the six-digit authenticator code, sent
  * with the same ID token to `verifyTokenAction`. Errors use the curated alert copy and are announced; the code
  * itself is never logged and is cleared after every refusal.
+ *
+ * Leaving the step without signing in (Back, a sign-in too old to finish, the page going away) signs the Firebase
+ * client out, so an abandoned sign-in leaves no refresh token behind.
  */
 export function TotpChallengeForm({ idToken, onSignedIn, onCancel }: TotpChallengeFormProps) {
   const [code, setCode] = useState('');
   const [error, setError] = useState<AuthFormError | null>(null);
+  // Bumped on every error so an identical one is announced again (the alert is remounted).
+  const [errorKey, setErrorKey] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const isSubmitting = useRef(false);
+  const signedIn = useRef(false);
+  const signedOut = useRef(false);
+  const redirectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // A new step: put the cursor where the person types.
-  useEffect(() => {
-    document.getElementById(CODE_FIELD_ID)?.focus();
+  const signOutOnce = useCallback(async () => {
+    if (signedOut.current) return;
+    signedOut.current = true;
+    await signOutQuietly();
   }, []);
+
+  // Unmounting without a successful sign-in abandons it.
+  useEffect(
+    () => () => {
+      clearTimeout(redirectTimer.current);
+      if (!signedIn.current) void signOutOnce();
+    },
+    [signOutOnce]
+  );
+
+  // A new step, and after each error: the cursor goes where the person types (this also keeps a phone keypad open).
+  useEffect(() => {
+    if (!isLoading) document.getElementById(CODE_FIELD_ID)?.focus();
+  }, [error, isLoading]);
 
   function release() {
     isSubmitting.current = false;
     setIsLoading(false);
   }
 
+  function showError(next: AuthFormError) {
+    setError({ ...next });
+    setErrorKey((key) => key + 1);
+  }
+
+  async function leave(notice?: AuthFormError) {
+    await signOutOnce();
+    onCancel(notice);
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSubmitting.current) return;
-    if (!CODE_PATTERN.test(code)) {
-      setError(INCOMPLETE_CODE);
+    if (!totpCodeSchema.safeParse(code).success) {
+      showError(INCOMPLETE_CODE);
       return;
     }
     isSubmitting.current = true;
-    let signedIn = false;
+    let done = false;
     try {
       setIsLoading(true);
       setError(null);
 
       const result = await verifyTokenAction(idToken, code);
       if (!result.success) {
+        const failure = classifyTotpResult(result);
+        if (failure.kind === 'totp-expired') {
+          // The first sign-in is too old to finish: every retry would fail and still count against the sign-in limit.
+          done = true;
+          await leave(SIGN_IN_TIMED_OUT);
+          return;
+        }
         setCode('');
-        setError(classifyTotpResult(result));
+        showError(failure);
         return;
       }
 
-      signedIn = true;
+      signedIn.current = true;
+      done = true;
       // If navigation fails or stalls, give the form back instead of leaving it locked.
-      setTimeout(release, REDIRECT_RECOVERY_MS);
+      redirectTimer.current = setTimeout(release, REDIRECT_RECOVERY_MS);
       onSignedIn();
     } catch (thrown) {
-      signedIn = false;
       setCode('');
-      setError(classifyThrownAuthError(thrown, 'sign-in'));
+      showError(classifyThrownAuthError(thrown, 'sign-in'));
     } finally {
-      // Stay locked while the redirect is in flight so a second submit cannot run.
-      if (!signedIn) release();
+      // Stay locked while the redirect is in flight (or the step is closing) so a second submit cannot run.
+      if (!done) release();
     }
   }
 
@@ -97,7 +142,7 @@ export function TotpChallengeForm({ idToken, onSignedIn, onCancel }: TotpChallen
         </p>
       </div>
 
-      {error && <AuthFormAlert error={error} id={ERROR_ID} />}
+      {error && <AuthFormAlert key={errorKey} error={error} id={ERROR_ID} focusOnShow={false} />}
 
       <TwoFactorCodeField
         id={CODE_FIELD_ID}
@@ -114,7 +159,7 @@ export function TotpChallengeForm({ idToken, onSignedIn, onCancel }: TotpChallen
       </Button>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button type="button" variant="ghost" onClick={onCancel} disabled={isLoading}>
+        <Button type="button" variant="ghost" onClick={() => void leave()} disabled={isLoading}>
           Back to sign in
         </Button>
         <Link

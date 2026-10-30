@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   verifyTokenAction: vi.fn(),
   signInWithGoogle: vi.fn(),
   signInWithGitHub: vi.fn(),
+  signOut: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
@@ -16,6 +17,7 @@ vi.mock('@/app/actions/auth-actions', () => ({ verifyTokenAction: mocks.verifyTo
 vi.mock('@/lib/firebase/auth-helpers', () => ({
   signInWithGoogle: mocks.signInWithGoogle,
   signInWithGitHub: mocks.signInWithGitHub,
+  signOut: mocks.signOut,
 }));
 
 import { OAuthButtons } from '@/components/auth/oauth-buttons';
@@ -23,6 +25,7 @@ import { OAuthButtons } from '@/components/auth/oauth-buttons';
 describe('OAuthButtons verification failures', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.signOut.mockResolvedValue({ error: null });
     mocks.signInWithGoogle.mockResolvedValue({ user: { uid: 'u' }, idToken: 'tok' });
     mocks.signInWithGitHub.mockResolvedValue({ user: { uid: 'u' }, idToken: 'tok' });
   });
@@ -107,6 +110,23 @@ describe('OAuthButtons verification failures', () => {
     const toast = mocks.toast.mock.calls[0][0];
     expect(toast.title).toBe('Two-factor code needed');
     expect(toast.description).toMatch(/login page/i);
+    // The half-finished sign-in must not leave the browser signed in to Firebase.
+    expect(mocks.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not sign out when the code step takes over', async () => {
+    mocks.verifyTokenAction.mockResolvedValue({
+      success: false,
+      error: 'Two-factor code required',
+      data: { totpRequired: true },
+    });
+    const onTotpRequired = vi.fn();
+    render(<OAuthButtons onTotpRequired={onTotpRequired} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /google/i }));
+
+    await waitFor(() => expect(onTotpRequired).toHaveBeenCalled());
+    expect(mocks.signOut).not.toHaveBeenCalled();
   });
 
   it('names a rate limit instead of "Authentication Failed"', async () => {
@@ -123,5 +143,6 @@ describe('OAuthButtons verification failures', () => {
     const toast = mocks.toast.mock.calls[0][0];
     expect(toast.title).toBe('Too many attempts');
     expect(toast.description).toMatch(/wait a few minutes/i);
+    expect(toast.description).not.toMatch(/reset your password/i);
   });
 });

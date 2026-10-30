@@ -70,6 +70,13 @@ export const NETWORK_ERROR: AuthFormError = {
   message: 'Check your connection and try again.',
 };
 
+/** What step one shows when the code step gave up because the first sign-in is too old to finish. */
+export const SIGN_IN_TIMED_OUT: AuthFormError = {
+  kind: 'totp-expired',
+  title: 'Your sign-in timed out',
+  message: 'Sign in again.',
+};
+
 /** Slow-redirect recovery: how long a submitted form stays locked while navigation is in flight. */
 export const REDIRECT_RECOVERY_MS = 8000;
 
@@ -168,8 +175,8 @@ function errorForKind(kind: AuthErrorKind, flow: AuthFlow): AuthFormError {
     case 'totp-expired':
       return {
         kind,
-        title: TITLE_BY_FLOW[flow],
-        message: 'Your sign-in may have timed out. Go back and sign in again.',
+        title: 'Your sign-in timed out',
+        message: 'Sign in again.',
       };
     default:
       return {

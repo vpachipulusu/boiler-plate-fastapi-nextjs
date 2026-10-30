@@ -144,6 +144,20 @@ describe('restoreSessionWithNewPassword', () => {
     expect(mocks.verifyTokenAction).toHaveBeenCalledWith('new-id-token');
   });
 
+  it('resolves false for a two-factor account, whose new session needs a code', async () => {
+    mocks.currentUser = user(['password']);
+    mocks.signInWithEmailAndPassword.mockResolvedValue({
+      user: { getIdToken: vi.fn().mockResolvedValue('t') },
+    });
+    mocks.verifyTokenAction.mockResolvedValue({
+      success: false,
+      error: 'Two-factor code required',
+      data: { totpRequired: true },
+    });
+
+    await expect(restoreSessionWithNewPassword('new-pass-1')).resolves.toBe(false);
+  });
+
   it('resolves false when the server refuses the new session', async () => {
     mocks.currentUser = user(['password']);
     mocks.signInWithEmailAndPassword.mockResolvedValue({

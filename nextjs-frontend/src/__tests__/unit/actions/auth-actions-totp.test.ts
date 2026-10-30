@@ -94,7 +94,7 @@ describe('verifyTokenAction two-factor step', () => {
       data: { totpRequired: true },
     });
     expect(JSON.stringify(result)).not.toContain('backend wording');
-    expect(mocks.createBackendSession).toHaveBeenCalledWith('id-token', 'vitest');
+    expect(mocks.createBackendSession).toHaveBeenCalledWith('id-token', 'vitest', undefined);
     expect(mocks.cookieSet).not.toHaveBeenCalled();
     expect(mocks.logError).not.toHaveBeenCalled();
     expect(mocks.logWarn).not.toHaveBeenCalled();
@@ -125,7 +125,7 @@ describe('verifyTokenAction two-factor step', () => {
     expect(mocks.cookieSet).not.toHaveBeenCalled();
   });
 
-  it.each(['12345', '1234567', 'abcdef', '12 456', ' 123456', '123456\n', ''])(
+  it.each(['', '12345', '1234567', '12a456', 'abcdef', '12 456', ' 123456', '123456\n', '١٢٣٤٥٦'])(
     'refuses the malformed code %j without calling the API',
     async (code) => {
       const result = await verifyTokenAction('id-token', code);
@@ -145,7 +145,7 @@ describe('verifyTokenAction two-factor step', () => {
 
     await call('id-token', { code: CODE });
 
-    expect(mocks.createBackendSession).toHaveBeenCalledWith('id-token', 'vitest');
+    expect(mocks.createBackendSession).toHaveBeenCalledWith('id-token', 'vitest', undefined);
   });
 
   it('reports a rate limit when the API answers 429 and sets no cookie', async () => {

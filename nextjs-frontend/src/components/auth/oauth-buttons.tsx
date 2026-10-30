@@ -7,7 +7,11 @@ import { verifyTokenAction } from '@/app/actions/auth-actions';
 import { useToast } from '@/hooks/use-toast';
 import { isTotpRequiredResult, type AuthFailureResult } from '@/lib/auth/auth-error-messages';
 import { classifyAuthResult } from './auth-form-errors';
+import { signOutQuietly } from './sign-out-quietly';
 import { useCompleteSignIn } from './use-complete-sign-in';
+
+/** No "reset your password": a rate limit is not a password problem, and the provider sign-in has none to reset. */
+const RATE_LIMIT_TOAST_DESCRIPTION = 'Wait a few minutes before trying again.';
 
 /**
  * Toast for a failed server-side verification, shared by every provider. An outage (typed flag) is
@@ -19,9 +23,12 @@ function verificationFailureToast(result: AuthFailureResult) {
   const hasOwnCopy = failure.kind === 'service-unavailable' || failure.kind === 'rate-limit';
   return {
     title: hasOwnCopy ? failure.title : 'Authentication Failed',
-    description: hasOwnCopy
-      ? failure.message
-      : result.error || 'Failed to create session. Please try again.',
+    description:
+      failure.kind === 'rate-limit'
+        ? RATE_LIMIT_TOAST_DESCRIPTION
+        : hasOwnCopy
+          ? failure.message
+          : result.error || 'Failed to create session. Please try again.',
     variant: 'destructive' as const,
   };
 }
@@ -73,8 +80,13 @@ export function OAuthButtons({ onTotpRequired }: OAuthButtonsProps = {}) {
 
         if (!result.success) {
           if (isTotpRequiredResult(result)) {
-            if (onTotpRequired) onTotpRequired(idToken);
-            else toast(TOTP_ON_LOGIN_PAGE_TOAST);
+            if (onTotpRequired) {
+              onTotpRequired(idToken);
+            } else {
+              // No code step here: do not leave the browser signed in to Firebase for a sign-in that ends.
+              await signOutQuietly();
+              toast(TOTP_ON_LOGIN_PAGE_TOAST);
+            }
             return;
           }
           toast(verificationFailureToast(result));

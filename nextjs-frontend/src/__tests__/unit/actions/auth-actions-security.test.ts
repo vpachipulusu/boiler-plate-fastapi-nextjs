@@ -95,7 +95,7 @@ describe('auth server actions', () => {
       await verifyTokenAction('id-token', { selectedPlan: requestedPlan });
 
       expect(mocks.createBackendSession).toHaveBeenCalledTimes(1);
-      expect(mocks.createBackendSession).toHaveBeenCalledWith('id-token', 'vitest');
+      expect(mocks.createBackendSession).toHaveBeenCalledWith('id-token', 'vitest', undefined);
     }
   );
 

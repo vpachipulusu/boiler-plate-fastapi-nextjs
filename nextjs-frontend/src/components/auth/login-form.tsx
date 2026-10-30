@@ -38,12 +38,17 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 interface LoginFormProps {
   /** The account has two-factor authentication on: continue with the code step, using this ID token. */
   onTotpRequired: (idToken: string) => void;
+  /** Shown above the form until the next submit (for example when the code step timed out). */
+  notice?: AuthFormError | null;
 }
 
-export function LoginForm({ onTotpRequired }: LoginFormProps) {
+export function LoginForm({ onTotpRequired, notice = null }: LoginFormProps) {
   const completeSignIn = useCompleteSignIn();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<AuthFormError | null>(null);
+  // A notice is shown until the next submit; remembering which one was dismissed keeps this derived, not synced.
+  const [dismissedNotice, setDismissedNotice] = useState<AuthFormError | null>(null);
+  const shownError = error ?? (notice !== dismissedNotice ? notice : null);
   const isSubmitting = useRef(false);
 
   const form = useForm<LoginFormValues>({
@@ -66,6 +71,7 @@ export function LoginForm({ onTotpRequired }: LoginFormProps) {
     try {
       setIsLoading(true);
       setError(null);
+      setDismissedNotice(notice);
 
       const {
         user,
@@ -85,6 +91,8 @@ export function LoginForm({ onTotpRequired }: LoginFormProps) {
         if (!result.success) {
           if (isTotpRequiredResult(result)) {
             // The password was right; the code step finishes the sign-in with this same ID token.
+            // Drop the password from the form: it is not needed again, and Back asks for it anew.
+            form.resetField('password');
             onTotpRequired(idToken);
             return;
           }
@@ -115,7 +123,7 @@ export function LoginForm({ onTotpRequired }: LoginFormProps) {
         noValidate
         aria-busy={isLoading}
       >
-        {error && <AuthFormAlert error={error} />}
+        {shownError && <AuthFormAlert error={shownError} />}
 
         <FormField
           control={form.control}
