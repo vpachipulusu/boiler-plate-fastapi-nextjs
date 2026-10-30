@@ -2,9 +2,16 @@ import { test, expect } from './helpers/fixtures';
 import { waitForPageReady } from './helpers/e2e-utils';
 
 /**
- * Offer detail (`/freebies/[slug]`) journey. Fixture offers have no destination, so the call to
- * action opens a "Demo offer" dialog and the page never links to an external site.
+ * Offer detail (`/freebies/[slug]`) journey on the FIXTURE catalogue (the e2e server runs with
+ * CATALOGUE_SOURCE=fixture unless E2E_LIVE_CATALOGUE=1; see catalogue-live.spec.ts for real data).
+ * Fixture offers have no destination, so the call to action opens a "Demo offer" dialog and the page
+ * never links to an external site.
  */
+
+test.skip(
+  process.env.E2E_LIVE_CATALOGUE === '1',
+  'Fixture specs: the server is on the live catalogue'
+);
 
 const SAMPLE = '/freebies/glow-boosting-face-cream-sample';
 const TRIAL = '/freebies/overnight-sheet-mask-trial';
@@ -27,7 +34,7 @@ for (const viewport of VIEWPORTS) {
         page.getByRole('heading', { level: 1, name: 'Glow-boosting face cream sample' })
       ).toBeVisible();
       await expect(page.getByText('Last checked 27 October 2026')).toBeVisible();
-      await expect(page.getByText('POSTAGE: FREE')).toBeVisible();
+      await expect(page.getByText('POSTAGE: FREE', { exact: true })).toBeVisible();
       await expect(page.getByText('UK OFFER')).toBeVisible();
       await expect(
         page.getByRole('region', { name: 'How to claim this freebie' }).getByRole('listitem')
@@ -86,17 +93,21 @@ for (const viewport of VIEWPORTS) {
 }
 
 test.describe('Offer detail routing and metadata', () => {
-  test('returns 404 for an unknown slug', async ({ page }) => {
-    const response = await page.goto('/freebies/no-such-offer');
+  // No loading.tsx sits above the public pages, so notFound() runs before the response starts and the
+  // status really is 404 (src/__tests__/unit/config/loading-boundary.test.ts guards this).
+  for (const [name, route] of [
+    ['an unknown offer slug', '/freebies/no-such-offer'],
+    ['a draft offer', '/freebies/cat-pouch-tasting-sample'],
+    ['a slug that is not a slug', '/freebies/Bad%20Slug'],
+    ['an unknown category', '/category/no-such-category'],
+  ] as const) {
+    test(`returns 404 and the not-found page for ${name}`, async ({ page }) => {
+      const response = await page.goto(route);
 
-    expect(response?.status()).toBe(404);
-  });
-
-  test('returns 404 for a draft offer', async ({ page }) => {
-    const response = await page.goto('/freebies/cat-pouch-tasting-sample');
-
-    expect(response?.status()).toBe(404);
-  });
+      expect(response?.status()).toBe(404);
+      await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
+    });
+  }
 
   test('is noindex with a canonical link while fixture-backed', async ({ page }) => {
     await page.goto(SAMPLE);

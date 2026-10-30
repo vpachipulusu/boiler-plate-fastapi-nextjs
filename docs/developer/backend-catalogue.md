@@ -117,11 +117,15 @@ the allowlist test together.
 
 ## Consumers
 
-The Next.js wrappers belong to a later story. Call the generated SDK (`listOffers`, `readOffer`, `listCategories`)
-only through `src/lib/api/` and `callBackend`. The 120/min limit is keyed by the forwarded client IP, so the wrapper must
-forward the visitor's address in `X-Client-IP`, taken from the hosting platform's trusted header (for example the one
-Vercel sets), never from a header the client can set. Renders that forward nothing share one bucket keyed on the
-Next.js server's egress IP, which the limit can exhaust.
+The Next.js wrapper is `nextjs-frontend/src/lib/api/catalogue.ts` (FREEJ-21; see
+[freejoy-frontend.md](freejoy-frontend.md#catalogue-api-wrapper-freej-21)). Call the generated SDK (`listOffers`,
+`readOffer`, `listCategories`) only through `src/lib/api/` and `callBackend`. The 120/min limit is keyed by the
+forwarded client IP, so the wrapper forwards the visitor's address in `X-Client-IP`, taken only from Vercel's
+`x-vercel-forwarded-for` (`readTrustedClientIp()` in `src/lib/api/server.ts`), never from a header the client can
+set, and omits it when that header is absent. Renders that forward nothing share one bucket keyed on the Next.js
+server's egress IP, which the limit can exhaust; the wrapper's 60 second cache keeps that traffic low, and a search
+with text bypasses the cache so it is limited per visitor. The wrapper maps 404 to "not found", 410 to the ended
+page (it reads the stub's `data`), and every other failure, including 429, to an outage error that is never cached.
 
 ## Operations notes
 

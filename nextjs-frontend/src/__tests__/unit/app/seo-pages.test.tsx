@@ -1,15 +1,18 @@
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { EndedOffer, OfferLookup } from '@/lib/catalogue';
+import { CatalogueUnavailableError } from '@/lib/catalogue/errors';
 import type { Offer } from '@/lib/catalogue/types';
 
 const mocks = vi.hoisted(() => ({
   notFound: vi.fn(),
-  liveOffers: vi.fn(),
-  logError: vi.fn(),
+  source: vi.fn(),
+  lookup: vi.fn(),
+  search: vi.fn(),
+  featured: vi.fn(),
 }));
-
-vi.mock('@/lib/logger', () => ({ logger: { error: mocks.logError } }));
 
 vi.mock('next/navigation', () => ({
   notFound: () => {
@@ -21,32 +24,39 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() }),
 }));
 
-// Everything is the real facade except `getLiveOffers` and `getOfferBySlug`, which the tests can
-// point at API-shaped offers to prove the indexing flip needs no code change.
+// Everything is the real facade (fixtures under test) except the source, the offer lookup, the search
+// and the featured list, which a test can point at API-shaped answers or an outage. That proves the
+// indexing flip is driven by the source and the data, with no code change.
 vi.mock('@/lib/catalogue', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/catalogue')>();
+  const override =
+    <T extends (...args: never[]) => unknown>(mock: ReturnType<typeof vi.fn>, real: T) =>
+    (...args: Parameters<T>) =>
+      mock.getMockImplementation()
+        ? (mock as (...a: unknown[]) => unknown)(...args)
+        : real(...args);
   return {
     ...actual,
-    getLiveOffers: (...args: Parameters<typeof actual.getLiveOffers>) =>
-      mocks.liveOffers.getMockImplementation()
-        ? mocks.liveOffers(...args)
-        : actual.getLiveOffers(...args),
-    getOfferBySlug: async (slug: string) => {
-      const overridden = (await mocks.liveOffers())?.find((offer: Offer) => offer.slug === slug);
-      return overridden ?? actual.getOfferBySlug(slug);
-    },
+    getCatalogueSource: override(mocks.source, actual.getCatalogueSource),
+    lookupOffer: override(mocks.lookup, actual.lookupOffer),
+    searchOffers: override(mocks.search, actual.searchOffers),
+    getFeaturedOffers: override(mocks.featured, actual.getFeaturedOffers),
   };
 });
 
-import CategoryPage, {
-  generateMetadata as categoryMetadata,
-} from '@/app/(public)/category/[slug]/page';
-import OfferPage, { generateMetadata as offerMetadata } from '@/app/(public)/freebies/[slug]/page';
-import { generateMetadata as freebiesMetadata } from '@/app/(public)/freebies/page';
-import HomePage, { generateMetadata as homeMetadata } from '@/app/(public)/page';
+import CategoryPage, * as categoryRoute from '@/app/(public)/category/[slug]/page';
+import OfferPage, * as offerRoute from '@/app/(public)/freebies/[slug]/page';
+import * as freebiesRoute from '@/app/(public)/freebies/page';
+import HomePage, * as homeRoute from '@/app/(public)/page';
 import { metadata as alertsMetadata } from '@/app/(public)/alerts/page';
+import { HomeSections } from '@/components/home/home-sections';
 import { JsonLd } from '@/components/seo/json-ld';
 import { OFFERS } from '@/lib/catalogue/fixtures';
+
+const homeMetadata = homeRoute.generateMetadata;
+const freebiesMetadata = freebiesRoute.generateMetadata;
+const categoryMetadata = categoryRoute.generateMetadata;
+const offerMetadata = offerRoute.generateMetadata;
 
 const FIXTURE_LIVE = OFFERS.find(
   (offer) => offer.status === 'published' && offer.endAt && offer.categorySlug === 'beauty'
@@ -61,7 +71,22 @@ const apiOffer = (patch: Partial<Offer> = {}): Offer => ({
   ...patch,
 });
 
+const found = (offer: Offer): OfferLookup => ({ kind: 'found', offer });
+const ended = (patch: Partial<EndedOffer> = {}): OfferLookup => ({
+  kind: 'ended',
+  ended: {
+    slug: FIXTURE_LIVE.slug,
+    title: FIXTURE_LIVE.title,
+    categorySlug: 'beauty',
+    categoryName: 'Beauty',
+    endedAt: '2026-10-24',
+    ...patch,
+  },
+});
+
 const search = (params: Record<string, string>) => ({ searchParams: Promise.resolve(params) });
+const offerParams = { params: Promise.resolve({ slug: FIXTURE_LIVE.slug }) };
+const outage = () => Promise.reject(new CatalogueUnavailableError());
 
 const jsonLdOf = (container: HTMLElement) =>
   Array.from(container.querySelectorAll('script[type="application/ld+json"]')).flatMap((script) => {
@@ -71,8 +96,7 @@ const jsonLdOf = (container: HTMLElement) =>
 
 beforeEach(() => {
   mocks.notFound.mockClear();
-  mocks.liveOffers.mockReset();
-  mocks.logError.mockClear();
+  for (const mock of [mocks.source, mocks.lookup, mocks.search, mocks.featured]) mock.mockReset();
 });
 
 describe('fixture-backed catalogue', () => {
@@ -84,9 +108,7 @@ describe('fixture-backed catalogue', () => {
   });
 
   it('keeps a live fixture offer out of search', async () => {
-    const metadata = await offerMetadata({ params: Promise.resolve({ slug: FIXTURE_LIVE.slug }) });
-
-    expect(metadata.robots).toEqual({ index: false });
+    expect((await offerMetadata(offerParams)).robots).toEqual({ index: false });
   });
 
   it('marks an expired fixture offer noindex, follow while keeping its canonical', async () => {
@@ -108,11 +130,25 @@ describe('fixture-backed catalogue', () => {
 });
 
 describe('once the catalogue is API-backed', () => {
-  beforeEach(() => mocks.liveOffers.mockResolvedValue([apiOffer()]));
+  beforeEach(() => {
+    mocks.source.mockResolvedValue('api');
+    mocks.lookup.mockResolvedValue(found(apiOffer()));
+  });
 
   it('makes the home page and unfiltered /freebies indexable', async () => {
     expect((await homeMetadata()).robots).toMatchObject({ index: true, follow: true });
     expect((await freebiesMetadata(search({}))).robots).toMatchObject({ index: true });
+  });
+
+  it('stays indexable on launch day, when nothing is live yet', async () => {
+    mocks.featured.mockResolvedValue([]);
+    mocks.search.mockResolvedValue({ items: [], page: 1, pageCount: 1, total: 0, from: 0, to: 0 });
+
+    expect((await homeMetadata()).robots).toMatchObject({ index: true });
+    expect((await freebiesMetadata(search({}))).robots).toMatchObject({ index: true });
+    expect(
+      (await categoryMetadata({ params: Promise.resolve({ slug: 'beauty' }) })).robots
+    ).toMatchObject({ index: true });
   });
 
   it.each([
@@ -145,36 +181,82 @@ describe('once the catalogue is API-backed', () => {
   });
 
   it('makes a live API offer indexable', async () => {
-    const metadata = await offerMetadata({ params: Promise.resolve({ slug: FIXTURE_LIVE.slug }) });
+    expect((await offerMetadata(offerParams)).robots).toMatchObject({ index: true, follow: true });
+  });
 
-    expect(metadata.robots).toMatchObject({ index: true, follow: true });
+  it('drops the demo wording from the home page', async () => {
+    render(await HomePage());
+    render(await HomeSections({ demo: false }));
+
+    expect(document.body.textContent).not.toMatch(/design preview|sample listings/i);
   });
 
   it('keeps the alerts page noindex until its form is live', () => {
     expect(alertsMetadata.robots).toEqual({ index: false });
   });
+
+  it('renders a real offer with no demo wording and an honest, coming-soon call to action', async () => {
+    const user = userEvent.setup();
+    render(await OfferPage(offerParams));
+
+    // The related offers below are fixtures in this test; the offer's own hero must be clean.
+    const hero = screen.getByRole('heading', { level: 1 }).closest('section') as HTMLElement;
+    expect(hero.textContent).not.toMatch(/demo|design preview|sample data/i);
+    const cta = screen.getByRole('button', { name: /^get this free sample, coming soon$/i });
+    expect(cta).toHaveTextContent('Coming soon');
+
+    await user.click(cta);
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Claim link coming soon' })
+    ).toBeInTheDocument();
+  });
 });
 
 describe('API offers that have ended', () => {
-  it('answers with the ended state and noindex, follow within 30 days of endAt', async () => {
-    mocks.liveOffers.mockResolvedValue([apiOffer({ status: 'expired', endAt: '2026-10-24' })]);
+  it('answers with the ended state and noindex, follow within 30 days of the end date', async () => {
+    mocks.lookup.mockResolvedValue(ended());
 
-    const metadata = await offerMetadata({ params: Promise.resolve({ slug: FIXTURE_LIVE.slug }) });
+    const metadata = await offerMetadata(offerParams);
 
     expect(metadata.robots).toEqual({ index: false, follow: true });
-    const { container } = render(
-      await OfferPage({ params: Promise.resolve({ slug: FIXTURE_LIVE.slug }) })
+    expect(metadata.alternates?.canonical).toBe(`/freebies/${FIXTURE_LIVE.slug}`);
+    expect(metadata.title).toBe(FIXTURE_LIVE.title);
+    render(await OfferPage(offerParams));
+    expect(screen.getByRole('heading', { level: 1, name: FIXTURE_LIVE.title })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'This offer has ended' })).toBeInTheDocument();
+    expect(screen.getByText(/ended on 24 October 2026/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Beauty' })).toHaveAttribute(
+      'href',
+      '/category/beauty'
     );
-    expect(container.textContent).toContain('This offer has ended');
+    expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('is gone (not found for now) more than 30 days after endAt', async () => {
-    mocks.liveOffers.mockResolvedValue([apiOffer({ status: 'expired', endAt: '2026-09-01' })]);
-    const params = Promise.resolve({ slug: FIXTURE_LIVE.slug });
+  it('stays in the ended state when the end date is unknown', async () => {
+    mocks.lookup.mockResolvedValue(ended({ endedAt: null }));
 
-    expect((await offerMetadata({ params })).title).toBe('Offer not found');
-    await expect(OfferPage({ params })).rejects.toThrow('NEXT_NOT_FOUND');
+    expect((await offerMetadata(offerParams)).robots).toEqual({ index: false, follow: true });
+    render(await OfferPage(offerParams));
+    expect(screen.getByRole('heading', { name: 'This offer has ended' })).toBeInTheDocument();
+  });
+
+  it('is gone (not found for now) more than 30 days after the end date', async () => {
+    mocks.lookup.mockResolvedValue(ended({ endedAt: '2026-09-01' }));
+
+    expect((await offerMetadata(offerParams)).title).toBe('Offer not found');
+    await expect(OfferPage(offerParams)).rejects.toThrow('NEXT_NOT_FOUND');
     expect(mocks.notFound).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers not found, with noindex, for an unknown or unpublished offer', async () => {
+    mocks.lookup.mockResolvedValue({ kind: 'not_found' });
+
+    expect(await offerMetadata(offerParams)).toMatchObject({
+      title: 'Offer not found',
+      robots: { index: false },
+    });
+    await expect(OfferPage(offerParams)).rejects.toThrow('NEXT_NOT_FOUND');
   });
 });
 
@@ -188,9 +270,7 @@ describe('page JSON-LD', () => {
   });
 
   it('puts a Home > category > offer BreadcrumbList on an offer page', async () => {
-    const { container } = render(
-      await OfferPage({ params: Promise.resolve({ slug: FIXTURE_LIVE.slug }) })
-    );
+    const { container } = render(await OfferPage(offerParams));
     const [breadcrumbs] = jsonLdOf(container);
 
     expect(breadcrumbs['@type']).toBe('BreadcrumbList');
@@ -222,39 +302,89 @@ describe('page JSON-LD', () => {
   });
 });
 
-describe('when the catalogue has no live API offers or cannot be read', () => {
-  it('goes noindex on launch day, when the live list is empty', async () => {
-    mocks.liveOffers.mockResolvedValue([]);
+describe('when the catalogue cannot be read (API source)', () => {
+  beforeEach(() => mocks.source.mockResolvedValue('api'));
+
+  // An outage answers 200 with the error state and keeps the page's normal robots, so a short backend
+  // failure cannot de-index pages. Only a refined view is noindex, as it always is.
+  it('keeps the home page indexable and shows a retryable alert instead of the catalogue', async () => {
+    mocks.featured.mockImplementation(outage);
+
+    expect((await homeMetadata()).robots).toMatchObject({ index: true });
+    render(await HomeSections({ demo: false }));
+    expect(screen.getByRole('alert')).toHaveTextContent(/could not load the freebies/i);
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  it('keeps /freebies and a category on their normal robots when the results cannot be read', async () => {
+    mocks.search.mockImplementation(outage);
+
+    expect((await freebiesMetadata(search({}))).robots).toMatchObject({ index: true });
+    expect((await freebiesMetadata(search({ q: 'tea' }))).robots).toEqual({
+      index: false,
+      follow: true,
+    });
+    expect(
+      (await categoryMetadata({ params: Promise.resolve({ slug: 'beauty' }) })).robots
+    ).toMatchObject({ index: true });
+    render(
+      await CategoryPage({
+        params: Promise.resolve({ slug: 'beauty' }),
+        searchParams: Promise.resolve({}),
+      })
+    );
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Beauty freebies' })).toBeInTheDocument();
+  });
+
+  it('marks an offer page noindex, follow when the offer cannot be read, and shows the alert, never a 404', async () => {
+    mocks.lookup.mockImplementation(outage);
+
+    const metadata = await offerMetadata(offerParams);
+
+    expect(metadata.title).toBe('Freebie unavailable');
+    expect(metadata.robots).toEqual({ index: false, follow: true });
+    render(await OfferPage(offerParams));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(mocks.notFound).not.toHaveBeenCalled();
+  });
+
+  it('marks a category page noindex, follow when the category cannot be read', async () => {
+    mocks.search.mockImplementation(outage);
+    const { CatalogueUnavailableError: Outage } = await import('@/lib/catalogue/errors');
+    const lookupFails = vi.spyOn(await import('@/lib/catalogue'), 'getCategoryBySlug');
+    lookupFails.mockRejectedValue(new Outage());
+
+    const metadata = await categoryMetadata({ params: Promise.resolve({ slug: 'beauty' }) });
+
+    expect(metadata.title).toBe('Freebies unavailable');
+    expect(metadata.robots).toEqual({ index: false, follow: true });
+    lookupFails.mockRestore();
+  });
+
+  it('lets an error that is not an outage through instead of calling it an outage', async () => {
+    mocks.lookup.mockRejectedValue(new Error('a real bug'));
+
+    await expect(offerMetadata(offerParams)).rejects.toThrow('a real bug');
+  });
+});
+
+describe('when the catalogue cannot be read (fixture source)', () => {
+  it('stays noindex', async () => {
+    mocks.source.mockResolvedValue('fixture');
+    mocks.search.mockImplementation(outage);
+    mocks.featured.mockImplementation(outage);
 
     expect((await homeMetadata()).robots).toEqual({ index: false });
     expect((await freebiesMetadata(search({}))).robots).toEqual({ index: false });
     expect(
       (await categoryMetadata({ params: Promise.resolve({ slug: 'beauty' }) })).robots
     ).toEqual({ index: false });
-  });
-
-  it('does not let a demo API offer flip the listings to index', async () => {
-    mocks.liveOffers.mockResolvedValue([apiOffer({ demo: true })]);
-
-    expect((await homeMetadata()).robots).toEqual({ index: false });
-    expect((await freebiesMetadata(search({}))).robots).toEqual({ index: false });
-  });
-
-  it('fails secure to noindex and logs when the live offers cannot be read', async () => {
-    mocks.liveOffers.mockRejectedValue(new Error('catalogue down'));
-
-    expect((await homeMetadata()).robots).toEqual({ index: false });
-    expect((await freebiesMetadata(search({}))).robots).toEqual({ index: false });
-    expect(
-      (await categoryMetadata({ params: Promise.resolve({ slug: 'beauty' }) })).robots
-    ).toEqual({ index: false });
-    expect(mocks.logError).toHaveBeenCalledTimes(3);
-    expect(JSON.stringify(mocks.logError.mock.calls)).toContain('catalogue down');
   });
 });
 
 describe('refined views', () => {
-  beforeEach(() => mocks.liveOffers.mockResolvedValue([apiOffer()]));
+  beforeEach(() => mocks.source.mockResolvedValue('api'));
 
   it('treats a category page carrying another ?category= as noindex, follow', async () => {
     const metadata = await categoryMetadata({
@@ -277,11 +407,9 @@ describe('refined views', () => {
 describe('offer page JSON-LD with hostile text', () => {
   it('renders no raw < inside the script when the title contains a closing script tag', async () => {
     const title = 'Tea </script><!-- deal';
-    mocks.liveOffers.mockResolvedValue([apiOffer({ title })]);
+    mocks.lookup.mockResolvedValue(found(apiOffer({ title })));
 
-    const { container } = render(
-      await OfferPage({ params: Promise.resolve({ slug: FIXTURE_LIVE.slug }) })
-    );
+    const { container } = render(await OfferPage(offerParams));
     const script = container.querySelector('script[type="application/ld+json"]');
 
     expect(script?.textContent).not.toContain('<');

@@ -1,7 +1,7 @@
 import { Skeleton } from '@/components/ui/skeleton';
 
 /** Route loading state: skeleton blocks shaped like a page (title, lead, cards), no spinner. */
-export default function Loading() {
+export function RouteSkeleton() {
   return (
     <div className="container py-12">
       <div role="status" aria-busy="true" aria-label="Loading" className="space-y-8">

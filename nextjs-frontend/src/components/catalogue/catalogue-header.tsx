@@ -5,6 +5,8 @@ import type { CatalogueQuery } from '@/lib/catalogue';
 interface CatalogueHeaderProps {
   /** Current query: the search text is prefilled and the active filters ride along as hidden fields. */
   query: CatalogueQuery;
+  /** True when the listings are fixtures: the intro says so. */
+  demo: boolean;
 }
 
 /** Filters a new search must keep, so searching from a filtered view narrows it instead of resetting it. */
@@ -18,7 +20,7 @@ function carriedParams(query: CatalogueQuery): [string, string][] {
 }
 
 /** Page header for /freebies (design screens 02 and 06): breadcrumb, display heading, copy and search. */
-export function CatalogueHeader({ query }: CatalogueHeaderProps) {
+export function CatalogueHeader({ query, demo }: CatalogueHeaderProps) {
   const q = query.q;
   return (
     <header className="mx-auto max-w-content px-4 pt-8 sm:px-6 lg:pt-12">
@@ -41,7 +43,8 @@ export function CatalogueHeader({ query }: CatalogueHeaderProps) {
             little free thing.
           </h1>
           <p className="mt-4 max-w-xl text-sm text-muted-foreground sm:text-base">
-            Discover samples, trials and lovely surprises. Sample listings for the design preview.
+            Discover samples, trials and lovely surprises.
+            {demo && ' Sample listings for the design preview.'}
           </p>
         </div>
         <SearchForm

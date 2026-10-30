@@ -1,7 +1,15 @@
 import { Skeleton } from '@/components/ui/skeleton';
-import { getCategories, getMerchants, searchOffers, type CatalogueQuery } from '@/lib/catalogue';
+import {
+  getCatalogueSource,
+  getCategories,
+  getMerchants,
+  searchOffers,
+  settle,
+  type CatalogueQuery,
+} from '@/lib/catalogue';
 import { CatalogueEmptyState } from './catalogue-empty-state';
 import { CataloguePagination } from './catalogue-pagination';
+import { InlineError } from './inline-error';
 import { OfferGrid } from './offer-card';
 
 export interface CatalogueResultsProps {
@@ -19,8 +27,15 @@ function countLabel(total: number): string {
  * filter and sort controls next to it stay mounted (and keep focus) while results stream in.
  */
 export async function CatalogueHeading({ query }: Pick<CatalogueResultsProps, 'query'>) {
-  const [page, categories] = await Promise.all([searchOffers(query), getCategories()]);
-  const category = categories.find((entry) => entry.slug === query.category);
+  // Read separately: a search outage must not cost the heading its category name, nor the reverse.
+  const [searched, categoriesRead] = await Promise.all([
+    settle(searchOffers(query)),
+    settle(getCategories()),
+  ]);
+  const page = searched.ok ? searched.data : null;
+  const category = categoriesRead.ok
+    ? categoriesRead.data.find((entry) => entry.slug === query.category)
+    : undefined;
 
   return (
     <div className="min-w-0">
@@ -30,20 +45,23 @@ export async function CatalogueHeading({ query }: Pick<CatalogueResultsProps, 'q
       >
         {category?.name ?? 'All freebies'}
       </h2>
-      <p aria-live="polite" className="mt-1 text-sm text-muted-foreground">
-        {countLabel(page.total)}
-      </p>
+      {page && (
+        <p aria-live="polite" className="mt-1 text-sm text-muted-foreground">
+          {countLabel(page.total)}
+        </p>
+      )}
     </div>
   );
 }
 
-/** Results column body: grid (or empty state), pagination and the demo note. */
+/** Results column body: grid (or empty or error state), pagination and the terms note. */
 export async function CatalogueResults({ query, scopeCategory }: CatalogueResultsProps) {
-  const [page, merchants, categories] = await Promise.all([
-    searchOffers(query),
-    getMerchants(),
-    getCategories(),
+  const [loaded, source] = await Promise.all([
+    settle(Promise.all([searchOffers(query), getMerchants(), getCategories()])),
+    getCatalogueSource(),
   ]);
+  if (!loaded.ok) return <InlineError className="mt-6" />;
+  const [page, merchants, categories] = loaded.data;
 
   return (
     <div>
@@ -65,8 +83,8 @@ export async function CatalogueResults({ query, scopeCategory }: CatalogueResult
       </div>
 
       <p className="mt-8 text-sm text-muted-foreground">
-        Sample listings for the design preview. Availability can change quickly, so always read the
-        provider’s terms.
+        {source === 'fixture' && 'Sample listings for the design preview. '}Availability can change
+        quickly, so always read the provider’s terms.
       </p>
     </div>
   );

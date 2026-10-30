@@ -7,6 +7,7 @@
  * there is none, never taken from the wall clock.
  */
 import type { MetadataRoute } from 'next';
+import type { CatalogueSource } from '@/lib/catalogue/source';
 import type { Category, Offer } from '@/lib/catalogue/types';
 import { isIndexableCategory, isIndexableOffer } from './indexing';
 import { absoluteUrl } from './urls';
@@ -17,6 +18,7 @@ export interface SitemapInput {
   offers: readonly Offer[];
   categories: readonly Category[];
   today: string;
+  source: CatalogueSource;
 }
 
 /** The date an offer was last touched by an editor, or its start date, or nothing. */
@@ -33,12 +35,17 @@ function entry(path: string, lastModified: string | undefined): SitemapEntry {
   return lastModified ? { url: absoluteUrl(path), lastModified } : { url: absoluteUrl(path) };
 }
 
-export function buildSitemapEntries({ offers, categories, today }: SitemapInput): SitemapEntry[] {
+export function buildSitemapEntries({
+  offers,
+  categories,
+  today,
+  source,
+}: SitemapInput): SitemapEntry[] {
   const indexable = offers.filter((offer) => isIndexableOffer(offer, today));
   const catalogueModified = newest(indexable.map(offerLastModified));
 
   const categoryEntries = categories
-    .filter((category) => isIndexableCategory(category, offers))
+    .filter((category) => isIndexableCategory(category, source))
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((category) =>
       entry(

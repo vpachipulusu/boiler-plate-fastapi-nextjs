@@ -29,13 +29,23 @@ const urls = (entries: { url: string }[]) => entries.map((entry) => entry.url);
 
 describe('buildSitemapEntries', () => {
   it('lists only the home page and /freebies while the catalogue is fixture-backed', () => {
-    const entries = buildSitemapEntries({ offers: OFFERS, categories, today: FIXTURE_TODAY });
+    const entries = buildSitemapEntries({
+      offers: OFFERS,
+      categories,
+      today: FIXTURE_TODAY,
+      source: 'fixture',
+    });
 
     expect(urls(entries)).toEqual([`${BASE}/`, `${BASE}/freebies`]);
   });
 
   it('never gives the generic entries a lastModified when nothing has a date', () => {
-    const entries = buildSitemapEntries({ offers: OFFERS, categories, today: FIXTURE_TODAY });
+    const entries = buildSitemapEntries({
+      offers: OFFERS,
+      categories,
+      today: FIXTURE_TODAY,
+      source: 'fixture',
+    });
 
     expect(entries.every((entry) => entry.lastModified === undefined)).toBe(true);
   });
@@ -47,6 +57,7 @@ describe('buildSitemapEntries', () => {
       offers,
       categories: [...categories, disabledCategory],
       today: TODAY,
+      source: 'api',
     });
 
     expect(urls(entries)).toEqual([
@@ -59,6 +70,16 @@ describe('buildSitemapEntries', () => {
     expect(urls(entries)).not.toContain(`${BASE}/category/off`);
   });
 
+  it('lists the home page, /freebies and the categories when API-backed with nothing live yet', () => {
+    const entries = buildSitemapEntries({ offers: [], categories, today: TODAY, source: 'api' });
+
+    expect(urls(entries)).toEqual([
+      `${BASE}/`,
+      `${BASE}/freebies`,
+      ...categories.map((category) => `${BASE}/category/${category.slug}`),
+    ]);
+  });
+
   it('excludes expired, draft, demo and fixture offers even next to a good API offer', () => {
     const offers = [
       apiOffer('good'),
@@ -69,9 +90,9 @@ describe('buildSitemapEntries', () => {
       { ...apiOffer('fixture'), source: 'fixture' as const },
     ];
 
-    const offerUrls = urls(buildSitemapEntries({ offers, categories, today: TODAY })).filter(
-      (url) => url.includes('/freebies/')
-    );
+    const offerUrls = urls(
+      buildSitemapEntries({ offers, categories, today: TODAY, source: 'api' })
+    ).filter((url) => url.includes('/freebies/'));
 
     expect(offerUrls).toEqual([`${BASE}/freebies/good`]);
   });
@@ -83,7 +104,7 @@ describe('buildSitemapEntries', () => {
       apiOffer('undated', { lastVerifiedAt: '', startAt: '' }),
     ];
 
-    const entries = buildSitemapEntries({ offers, categories, today: TODAY });
+    const entries = buildSitemapEntries({ offers, categories, today: TODAY, source: 'api' });
     const byUrl = new Map(entries.map((entry) => [entry.url, entry.lastModified]));
 
     expect(byUrl.get(`${BASE}/freebies/verified`)).toBe('2026-10-25');
@@ -98,6 +119,7 @@ describe('buildSitemapEntries', () => {
       offers: [apiOffer('odd slug?x#y')],
       categories,
       today: TODAY,
+      source: 'api',
     });
 
     expect(urls(entries)).toContain(`${BASE}/freebies/odd%20slug%3Fx%23y`);

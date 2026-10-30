@@ -130,7 +130,7 @@ brings it back.
   in a URL any more (finding N-07 of the checklist; the Sentry scrubber, FREEJ-31, is still worth having for old
   links).
 - **Alerts switch.** `/alerts` shows the form only when `ALERTS_FORM_LIVE=true` is set (server-only, read when
-  the page is built); otherwise it shows a plain "Alerts aren't open yet" notice, no form, and stays noindex. The
+  the server starts; the page is dynamic); otherwise it shows a plain "Alerts aren't open yet" notice, no form, and stays noindex. The
   backend refuses sign-ups in production without a provider as a last line. Set it when a provider is live.
 - **Sentry.** The links must carry a token in the query string (a mail app POSTs to the one-click URL directly),
   so `src/lib/sentry/scrub-token.ts` replaces `token=...` with `[Filtered]` in every URL, query string and
@@ -172,4 +172,4 @@ uv run uvicorn app.main:app --port 8000
 
 Create the Brevo account and set the variables; verify the sending domain; set a postal address and legal
 operator name for the email footer and the consent label; have the consent wording, the 30-day and 12-month
-retention periods, the named processor and the minimum age reviewed; then build the frontend with `ALERTS_FORM_LIVE=true`.
+retention periods, the named processor and the minimum age reviewed; then start the frontend with `ALERTS_FORM_LIVE=true`.

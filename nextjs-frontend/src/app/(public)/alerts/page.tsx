@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import { AlertsForm } from '@/components/alerts/alerts-form';
+import { InlineError } from '@/components/catalogue/inline-error';
 import { Spark } from '@/components/site/brand-mark';
-import { getCategories } from '@/lib/catalogue';
+import { getCategories, settle } from '@/lib/catalogue';
 import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
 /**
- * Alerts are open only when ALERTS_FORM_LIVE=true is set (server-only, read when the page is built). Set it
+ * Alerts are open only when ALERTS_FORM_LIVE=true is set (server-only, read when the server starts). Set it
  * once a real email provider is configured in production (ADR-012). Until then the page shows a plain "not
  * open yet" notice instead of the form, stays noindex, and the backend refuses sign-ups as a last line.
  */
@@ -27,9 +28,13 @@ export const metadata: Metadata = {
   robots: listingRobots({ indexable: ALERTS_FORM_LIVE }),
 };
 
+// Dynamic, like the other catalogue pages: a build never reaches the catalogue, and a request that cannot
+// reach it shows an error instead of failing the page.
+export const dynamic = 'force-dynamic';
+
 /** No query string is read: an address must never travel in a page address, so nothing is prefilled. */
 export default async function AlertsPage() {
-  const categories = await getCategories();
+  const categories = await settle(getCategories());
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-14">
@@ -62,10 +67,17 @@ export default async function AlertsPage() {
           </div>
         </section>
         <section className="px-6 py-10 sm:px-10 sm:py-12">
-          <AlertsForm
-            categories={categories.map(({ slug, name }) => ({ slug, name }))}
-            live={ALERTS_FORM_LIVE}
-          />
+          {categories.ok ? (
+            <AlertsForm
+              categories={categories.data.map(({ slug, name }) => ({ slug, name }))}
+              live={ALERTS_FORM_LIVE}
+            />
+          ) : (
+            <InlineError
+              title="The alerts form is not loading"
+              message="We could not load the categories for your alerts. Please try again in a moment."
+            />
+          )}
         </section>
       </div>
     </div>

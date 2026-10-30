@@ -3,6 +3,9 @@ import { render, screen, within } from '@testing-library/react';
 
 vi.mock('@/app/actions/alerts-actions', () => ({ subscribeToAlertsAction: vi.fn() }));
 
+// Each test re-imports the page and the catalogue; that is slow when the whole suite runs in parallel.
+vi.setConfig({ testTimeout: 30_000 });
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.resetModules();

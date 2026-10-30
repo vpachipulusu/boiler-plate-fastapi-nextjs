@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { getCategories } from '@/lib/catalogue';
+import { getCategories, settle } from '@/lib/catalogue';
 import { drawerFilterCount } from './catalogue-links';
 import {
   CatalogueHeading,
@@ -12,6 +12,7 @@ import { DrawerFilters } from './drawer-filters';
 import { FilterChips } from './filter-chips';
 import { FilterDrawer } from './filter-drawer';
 import { FilterSidebar } from './filter-sidebar';
+import { InlineError } from './inline-error';
 import { SortSelect } from './sort-select';
 
 /**
@@ -22,7 +23,15 @@ import { SortSelect } from './sort-select';
  * "Categories" links.
  */
 export async function CatalogueLayout({ query, scopeCategory }: CatalogueResultsProps) {
-  const categories = await getCategories();
+  const loaded = await settle(getCategories());
+  if (!loaded.ok) {
+    return (
+      <div className="mx-auto max-w-content px-4 pb-16 pt-8 sm:px-6">
+        <InlineError />
+      </div>
+    );
+  }
+  const categories = loaded.data;
   const key = `${scopeCategory ?? ''}|${JSON.stringify(query)}`;
 
   return (
