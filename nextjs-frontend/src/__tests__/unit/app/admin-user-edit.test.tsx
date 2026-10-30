@@ -179,10 +179,13 @@ describe('EditAdminUserPage', () => {
     expect(markup).toContain('aria-label="Edit user profile"');
   });
 
-  it.each(['.', '..', 'a/b'])('calls notFound for the id %j without reading', async (id) => {
-    await expect(EditAdminUserPage(params(id))).rejects.toThrow('NEXT_NOT_FOUND');
-    expect(mocks.fetchAdminUser).not.toHaveBeenCalled();
-  });
+  it.each(['.', '..', 'a/b', 'abc\n', '%2e%2e', '\uff41bc'])(
+    'calls notFound for the id %j without reading',
+    async (id) => {
+      await expect(EditAdminUserPage(params(id))).rejects.toThrow('NEXT_NOT_FOUND');
+      expect(mocks.fetchAdminUser).not.toHaveBeenCalled();
+    }
+  );
 
   it('does not read the user when the admin check refuses', async () => {
     mocks.requireAdminPage.mockRejectedValue(new Error('NEXT_REDIRECT'));

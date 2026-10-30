@@ -18,6 +18,7 @@ import {
 import { USER_ID_PATTERN } from '@/lib/admin-users/user-id';
 import {
   ADMIN_REQUEST_FAILED_MESSAGE,
+  ADMIN_ROLE_CONFLICT_MESSAGE,
   ADMIN_USER_CONFLICT_MESSAGE,
   ADMIN_USER_DELETE_CONFLICT_MESSAGE,
   ADMIN_USER_NOT_FOUND_MESSAGE,
@@ -56,6 +57,8 @@ const userIdSchema = z.string().regex(USER_ID_PATTERN, 'Invalid user id');
 
 const MAX_PAGE_SIZE = 100;
 const ADMIN_USERS_PATH = '/admin/users';
+/** Input cap before the phone pattern (which allows 20 characters) gives its own message. */
+const PHONE_MAX_INPUT = 64;
 
 /** Runs `run` only for a confirmed admin; everyone else gets the curated refusal and nothing is called. */
 async function asAdmin(
@@ -165,16 +168,27 @@ const clearableText = (max: number) =>
     .nullable()
     .optional();
 
+/** Like `clearableText`, for a field with a format: blank is allowed and clears it, anything else must match. */
+const clearableMatching = (max: number, pattern: RegExp, message: string) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .refine((value) => value === '' || pattern.test(value), message)
+    .transform((value) => (value === '' ? null : value))
+    .nullable()
+    .optional();
+
 const updateUserSchema = z.object({
   displayName: clearableText(DISPLAY_NAME_MAX),
   bio: clearableText(BIO_MAX),
   location: clearableText(LOCATION_MAX),
-  website: z.string().max(WEBSITE_MAX).regex(WEBSITE_PATTERN, WEBSITE_ERROR).nullable().optional(),
-  phoneNumber: z
-    .string()
-    .regex(PHONE_PATTERN, 'Use 3 to 20 digits, spaces and + ( ) - . characters.')
-    .nullable()
-    .optional(),
+  website: clearableMatching(WEBSITE_MAX, WEBSITE_PATTERN, WEBSITE_ERROR),
+  phoneNumber: clearableMatching(
+    PHONE_MAX_INPUT,
+    PHONE_PATTERN,
+    'Use 3 to 20 digits, spaces and + ( ) - . characters.'
+  ),
   avatarUrl: z
     .string()
     .max(2048)
@@ -256,7 +270,7 @@ export async function grantAdminRoleAction(
 
     const result = await grantAdminRole(userId, validation.data);
     if (!result.success) {
-      return failure(result, 'Admin grant role failed');
+      return failure(result, 'Admin grant role failed', ADMIN_ROLE_CONFLICT_MESSAGE);
     }
     refreshUser(userId);
     return {
@@ -278,7 +292,7 @@ export async function revokeAdminRoleAction(userId: string): Promise<AdminUserAc
     }
     const result = await revokeAdminRole(userId);
     if (!result.success) {
-      return failure(result, 'Admin revoke role failed');
+      return failure(result, 'Admin revoke role failed', ADMIN_ROLE_CONFLICT_MESSAGE);
     }
     refreshUser(userId);
     return { success: true, data: { message: 'Admin role revoked successfully' } };

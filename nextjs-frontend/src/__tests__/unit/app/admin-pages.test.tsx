@@ -124,12 +124,15 @@ describe('admin user detail page', () => {
     expect(mocks.fetchAdminUser).not.toHaveBeenCalled();
   });
 
-  it.each(['.', '..', 'a/b'])('calls notFound for the id %j without reading', async (id) => {
-    await expect(AdminUserDetailPage({ params: Promise.resolve({ id }) })).rejects.toThrow(
-      'NEXT_NOT_FOUND'
-    );
-    expect(mocks.fetchAdminUser).not.toHaveBeenCalled();
-  });
+  it.each(['.', '..', 'a/b', 'abc\n', '%2e%2e', '\uff41bc'])(
+    'calls notFound for the id %j without reading',
+    async (id) => {
+      await expect(AdminUserDetailPage({ params: Promise.resolve({ id }) })).rejects.toThrow(
+        'NEXT_NOT_FOUND'
+      );
+      expect(mocks.fetchAdminUser).not.toHaveBeenCalled();
+    }
+  );
 
   it('renders the user read through the API', async () => {
     mocks.fetchAdminUser.mockResolvedValue({

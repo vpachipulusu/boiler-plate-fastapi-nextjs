@@ -35,9 +35,12 @@ export { ADMIN_FORBIDDEN_MESSAGE, ADMIN_REQUEST_FAILED_MESSAGE, ADMIN_UNAVAILABL
 export const ADMIN_USER_NOT_FOUND_MESSAGE = 'User not found';
 /** A 409 from ban/unban: an admin cannot suspend or restore their own account. */
 export const ADMIN_USER_CONFLICT_MESSAGE = 'You cannot suspend or restore your own account.';
-/** A 409 from delete: the user is still an admin or owns an organisation. */
+/** A 409 from delete: your own account, an account that is still an admin, or one that owns an organisation. */
 export const ADMIN_USER_DELETE_CONFLICT_MESSAGE =
-  'This user cannot be deleted yet: revoke their admin role or transfer organisation ownership first.';
+  "This user cannot be deleted: you cannot delete your own account, and an admin's role must be revoked and any organisation ownership transferred first.";
+/** A 409 from grant or revoke: your own admin role, or the last super admin. */
+export const ADMIN_ROLE_CONFLICT_MESSAGE =
+  'You cannot change your own admin role or remove the last super admin.';
 
 /** Defence in depth: an id that is not a real user id never reaches the backend; it answers like a 404. */
 const NOT_FOUND_RESULT: Extract<ApiResult<never>, { success: false }> = {

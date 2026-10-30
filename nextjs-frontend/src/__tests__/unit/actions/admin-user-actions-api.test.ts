@@ -197,33 +197,42 @@ describe('admin user actions (API-backed)', () => {
     expect(result.error).toBe('The admin service is unavailable. Please try again later.');
   });
 
-  it.each(['../etc', 'a/b', '', 'x'.repeat(200)])(
-    'rejects the user id %j without calling the API',
-    async (id) => {
-      const results = await Promise.all([
-        getUserByIdAction(id),
-        updateUserAction(id, { bio: 'x' }),
-        deleteUserAction(id),
-        revokeAdminRoleAction(id),
-        banUserAction(id),
-        unbanUserAction(id),
-      ]);
+  it.each([
+    '../etc',
+    'a/b',
+    '',
+    'x'.repeat(200),
+    '.',
+    '..',
+    'abc\n',
+    '%2e%2e',
+    'a%2Fb',
+    '\uff41bc',
+    'abc\u200b',
+  ])('rejects the user id %j without calling the API', async (id) => {
+    const results = await Promise.all([
+      getUserByIdAction(id),
+      updateUserAction(id, { bio: 'x' }),
+      deleteUserAction(id),
+      revokeAdminRoleAction(id),
+      banUserAction(id),
+      unbanUserAction(id),
+    ]);
 
-      for (const result of results) {
-        expect(result).toEqual({ success: false, error: 'User not found' });
-      }
-      for (const api of [
-        mocks.fetchAdminUser,
-        mocks.patchAdminUser,
-        mocks.removeAdminUser,
-        mocks.revokeAdminRole,
-        mocks.banAdminUser,
-        mocks.unbanAdminUser,
-      ]) {
-        expect(api).not.toHaveBeenCalled();
-      }
+    for (const result of results) {
+      expect(result).toEqual({ success: false, error: 'User not found' });
     }
-  );
+    for (const api of [
+      mocks.fetchAdminUser,
+      mocks.patchAdminUser,
+      mocks.removeAdminUser,
+      mocks.revokeAdminRole,
+      mocks.banAdminUser,
+      mocks.unbanAdminUser,
+    ]) {
+      expect(api).not.toHaveBeenCalled();
+    }
+  });
 
   describe('server-side admin gate', () => {
     const DENIED = {
@@ -332,19 +341,35 @@ describe('admin user actions (API-backed)', () => {
       expect(result).toEqual({
         success: false,
         error:
-          'This user cannot be deleted yet: revoke their admin role or transfer organisation ownership first.',
+          "This user cannot be deleted: you cannot delete your own account, and an admin's role must be revoked and any organisation ownership transferred first.",
       });
     });
 
-    it('revokeAdminRoleAction answers a 409 generically, not with the own-account message', async () => {
-      mocks.revokeAdminRole.mockResolvedValue(fail(409));
+    it.each([
+      [
+        'grantAdminRoleAction',
+        () => grantAdminRoleAction('u1', { role: 'admin', permissions: [] }),
+        mocks.grantAdminRole,
+      ],
+      ['revokeAdminRoleAction', () => revokeAdminRoleAction('u1'), mocks.revokeAdminRole],
+    ])('%s explains a 409 and does not log it', async (_n, call, api) => {
+      api.mockResolvedValue(fail(409));
 
-      const result = await revokeAdminRoleAction('u1');
+      const result = await call();
 
       expect(result).toEqual({
         success: false,
-        error: 'Something went wrong. Please try again.',
+        error: 'You cannot change your own admin role or remove the last super admin.',
       });
+      expect(mocks.logError).not.toHaveBeenCalled();
+    });
+
+    it('updateUserAction and the reads answer a 409 generically', async () => {
+      mocks.patchAdminUser.mockResolvedValue(fail(409));
+
+      const result = await updateUserAction('u1', { bio: 'x' });
+
+      expect(result).toEqual({ success: false, error: 'Something went wrong. Please try again.' });
     });
 
     it.each([
@@ -370,6 +395,17 @@ describe('admin user actions (API-backed)', () => {
         display_name: null,
         bio: 'hi',
         location: null,
+      });
+    });
+
+    it('trims the website and phone number, and sends a blank one as null', async () => {
+      mocks.patchAdminUser.mockResolvedValue(ok(DETAIL));
+
+      await updateUserAction('user-1', { website: '  https://x.y  ', phoneNumber: '   ' });
+
+      expect(mocks.patchAdminUser).toHaveBeenCalledWith('user-1', {
+        website: 'https://x.y',
+        phone_number: null,
       });
     });
 
