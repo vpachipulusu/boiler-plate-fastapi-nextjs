@@ -6,7 +6,7 @@ security headers, Sentry, structured logging, and optional **Stripe Billing** an
 Everything is tested, linted and type-checked in a path-filtered GitHub Actions pipeline that ends in one
 required check, `CI gate`.
 
-The brand is a placeholder, "Your App". Replace it in two env files (see [Branding](#branding)).
+The brand name ("Freejoy" in the examples) is set in two env files (see [Branding](#branding)).
 
 ## What you get
 

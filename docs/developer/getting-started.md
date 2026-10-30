@@ -58,7 +58,7 @@ uv run fastapi dev app/main.py --host 127.0.0.1 --port 8000 --reload
 | `SUBSCRIBER_TOKEN_SECRET` | Outside local/test | 32+ character HMAC secret for the alerts confirm and unsubscribe tokens. |
 | `EMAIL_PROVIDER`, `EMAIL_PROVIDER_API_KEY`, `EMAIL_PROVIDER_LIST_ID`, `EMAIL_FROM`, `EMAIL_FROM_NAME`, `PUBLIC_SITE_URL` | To send alerts email | Backend only ([ADR-012](../adr/0012-email-provider.md), [backend-subscribers.md](backend-subscribers.md)). `EMAIL_PROVIDER` unset: nothing is ever sent, and production refuses sign-ups. `fake` records messages for tests (local/test only). |
 | `SENTRY_DSN` | No | Unset disables Sentry. |
-| `APP_NAME`, `LOG_LEVEL` | No | Brand and log level. |
+| `APP_NAME`, `TOTP_ISSUER`, `LOG_LEVEL` | No | Brand (API title), the name shown in the authenticator app (keep equal to `NEXT_PUBLIC_APP_NAME`), and log level. |
 | `STRIPE_*`, `BILLING_RETURN_URL_ORIGINS` | Billing module | See [modules.md](modules.md). |
 
 Check it with `curl http://localhost:8000/health` (`{"status":"ok"}`); `/health/ready` also checks the database and

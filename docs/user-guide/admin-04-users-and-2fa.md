@@ -155,5 +155,5 @@ needs a real Firebase sign-in and an account with 2FA turned on. The sign-in scr
 the first step, which has not changed.
 
 The Security page also holds **Change Password**, **Login History**, **Export my data** and **Delete Account**. They
-are account features for the signed-in person and are not covered further in this guide. The word "Your App" at the top
-of the sidebar is a placeholder name left over from the template.
+are account features for the signed-in person and are not covered further in this guide. The site name at the top of
+the sidebar is the configured one; screenshots taken earlier still read "Your App".

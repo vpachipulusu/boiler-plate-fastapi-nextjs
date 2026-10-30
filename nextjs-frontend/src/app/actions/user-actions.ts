@@ -3,6 +3,7 @@
 import { cookies, headers } from 'next/headers';
 import { z } from 'zod';
 import { profileUpdateSchema, userSettingsSchema } from '@/lib/utils/validation';
+import { siteConfig } from '@/config/site';
 import { logger } from '@/lib/logger';
 import type { ApiResult } from '@/lib/api/server';
 import { SESSION_COOKIE_NAME } from '@/lib/api/server';
@@ -108,10 +109,15 @@ export async function exportMyDataAction(): Promise<
       return apiFailure(result, 'Export my data error:', 'Failed to export your data');
     }
     const day = new Date().toISOString().slice(0, 10).replaceAll('-', '');
+    const slug =
+      siteConfig.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') || 'export';
     return {
       success: true,
       data: {
-        filename: `yourapp-export-${day}.json`,
+        filename: `${slug}-export-${day}.json`,
         json: JSON.stringify(result.data, null, 2),
         truncated: result.data.truncated,
       },

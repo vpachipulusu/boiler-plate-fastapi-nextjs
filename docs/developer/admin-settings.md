@@ -15,6 +15,11 @@ The admin portal now includes a **General Settings** form with the following con
 
 #### Currency Settings
 
+- **Default:** GBP (a UK product). The backend (`DEFAULT_CURRENCY` in `app/services/public_settings.py`) and the
+  frontend (`DEFAULT_CURRENCY_CODE` in `src/config/currencies.ts`) both default to it when the setting is missing,
+  unsupported or the lookup fails. Admin money is formatted by `src/lib/utils/format-money.ts` (en-GB; the currency
+  the data carries; the GBP default is applied where the currency is looked up).
+- **Stripe prices:** Stripe prices must be in the platform currency (GBP unless the `currency` app setting says otherwise): a price in another currency is excluded from admin MRR and shown with the platform symbol on `/pricing`.
 - **9 Supported Currencies:**
   - USD ($) - US Dollar
   - EUR (€) - Euro

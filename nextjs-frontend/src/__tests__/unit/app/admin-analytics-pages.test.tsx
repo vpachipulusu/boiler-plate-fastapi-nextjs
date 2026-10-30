@@ -49,15 +49,15 @@ const REVENUE = {
 
 describe('formatMinorUnits', () => {
   it.each([
-    [123456, 'USD', '$1,234.56'],
+    [123456, 'USD', 'US$1,234.56'],
     [123456, 'GBP', '£1,234.56'],
-    [1234, 'JPY', '¥1,234'],
+    [1234, 'JPY', 'JP¥1,234'],
   ])('formats %s %s as %s', (amount, currency, expected) => {
     expect(formatMinorUnits(amount, currency)).toBe(expected);
   });
 
   it('falls back to the raw amount for an unknown currency code', () => {
-    expect(formatMinorUnits(500, 'not-a-code')).toBe('500 not-a-code');
+    expect(formatMinorUnits(500, 'not-a-code')).toBe('5.00 NOT-A-CODE');
   });
 });
 

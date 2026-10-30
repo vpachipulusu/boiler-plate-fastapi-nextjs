@@ -30,3 +30,7 @@ def test_supported_currencies_are_the_nine_known_codes() -> None:
 
 def test_default_currency_is_supported() -> None:
     assert DEFAULT_CURRENCY in SUPPORTED_CURRENCIES
+
+
+def test_default_currency_is_pounds_for_a_uk_product() -> None:
+    assert DEFAULT_CURRENCY == "GBP"

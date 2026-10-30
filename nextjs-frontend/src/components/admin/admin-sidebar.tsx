@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { siteConfig } from '@/config/site';
 import { cn } from '@/lib/utils';
 import { ADMIN_NAV_ITEMS, activeAdminHref } from './admin-nav-items';
 
@@ -22,7 +23,7 @@ export function AdminSidebar() {
         href="/admin"
         className="flex min-h-11 items-center rounded-md px-3 font-display text-xl font-semibold"
       >
-        Your App
+        {siteConfig.name}
       </Link>
       <div className="flex min-h-[52px] items-center gap-2 rounded-md border border-background/20 px-3 text-sm font-semibold dark:border-foreground/20">
         <span className="rounded-sm bg-background/15 px-1.5 py-0.5 text-xs uppercase tracking-wide dark:bg-foreground/15">

@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { formatMinorUnits } from '@/lib/utils/format-money';
 
 export interface Invoice {
   id: string;
@@ -24,12 +25,8 @@ export interface Invoice {
 }
 
 export function formatAmount(amount: number, currency: string): string {
-  try {
-    return (amount / 100).toLocaleString('en-US', { style: 'currency', currency });
-  } catch {
-    // Unknown currency code from the provider: show the number rather than crash the page.
-    return `${(amount / 100).toFixed(2)} ${currency.toUpperCase()}`;
-  }
+  // An unknown currency code from the provider shows as a plain number and code rather than crashing the page.
+  return formatMinorUnits(amount, currency);
 }
 
 /** Provider-supplied links are only rendered when they are https. */

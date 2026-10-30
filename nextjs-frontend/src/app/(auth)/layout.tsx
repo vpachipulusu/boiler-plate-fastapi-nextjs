@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { siteConfig } from '@/config/site';
+
 /**
  * Auth shell. Below 760px: the form only, with a small brand link. From 760px: two columns,
  * an inverse brand panel (`--feature`) on the left and the form column on the right.
@@ -16,14 +18,14 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         Skip to main content
       </a>
       <aside
-        aria-label="About Your App"
+        aria-label={`About ${siteConfig.name}`}
         className="on-inverse hidden flex-col justify-between bg-feature p-12 text-background dark:text-foreground min-[760px]:flex"
       >
         <Link
           href="/"
           className="inline-flex min-h-11 items-center self-start rounded-md font-display text-2xl font-semibold"
         >
-          Your App
+          {siteConfig.name}
         </Link>
         <div className="max-w-sm space-y-4">
           <p className="font-display text-4xl font-semibold leading-tight">
@@ -45,7 +47,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             href="/"
             className="mb-6 inline-flex min-h-11 items-center font-display text-xl font-semibold min-[760px]:hidden"
           >
-            Your App
+            {siteConfig.name}
           </Link>
           {children}
         </div>

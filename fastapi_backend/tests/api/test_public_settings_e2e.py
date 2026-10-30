@@ -105,7 +105,7 @@ async def test_missing_row_answers_the_default(client: AsyncClient) -> None:
     response = await client.get("/v1/settings/currency")
 
     assert response.status_code == 200
-    assert response.json()["data"] == {"currency": "USD"}
+    assert response.json()["data"] == {"currency": "GBP"}
 
 
 @pytest.mark.parametrize("stored", ['"XYZ"', "42", "null", '["EUR"]', '{"a": 1}'])
@@ -116,7 +116,7 @@ async def test_unknown_or_non_string_value_answers_the_default(
 
     response = await client.get("/v1/settings/currency")
 
-    assert response.json()["data"] == {"currency": "USD"}
+    assert response.json()["data"] == {"currency": "GBP"}
 
 
 async def test_other_settings_never_appear(

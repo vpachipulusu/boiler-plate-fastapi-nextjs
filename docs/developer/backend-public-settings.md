@@ -9,7 +9,7 @@ subscriptions pages display.
 |---|---|
 | Auth | `X-Internal-Key` only (the browser never calls FastAPI). No user session. |
 | Rate limit | `PUBLIC_SETTINGS_POLICY`: 120 requests per 60 s per client IP (`X-Client-IP`). Fails open; 429 with `Retry-After`. |
-| 200 | `{"success": true, "data": {"currency": "USD"}}` |
+| 200 | `{"success": true, "data": {"currency": "GBP"}}` |
 | 304 | Empty body when `If-None-Match` matches the `ETag`. |
 | Cache | `private, max-age=60, stale-while-revalidate=300` plus an `ETag` (hash of the currency code). 429, 401 and 500 carry no cache header. |
 
@@ -19,7 +19,7 @@ The code is upper case, as the admin settings page stores it (`USD`, `EUR`, ...)
 straight onto `CURRENCIES` in `nextjs-frontend/src/config/currencies.ts`. The stored value is
 trimmed and upper-cased. A missing row, a non-string value, or a code outside the supported
 list (`SUPPORTED_CURRENCIES` in `app/services/public_settings.py`, kept in step with
-`currencies.ts`) answers the default `USD`, the same default `getCurrencySymbol` uses. A
+`currencies.ts`) answers the default `GBP` (`DEFAULT_CURRENCY`), the same default as `DEFAULT_CURRENCY_CODE` in `currencies.ts`, which `getCurrencySymbol` falls back to. A
 database error is a 500 and is not cached.
 
 The server trims and upper-cases the stored code, so a stored `" eur"` is served as `EUR`.

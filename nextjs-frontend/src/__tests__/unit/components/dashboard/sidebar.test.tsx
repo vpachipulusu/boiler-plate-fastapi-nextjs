@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => ({ pathname: '/dashboard' }));
 vi.mock('next/navigation', () => ({ usePathname: () => mocks.pathname }));
+vi.mock('@/config/site', () => ({ siteConfig: { name: 'Acme Shop' } }));
 
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { NAV_ITEMS } from '@/components/dashboard/nav-items';
@@ -17,6 +18,12 @@ describe('Sidebar', () => {
     render(<Sidebar />);
     const aside = screen.getByRole('complementary', { name: 'Workspace' });
     expect(within(aside).getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
+  });
+
+  it('brand link shows the configured brand (siteConfig) and returns to the dashboard home', () => {
+    render(<Sidebar />);
+    expect(screen.getByRole('link', { name: 'Acme Shop' })).toHaveAttribute('href', '/dashboard');
+    expect(screen.queryByText('Your App')).toBeNull();
   });
 
   it('lists every nav item as a link', () => {

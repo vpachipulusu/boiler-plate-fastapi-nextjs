@@ -11,7 +11,9 @@ Stripe takes the payments. Freejoy's freebies site itself is free to visitors an
 > results. Anything that needs a live Stripe account is marked **Screen pending**.
 
 Reading these pages needs the `subscriptions.read` and `users.read` permissions. The currency symbol on money
-figures comes from the platform's currency setting, which defaults to US dollars (so the screenshots show `$`).
+figures comes from the platform's currency setting, which defaults to British pounds (so amounts show `£`). If the
+setting names another currency, amounts show that currency. The screenshots on this page were taken before the default
+changed and still show `$`.
 
 ## Part A. Subscriptions
 

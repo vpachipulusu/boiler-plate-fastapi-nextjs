@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),
 }));
+vi.mock('@/config/site', () => ({ siteConfig: { name: 'Acme Shop' } }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock('@/lib/firebase/auth-helpers', () => ({
   signInWithEmail: mocks.signInWithEmail,
@@ -281,7 +282,7 @@ describe('two-factor code step', () => {
     await submitCode(user, CODE);
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(/could not reach your app/i);
+    expect(alert).toHaveTextContent(/could not reach Acme Shop/i);
     expect(alert).not.toHaveTextContent(CODE);
     expect(screen.getByLabelText('Authenticator code')).toHaveValue('');
   });

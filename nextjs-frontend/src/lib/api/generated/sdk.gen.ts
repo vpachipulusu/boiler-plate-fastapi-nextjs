@@ -565,9 +565,9 @@ export const updateOrganization = <ThrowOnError extends boolean = false>(options
 /**
  * Read the platform currency
  *
- * The platform currency code (upper case, e.g. ``USD``).
+ * The platform currency code (upper case, e.g. ``GBP``).
  *
- * Answers ``USD`` when the setting is missing or not a supported code. Sends
+ * Answers ``GBP`` when the setting is missing or not a supported code. Sends
  * ``Cache-Control: private, max-age=60`` and an ``ETag``.
  */
 export const readCurrency = <ThrowOnError extends boolean = false>(options?: Options<ReadCurrencyData, ThrowOnError>) => (options?.client ?? client).get<ReadCurrencyResponses, ReadCurrencyErrors, ThrowOnError>({ url: '/v1/settings/currency', ...options });

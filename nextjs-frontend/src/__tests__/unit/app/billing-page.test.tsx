@@ -130,7 +130,7 @@ describe('BillingPage invoice table', () => {
     const rows = within(table).getAllByRole('row');
     expect(rows).toHaveLength(3);
     expect(within(rows[1]).getByText('Paid')).toBeInTheDocument();
-    expect(within(rows[1]).getByText('$29.00')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('US$29.00')).toBeInTheDocument();
     expect(within(rows[1]).getByRole('link', { name: /PDF for invoice/ })).toHaveAttribute(
       'href',
       'https://example.test/in_1.pdf'

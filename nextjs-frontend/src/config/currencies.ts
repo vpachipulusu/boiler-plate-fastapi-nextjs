@@ -15,3 +15,6 @@ export const CURRENCIES = [
   { code: 'CNY', symbol: '¥', name: 'Chinese Yuan' },
   { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
 ] as const;
+
+/** The platform currency when none is configured or the lookup fails: a UK product, so pounds. */
+export const DEFAULT_CURRENCY_CODE = 'GBP';

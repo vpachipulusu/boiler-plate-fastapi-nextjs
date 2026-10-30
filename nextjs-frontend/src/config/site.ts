@@ -1,7 +1,7 @@
 /**
  * Single source of truth for brand strings. Everything that needs the app name,
- * description, URL or support email (metadata, manifest, TOTP issuer, logger,
- * admin settings, seed scripts) reads it from here.
+ * description, URL or support email (metadata, manifest, logger, admin settings, seed scripts)
+ * reads it from here. The backend's 2FA issuer is its own `TOTP_ISSUER` setting; keep the two equal.
  */
 export const siteConfig = {
   name: process.env.NEXT_PUBLIC_APP_NAME || 'Freejoy',

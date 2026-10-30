@@ -2,6 +2,7 @@ from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from typing import Protocol
 
+from app.core.config import settings
 from app.core.firebase import AuthenticationFailed, IdentityProvider, VerifiedIdentity
 from app.core.totp import TotpCodec, generate_secret, provisioning_uri, verify_token
 from app.repositories.totp import TotpState
@@ -77,7 +78,10 @@ class TotpService:
             await self.repository.set_state(
                 state.user_id, False, self.codec.encrypt(secret)
             )
-        return TotpEnrollment(secret, provisioning_uri(secret, current.email))
+        return TotpEnrollment(
+            secret,
+            provisioning_uri(secret, current.email, issuer=settings.TOTP_ISSUER),
+        )
 
     async def confirm(self, current: VerifiedIdentity, token: str) -> None:
         async with self.session.begin():

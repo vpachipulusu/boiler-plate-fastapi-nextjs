@@ -42,6 +42,7 @@ vi.mock('@/lib/api/account', async () => {
     exportBackendData: mocks.exportBackendData,
   };
 });
+vi.mock('@/config/site', () => ({ siteConfig: { name: 'Acme Shop' } }));
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: mocks.logWarn, error: mocks.logError },
 }));
@@ -58,6 +59,7 @@ import {
   updateUserProfileAction,
   updateUserSettingsAction,
 } from '@/app/actions/user-actions';
+import { siteConfig } from '@/config/site';
 
 const API_PROFILE = {
   id: 'user-1',
@@ -534,12 +536,25 @@ describe('exportMyDataAction', () => {
     expect(mocks.exportBackendData).toHaveBeenCalledWith('TestAgent/1.0');
     expect(result.success).toBe(true);
     expect(result.data?.truncated).toBe(true);
-    expect(result.data?.filename).toMatch(/^yourapp-export-\d{8}\.json$/);
+    expect(result.data?.filename).toMatch(/^acme-shop-export-\d{8}\.json$/);
     expect(JSON.parse(result.data?.json ?? '')).toEqual({
       profile: { email: 'a@b.test' },
       memberships: [],
       truncated: true,
     });
+  });
+
+  it('builds the filename slug from the brand, with a fallback when nothing usable is left', async () => {
+    mocks.exportBackendData.mockResolvedValue(ok({ truncated: false }));
+    const original = siteConfig.name;
+    try {
+      siteConfig.name = '  Free & Joy!! ';
+      expect((await exportMyDataAction()).data?.filename).toMatch(/^free-joy-export-\d{8}\.json$/);
+      siteConfig.name = '!!!';
+      expect((await exportMyDataAction()).data?.filename).toMatch(/^export-export-\d{8}\.json$/);
+    } finally {
+      siteConfig.name = original;
+    }
   });
 
   it('tells the user when the export rate limit is hit', async () => {
