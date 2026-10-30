@@ -56,6 +56,9 @@ Leaving the code step without signing in (Back, a sign-in too old to finish, the
 client out of the browser, so an abandoned sign-in leaves no refresh token behind. Once the first sign-in is too old
 (five minutes) every retry would fail and still count against the sign-in limit, so the step closes instead of retrying.
 
+If the page is left while the code request is still running, the browser is signed out of Firebase but the server may
+still set the session cookie. That fails safe: the person has a session, not a stray Firebase refresh token.
+
 Changing a password signs a 2FA user out: `restoreSessionWithNewPassword` (`src/lib/firebase/reauth.ts`) signs in again
 with the new password and calls `verifyTokenAction(idToken)` without a code, gets `totpRequired` and returns false, so
 the Security page signs the person out and sends them to `/login`, where they sign in with a code.
