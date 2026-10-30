@@ -29,7 +29,7 @@ export function OfferCard({ offer, merchant, className }: OfferCardProps) {
   return (
     <article
       className={cn(
-        'group relative flex flex-col rounded-card border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-offset-2',
+        'group relative flex flex-col rounded-card border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:[outline:3px_solid_hsl(var(--ring))]',
         className
       )}
     >

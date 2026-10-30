@@ -29,7 +29,7 @@ export function AuthFormAlert({ error }: AuthFormAlertProps) {
       ref={ref}
       role="alert"
       tabIndex={-1}
-      className="flex gap-3 rounded-lg border-2 border-crit-foreground bg-crit p-3 text-sm text-crit-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex gap-3 rounded-lg border-2 border-crit-foreground bg-crit p-3 text-sm text-crit-foreground"
     >
       <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
       <div className="space-y-1">

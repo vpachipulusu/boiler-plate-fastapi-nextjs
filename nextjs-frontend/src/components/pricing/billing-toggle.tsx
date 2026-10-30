@@ -68,7 +68,7 @@ export function BillingToggle({
             tabIndex={selected ? 0 : -1}
             onClick={() => onToggle(value)}
             onKeyDown={(event) => handleKeyDown(event, index)}
-            className={`flex min-h-11 min-w-24 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none ${
+            className={`flex min-h-11 min-w-24 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors motion-reduce:transition-none ${
               selected
                 ? 'bg-foreground text-background'
                 : 'text-muted-foreground hover:text-foreground'

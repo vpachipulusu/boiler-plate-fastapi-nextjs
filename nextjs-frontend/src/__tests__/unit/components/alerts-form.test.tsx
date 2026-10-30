@@ -45,6 +45,17 @@ beforeEach(() => {
   mocks.subscribe.mockResolvedValue({ success: true });
 });
 
+describe('AlertsForm keyboard focus', () => {
+  it('shows the focus of the hidden checkbox and radio inputs as the global 3px outline on their card', () => {
+    render(<AlertsForm categories={CATEGORIES} live />);
+    const card = screen.getByLabelText('Weekly round-up').closest('label')!;
+
+    expect(card.className).toContain('has-[:focus-visible]:[outline:3px_solid_hsl(var(--ring))]');
+    expect(card.className).toContain('has-[:focus-visible]:outline-offset-2');
+    expect(card.className).not.toMatch(/(^|[\s:])ring(-|\s|$)/);
+  });
+});
+
 describe('AlertsForm promises', () => {
   it('says how to stop, and makes no "no spam", "anytime" or sold-lists claim', () => {
     const { container } = render(<AlertsForm categories={CATEGORIES} live />);

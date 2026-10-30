@@ -87,7 +87,6 @@ export function TokenActionPanel({ copy, action }: TokenActionPanelProps) {
             // The button unmounts on success, so the result takes focus as it mounts.
             ref={(node) => node?.focus()}
             tabIndex={-1}
-            className="outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <h1 className="font-display text-3xl font-extrabold tracking-tight">
               {copy.doneHeading}
