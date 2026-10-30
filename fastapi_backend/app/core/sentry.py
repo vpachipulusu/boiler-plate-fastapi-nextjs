@@ -47,20 +47,45 @@ def _redact_addresses(value: Any) -> Any:
     )
 
 
-def _redact_keys(value: Any) -> Any:
+MAX_REDACT_DEPTH = 20
+_CONTAINERS = (dict, list, tuple, set, frozenset)
+
+
+def _redact_keys(
+    value: Any,
+    _depth: int = 0,
+    _path: frozenset[int] = frozenset(),
+    _done: dict[int, Any] | None = None,
+) -> Any:
     """Return a copy of ``value`` with sensitive keys filtered and addresses redacted.
 
-    Every string leaf at any depth loses an email address (``_redact_addresses``);
-    a dict value under a sensitive key is filtered whole.
+    Every string leaf loses an email address (``_redact_addresses``); a value under
+    a sensitive key is filtered whole. Lists, tuples and sets come back as lists. A
+    cycle, or anything nested deeper than ``MAX_REDACT_DEPTH``, becomes the filtered
+    marker, so a hostile or self-referencing event cannot raise ``RecursionError``
+    (the SDK sends the raw event when a hook raises). A container reached again by
+    another route is redacted once (``_done``), so shared children cost nothing.
     """
+    if not isinstance(value, _CONTAINERS):
+        return _redact_addresses(value)
+    if _depth >= MAX_REDACT_DEPTH or id(value) in _path:
+        return FILTERED
+    done = {} if _done is None else _done
+    if id(value) in done:
+        return done[id(value)]
+    path = _path | {id(value)}
+    result: Any
     if isinstance(value, dict):
-        return {
-            key: FILTERED if SENSITIVE_NAME.search(str(key)) else _redact_keys(item)
+        result = {
+            key: FILTERED
+            if SENSITIVE_NAME.search(str(key))
+            else _redact_keys(item, _depth + 1, path, done)
             for key, item in value.items()
         }
-    if isinstance(value, list):
-        return [_redact_keys(item) for item in value]
-    return _redact_addresses(value)
+    else:
+        result = [_redact_keys(item, _depth + 1, path, done) for item in value]
+    done[id(value)] = result
+    return result
 
 
 def _strip_query(url: Any) -> Any:

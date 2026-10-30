@@ -301,6 +301,52 @@ def test_scrub_redacts_addresses_in_contexts_extra_and_headers_at_any_depth() ->
     assert "victim" not in text
 
 
+def test_redaction_survives_a_self_referencing_dict() -> None:
+    data: dict[str, Any] = {"to": "victim@example.com"}
+    data["self"] = data
+    data["list"] = [data, {"again": data}]
+
+    crumb = scrub_breadcrumb({"category": "x", "data": data})
+
+    text = json.dumps(crumb)
+    assert "victim" not in text
+    assert FILTERED in text
+
+
+def test_redaction_survives_a_very_deep_nest() -> None:
+    nested: Any = {"url": "https://x/contacts/a%40b.com"}
+    for _ in range(5000):
+        nested = {"next": nested}
+
+    scrubbed = scrub_event({"extra": nested})
+
+    assert "a%40b.com" not in json.dumps(scrubbed)
+
+
+def test_redaction_is_quick_when_a_child_is_shared_many_times() -> None:
+    node: Any = {"url": "https://x/contacts/a%40b.com"}
+    for _ in range(18):
+        node = {"left": node, "right": node}
+
+    assert "a%40b.com" not in json.dumps(scrub_event({"extra": node}))
+
+
+def test_redaction_covers_tuples_and_sets() -> None:
+    event = {
+        "extra": {
+            "pair": ("victim@example.com", "ok"),
+            "tags": {"victim@example.com"},
+            "frozen": frozenset({"a%40b.com"}),
+        }
+    }
+
+    extra = scrub_event(event)["extra"]
+
+    assert "victim" not in json.dumps(extra)
+    assert "a%40b.com" not in json.dumps(extra)
+    assert extra["pair"] == [FILTERED, "ok"]
+
+
 def test_scrub_drops_an_email_address_held_in_the_request_path() -> None:
     event = {"request": {"url": f"http://test/v1/x/{ADDRESS}?token=abc"}}
 

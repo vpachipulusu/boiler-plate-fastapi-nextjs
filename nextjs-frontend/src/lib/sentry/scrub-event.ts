@@ -14,10 +14,18 @@
  *
  * Last, any address-shaped token in any string (`name@domain.tld`, plain or percent-encoded, also twice) is
  * replaced wherever it sits: a path segment (`/contacts/a%40b.com`), userinfo (`https://a%40b.com@host/`), a
- * nameless query (`?a%40b.com`), a fragment or free text. The domain must be dotted and end in a label that
- * starts with a letter, so `user@host`, `@scope/pkg`, `@Injectable()` and `pkg@8.1.0` are left alone. Not
- * covered: a quoted local part with a space (`"a b"@x.test`), a local part longer than 256 characters (the
- * rest is replaced, a leading part is not), and other spellings of `@` (full-width, `&#64;`).
+ * nameless query (`?a%40b.com`), a fragment or free text; letters of any script count, also percent-encoded
+ * (`victim@b%C3%BCcher.example`). The domain must be dotted and end in a label that starts with a letter, so
+ * `user@host`, `@scope/pkg`, `@Injectable()` and `pkg@8.1.0` are left alone. That rule is lossy in the other
+ * direction too: `logo@2x.png`, `icon@3x.webp`, `app@latest.js` and `version@1.0.beta` become `[Filtered]`
+ * (over-filtering, not a leak). Not covered (the part of the address before the stop leaks):
+ * - a local part with a character outside letters, digits and `_.+!%-` (`o'brien@x.test`, `a#1@x.test`,
+ *   `a&b@x.test`, `a=b@x.test`, a quoted part with a space);
+ * - a local part longer than 256 characters (its last 256 are replaced);
+ * - other spellings of `@`: full-width, `&#64;`, a literal `@`;
+ * - an IP-literal domain (`victim@192.168.0.1`);
+ * - percent-encoded letters in a parameter name (`?%65mail=`, `?t%6Fken=`; bracket escapes such as `%5B` work);
+ * - the second half of a surrogate pair at the start of a local part.
  *
  * Each parameter shape is covered in plain, percent-encoded (also nested in another URL, and encoded twice),
  * JSON, escaped-JSON and percent-encoded-JSON form, plus query strings held as an object or as name/value
@@ -30,6 +38,7 @@
  * treats as "do not send"; the SDK records a dropped `before_send` event in its Client Reports, so keep
  * `sendClientReports` on). A cycle becomes `[Circular]`, a child shared by several parents is walked once, an
  * object nested deeper than `MAX_DEPTH` becomes `[Filtered]`, and more than `MAX_NODES` objects drops the event.
+ * The memo ignores depth and ancestry, so a reused child can only be over-filtered, never leaked.
  * Sentry's own `normalizeDepth` (default 3) already truncates and de-cycles most events before the hooks run
  * and is the first line of defence; these limits cover whatever still gets through.
  */
@@ -53,7 +62,9 @@ const PCT = '%(?:25)*';
 /** One character of a parameter name: a word character, `.`, `[`, `]`, `-`, or a percent-escape that is no delimiter. */
 const NAME_CHAR = `(?:[\\w.[\\]-]|%(?!(?:25)*(?:3D|26|3F|23))[0-9a-f]{2})`;
 /** A parameter name that is always filtered: `token`, or anything containing `email` / `e-mail`. */
-const SENSITIVE_NAME = `(?:token|${NAME_CHAR}*e-?mail${NAME_CHAR}*)`;
+// The name is asserted once in a lookahead and then consumed by one unambiguous `NAME_CHAR+`, so a long run of
+// look-alike text (`emailemailemail...`) costs one scan per start, not a quadratic number of retries.
+const SENSITIVE_NAME = `(?=(?:token(?!${NAME_CHAR})|${NAME_CHAR}*e-?mail))${NAME_CHAR}+`;
 const ANY_NAME = `${NAME_CHAR}+`;
 /** What can start a parameter: the start, `?`, `&`, `;`, `#`, or one of those percent-encoded (a URL in a URL). */
 const START = `(^|[?&;#]|${PCT}(?:3F|26|23))`;
@@ -64,7 +75,7 @@ const ADDRESS_MARK = /@|%(?:25)*40/i;
 
 const NAMED_PARAM = new RegExp(`${START}(${SENSITIVE_NAME}${EQUALS})${VALUE}`, 'gi');
 const ANY_PARAM = new RegExp(`${START}(${ANY_NAME}${EQUALS})(${VALUE})`, 'gi');
-const JSON_NAME = '(?:token|[\\w.-]*e-?mail[\\w.-]*)';
+const JSON_NAME = '(?=(?:token(?![\\w.-])|[\\w.-]*e-?mail))[\\w.-]+';
 
 // Each pattern keeps its prefix and suffix and replaces only the value.
 const JSON_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
@@ -88,10 +99,16 @@ const JSON_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
 // Address-shaped tokens are found from the `@` outward, so a long run of look-alike characters costs no more
 // than the run itself: no pattern has to start at every character.
 const MARK_SCAN = /@|%(?:25)*40/gi;
-const LOCAL_CHAR = /[\w.+!%-]/;
+const LOCAL_CHAR = /[\p{L}\p{N}_.+!%-]/u;
 const MAX_LOCAL_LENGTH = 256;
 const DOT = `(?:\\.|%(?:25)*2E)`;
-const DOMAIN = new RegExp(`[\\w-]+(?:${DOT}[\\w-]+)*${DOT}[a-z][\\w-]*`, 'iy');
+// A domain label is a letter, digit, `_` or `-` (any script), or a percent-escape that is not a delimiter or `@`, so
+// `b%C3%BCcher.example` and `exam%70le.com` count; `%2E` stays the dot.
+const LABEL_CHAR = `(?:[\\p{L}\\p{N}_-]|%(?!(?:25)*(?:2E|26|23|3F|3D|2F|3B|40))[0-9a-f]{2})`;
+const DOMAIN = new RegExp(
+  `${LABEL_CHAR}+(?:${DOT}${LABEL_CHAR}+)*${DOT}\\p{L}${LABEL_CHAR}*`,
+  'iuy'
+);
 
 function isSensitiveName(name: string): boolean {
   const lower = name.toLowerCase();

@@ -261,14 +261,20 @@ file names (`node_modules/@sentry/core/...`, `@radix-ui/react-dialog`), decorato
 `oobCode`, `apiKey` (Firebase's public key appears as `?key=` on `googleapis.com` fetch breadcrumbs), `e` and `mail`
 are deliberately **not** listed: they do not appear in any URL of this app, and adding names that never occur only
 hides real findings. Add a name to `SENSITIVE_NAME` in `scrub-event.ts` (and a test) when a flow starts using one.
-Not covered: a quoted local part with a space (`"a b"@x.test`), a local part longer than 256 characters (only its last
-256 characters are replaced), and other spellings of `@` (full-width, `&#64;`).
+Letters of any script count in an address, also percent-encoded (`victim@b%C3%BCcher.example`). The memo that makes a
+shared child cheap ignores depth and ancestry, so it can only over-filter, never leak. **Known false positives** (lossy,
+not leaky): `logo@2x.png`, `icon@3x.webp`, `app@latest.js` and `version@1.0.beta` become `[Filtered]`.
+**Not covered** (the part of the address before the stop leaks): a local part with a character outside letters, digits
+and `_.+!%-` (`o'brien@x.test`, `victim#1@x.test`, `victim&x@x.test`, `victim=x@x.test`, a quoted part with a space);
+a local part longer than 256 characters (only its last 256 are replaced); other spellings of `@` (full-width, `&#64;`, a
+literal `@`); an IP-literal domain (`victim@192.168.0.1`); percent-encoded letters in a parameter name
+(`?%65mail=`, `?t%6Fken=`; bracket escapes such as `%5B` are handled).
 Tests: `src/__tests__/unit/lib/sentry-scrub-event.test.ts` (token), `sentry-scrub-email.test.ts` (hostile URLs,
 every shape above), `sentry-scrub-hardening.test.ts` (cycles, shared references, depth, fragments, encoded names,
 address tokens, false-positive guards) and `sentry-configs.test.ts` (the three configs register the hooks). They run on constructed events; **nothing here has been checked against a live Sentry project**.
 
 **Backend.** `app/core/sentry.py` already dropped query strings, bodies and cookies; FREEJ-31 also redacts an email
-address from the request path and from every string at any depth in breadcrumb data, `contexts`, `extra` and headers,
+address from the request path and from every string in breadcrumb data, `contexts`, `extra` and headers (to 20 levels; a cycle or anything deeper becomes `[Filtered]`, tuples and sets come back as lists),
 because the Brevo contact lookup and delete calls put
 the subscriber's address in the path (`/contacts/<email>`) and the SDK's httpx integration records that URL.
 `configure_logging` now holds the `httpx` and `httpcore` loggers at WARNING for the same reason (httpx logs each

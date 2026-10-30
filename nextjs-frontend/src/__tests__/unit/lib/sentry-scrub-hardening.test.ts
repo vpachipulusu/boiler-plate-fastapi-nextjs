@@ -173,3 +173,65 @@ describe('scrubEvent: gaps in how an address can be written into a URL', () => {
     expect(ms).toBeLessThan(3000);
   });
 });
+
+describe('scrubEvent: parameter-name and JSON-name patterns stay linear', () => {
+  const REPEATED: ReadonlyArray<readonly [string, (n: number) => string]> = [
+    ['a query of repeated email', (n) => `?${'email'.repeat(n)}`],
+    ['repeated email', (n) => 'email'.repeat(n)],
+    ['a quote then repeated email', (n) => `"${'email'.repeat(n)}`],
+    ['an escaped quote then repeated email', (n) => `\\"${'email'.repeat(n)}`],
+    ['repeated percent-encoded email', (n) => '%22email%22'.repeat(n)],
+  ];
+  const BOUNDS = [
+    ['20 000 repeats', 20_000, 50],
+    ['about 1 MB', 200_000, 1500],
+  ] as const;
+
+  for (const [name, build] of REPEATED) {
+    for (const [size, repeats, limit] of BOUNDS) {
+      it(`${name}, ${size}, takes under ${limit} ms`, () => {
+        const text = build(repeats);
+
+        const ms = elapsed(() => {
+          scrubEvent({ message: text, request: { url: text } });
+        });
+
+        expect(ms).toBeLessThan(limit);
+      });
+    }
+  }
+});
+
+describe('scrubEvent: addresses with letters outside ASCII', () => {
+  it.each([
+    'jösé@example.com',
+    'josé@example.com',
+    'victim@bücher.example',
+    'victim@exämple.com',
+    'victim%40ex%C3%A4mple.com',
+    'victim@exam%70le.com',
+    'ünïcode@exämple.co.uk',
+  ])('replaces %s wherever it appears', (address) => {
+    const url = `https://x.test/contacts/${address}?q=${address}`;
+    const scrubbed = scrubEvent({
+      message: `for ${address}.`,
+      request: { url },
+      breadcrumbs: [{ data: { to: url, from: `/a/${address}` } }],
+    });
+
+    const text = JSON.stringify(scrubbed);
+    expect(text).not.toMatch(/jös|josé|victim|ünï|bücher|exäm|exam%70|%C3/i);
+    expect(scrubbed?.message).toBe(`for ${FILTERED}.`);
+  });
+
+  it('is fast on a long run of non-ASCII labels', () => {
+    const ms = elapsed(() => {
+      scrubEvent({
+        message: `x@${'ä.'.repeat(100_000)}`,
+        extra: { u: `/a?${'ä@'.repeat(50_000)}` },
+      });
+    });
+
+    expect(ms).toBeLessThan(200);
+  });
+});
