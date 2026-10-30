@@ -1,6 +1,6 @@
 # Alerts sign-up: double opt-in, confirm and unsubscribe
 
-**Story:** FREEJ-24. **Decision:** [ADR-012](../adr/0012-email-provider.md) (Brevo, proposed). **Last updated:** 2026-10-29.
+**Story:** FREEJ-24. **Decision:** [ADR-012](../adr/0012-email-provider.md) (Brevo, proposed). **Last updated:** 2026-10-30 (FREEJ-32: confirmation sent after the commit).
 
 Visitors sign up for freebie alerts on `/alerts`. Nothing starts until they open an emailed link and press a
 button (double opt-in). Consent is recorded in `email_subscribers` (model in
@@ -11,7 +11,8 @@ subscribers. Compliance rules and acceptance criteria are in
 ## Flow
 
 ```text
-/alerts form --server action--> POST /v1/subscribers          PENDING row + confirmation email (signed token)
+/alerts form --server action--> POST /v1/subscribers          202 once the PENDING row and the token hash are committed
+                                                              (the confirmation email goes out AFTER the response)
 email link  --> /alerts/confirm?token=...   (page changes nothing; a button press runs the server action)
                  --> POST /v1/subscribers/confirm {token}       CONFIRMED, contact added to the provider list
 email link  --> /alerts/unsubscribe?token=... (button)          UNSUBSCRIBED, contact erased at the provider
@@ -27,7 +28,7 @@ All routes need `X-Internal-Key`. Bodies and errors use the usual envelope.
 
 | Route | Answers | Notes |
 | --- | --- | --- |
-| `POST /v1/subscribers` | 202 `{"success":true,"data":{"status":"accepted"}}` | Same answer for a new, pending, confirmed or unsubscribed address. Limited per client IP (`SUBSCRIBE_IP_POLICY`: 20 per hour, since a shared network can hold several visitors) **and** per keyed hash of the address (`SUBSCRIBE_EMAIL_POLICY`: 5 per hour); both fail closed. 503 when the provider is down, or when `EMAIL_PROVIDER` is unset and `ENVIRONMENT` is not `local`/`test` (a Vercel preview counts as deployed). |
+| `POST /v1/subscribers` | 202 `{"success":true,"data":{"status":"accepted"}}` | Same answer for a new, pending, confirmed or unsubscribed address. Limited per client IP (`SUBSCRIBE_IP_POLICY`: 20 per hour, since a shared network can hold several visitors) **and** per keyed hash of the address (`SUBSCRIBE_EMAIL_POLICY`: 5 per hour); both fail closed. 503 when `EMAIL_PROVIDER` is unset and `ENVIRONMENT` is not `local`/`test` (a Vercel preview counts as deployed). A provider outage is **not** a 503 any more: the email is sent after the response, so the failure is logged and withdrawn (see below). |
 | `POST /v1/subscribers/confirm` `{token}` | 200 `confirmed`, or 400 `Invalid or expired link` | Forged, expired, used, wrong-purpose and unknown tokens all give the same 400. 503 when the provider list cannot be updated; the link stays usable. |
 | `POST /v1/subscribers/unsubscribe` `{token}` | 200 `unsubscribed`, or 400 | Idempotent. The local change is committed first (status, `unsubscribed_at`; `categories` emptied and `provider_subscriber_id` cleared, as [platform-models.md](platform-models.md) requires); a provider failure gives 503 and the next try repeats the provider call. |
 
@@ -45,9 +46,30 @@ thin route that redirects to the landing page; do not make it change state.
 ## Rules the code keeps
 
 - **No enumeration.** `subscribe` returns normally in every state and the frontend shows one neutral message. A
-  confirmed subscriber is never changed by a sign-up form submission (anyone can type an address). Residual risk:
-  a new address takes one provider round trip longer than a no-op, so response time can still hint at state. The
-  per-IP and per-address limits bound how often it can be probed.
+  confirmed subscriber is never changed by a sign-up form submission (anyone can type an address). No path waits
+  for the provider before answering (next item), so response time no longer separates a stranger from a known
+  address by an HTTP round trip to the provider. A small database difference remains: see Known residual risks.
+  The per-IP and per-address limits bound how often it can be probed.
+- **Send after the commit (FREEJ-32).** `SubscriberService.subscribe` writes the row, the SHA-256 of the new confirm
+  token and `confirmation_sent_at`, builds the email (with that same token), commits, and returns a
+  `PendingConfirmation`. The route queues `ConfirmationDelivery.deliver` (`app/services/subscriber_delivery.py`) on
+  FastAPI `BackgroundTasks`, which runs after the 202 has been sent. Throttled, confirmed and unsubscribed
+  addresses return nothing to send. The background step runs in its own database session (the request session is
+  closed by then) and sends the message built before the commit, so the link always matches the stored hash.
+  - **`confirmation_sent_at` is a claim made at commit.** It makes the one-hour throttle hold while the mail is in
+    flight, so a burst of submissions or a double click cannot send a burst of mail (the row lock serialises them).
+  - **When the provider fails** (any exception, including a non-provider one), the claim is withdrawn in a new
+    transaction: `confirmation_token_hash` and `confirmation_sent_at` go back to NULL, but only while the stored
+    hash is still that mail's hash, so a newer link from a later request is never undone. The row then does not
+    claim a mail was sent, no live link exists for an undelivered mail, and the next submission sends at once
+    (instead of waiting the hour). The visitor was already told 202 and "check your inbox, then spam", so a
+    silent outage costs them one resubmission; it is logged as `confirmation email failed: email provider send
+    failed (status=...)` (operation and HTTP status, or the exception class for non-provider errors; never the
+    address, token or body) and non-provider errors also go to Sentry. A failed withdrawal is logged and swallowed.
+  - **A failed brand-new sign-up keeps its row** (PENDING, consent recorded, no token, no claim) until the 30 day
+    purge or the visitor's retry, where before the whole row was rolled back. It holds nothing beyond what the
+    visitor submitted.
+  - **Production without a provider** still answers 503 before anything is stored (`require_email_delivery`).
 - **Throttle.** A confirmation is re-sent at most once per hour per address (`confirmation_sent_at`). A newer token
   replaces the stored hash, so older links stop working.
 - **Tokens** (`app/core/subscriber_tokens.py`): `base64url(purpose|subject|expiry|nonce).base64url(HMAC-SHA256)`
@@ -143,11 +165,22 @@ brings it back.
 
 ## Known residual risks (pre-launch follow-ups)
 
-- **Timing side channel on `POST /v1/subscribers`.** A new or re-sendable address takes one provider round trip
-  longer than a confirmed, unsubscribed or recently-sent one, which returns at once. The bodies and statuses are
-  identical and the per-IP and per-address limits bound probing, but response time can still hint at state.
-  Recommended fix: send the email after the commit with `BackgroundTasks` (checking the platform keeps the task
-  alive after the response), or pad every answer to a fixed minimum duration. To be filed as its own story.
+- **Background send is best effort, not a queue.** The email is sent by a FastAPI background task in the same
+  process after the response. If the process is stopped between the commit and the send (a crash, a deploy, or a host
+  that freezes the function as soon as the response is out), nothing withdraws the claim: the row says a mail was
+  sent for up to one hour (`RESEND_INTERVAL`), then a resubmission sends again. Before launch, check that the
+  production runtime keeps the task alive after the response (on Vercel, Python functions may be frozen once the
+  response is sent; if so, hand the send to a platform "run after response" hook or a durable outbox). A durable outbox
+  (a table drained by a worker or cron) would remove this window and also retry failed sends without a visitor.
+- **Remaining timing differences on `POST /v1/subscribers`.** No path awaits the provider, so the hundreds of
+  milliseconds of an HTTP round trip are gone, but the database work still differs by path: a new address does an
+  `INSERT`, an `UPDATE` and a `COMMIT`; a resend-eligible pending address an `INSERT` (which conflicts), a locking
+  `SELECT`, two `UPDATE`s and a `COMMIT`; a confirmed, unsubscribed or recently-sent address an `INSERT`, a locking
+  `SELECT` and a `ROLLBACK`. That is a few statements and one write-ahead-log flush on a nearby database, in the
+  order of milliseconds, and is within the noise of a network round trip from the Next.js server. It is not constant
+  time and this change does not claim it is. Rate limiting (20 per hour per IP, 5 per hour per address) bounds how
+  many samples a prober gets. If it ever matters, equalise by doing a dummy write and commit on the no-op paths or
+  pad every answer to a fixed minimum duration.
 - **Client IP off Vercel.** `callBackend` forwards `X-Client-IP` only when `VERCEL=1` (it trusts
   `x-vercel-forwarded-for`, never a raw `X-Forwarded-For`). Anywhere else (local runs, another host) every visitor
   reaches the backend as one address and shares one per-IP bucket, so the 20 per hour IP limit is shared by all.
@@ -164,10 +197,13 @@ uv run uvicorn app.main:app --port 8000
 ```
 
 - Backend unit tests use `FakeEmailProvider` and the in-memory store in `tests/fakes_subscribers.py`.
-  `tests/api/test_subscribers_e2e.py` runs the whole lifecycle on Postgres (`TEST_DATABASE_URL`).
+  `tests/api/test_subscribers_e2e.py` runs the whole lifecycle on Postgres (`TEST_DATABASE_URL`). Tests prove "the
+  provider is not awaited before the response" with a `GatedEmailProvider` (an `asyncio.Event` the test releases)
+  and a raw ASGI call that returns as soon as the response is complete; `httpx.ASGITransport` waits for background
+  tasks, so ordinary client calls see the email in the fake outbox once they return.
 - Frontend: Vitest for the action, form states, pages, route handler and proxy header.
   `src/__tests__/e2e/alerts-optin.spec.ts` runs the journey in a browser when `E2E_EMAIL_OUTBOX` points at the
-  same outbox file the backend writes (it skips otherwise). See [local-e2e.md](local-e2e.md).
+  same outbox file the backend writes (it skips otherwise); it polls the outbox because the email is written after the response. See [local-e2e.md](local-e2e.md).
 
 ## Owner follow-ups
 
