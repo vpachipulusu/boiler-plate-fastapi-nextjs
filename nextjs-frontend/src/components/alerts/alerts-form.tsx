@@ -48,9 +48,17 @@ interface AlertsFormProps {
 
 const LABEL_CLASS = 'text-[11px] font-bold uppercase tracking-wider text-foreground';
 const ERROR_CLASS = 'mt-2 text-sm font-medium text-crit-foreground';
-// The checkbox/radio is sr-only, so the label carries the focus outline (same 3px solid --ring, 2px offset as globals.css; an arbitrary property so tailwind-merge in cn() keeps it).
+// The checkbox/radio is sr-only, so the label carries the focus outline: the focus-proxy rule in globals.css
+// (label:has(> .sr-only:focus-visible)) draws the one 3px --ring outline. Browsers without :has() get the same
+// outline from the peer-focus-visible fallback on the fake box (checkbox) or the overlay (radio), gated so
+// browsers with :has() never draw two.
 const CARD_CLASS =
-  'flex min-h-11 cursor-pointer items-center gap-3 rounded-input border border-border bg-background px-3 text-sm font-bold text-foreground transition-colors has-[:checked]:border-accent-ink has-[:checked]:bg-good has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:[outline:3px_solid_hsl(var(--ring))]';
+  'relative flex min-h-11 cursor-pointer items-center gap-3 rounded-input border border-border bg-background px-3 text-sm font-bold text-foreground transition-colors has-[:checked]:border-accent-ink has-[:checked]:bg-good';
+// Joined with a template string, not cn(): tailwind-merge drops the plain `outline` (style) utility next to `outline-[3px]`.
+const NO_HAS_FOCUS =
+  'supports-[not_(selector(:has(*)))]:peer-focus-visible:outline supports-[not_(selector(:has(*)))]:peer-focus-visible:outline-[3px] supports-[not_(selector(:has(*)))]:peer-focus-visible:outline-offset-2 supports-[not_(selector(:has(*)))]:peer-focus-visible:outline-ring';
+const CHECK_BOX_CLASS = `flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-border bg-card text-accent-foreground peer-checked:border-accent-ink peer-checked:bg-accent-ink peer-checked:text-white [&>svg]:opacity-0 peer-checked:[&>svg]:opacity-100 ${NO_HAS_FOCUS}`;
+const RADIO_OVERLAY_CLASS = `pointer-events-none absolute inset-0 rounded-[inherit] ${NO_HAS_FOCUS}`;
 
 function NotOpenYet() {
   return (
@@ -192,10 +200,7 @@ export function AlertsForm({ categories, live }: AlertsFormProps) {
                               )
                             }
                           />
-                          <span
-                            aria-hidden="true"
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-border bg-card text-accent-foreground peer-checked:border-accent-ink peer-checked:bg-accent-ink peer-checked:text-white [&>svg]:opacity-0 peer-checked:[&>svg]:opacity-100"
-                          >
+                          <span aria-hidden="true" className={CHECK_BOX_CLASS}>
                             <Check className="h-3.5 w-3.5" strokeWidth={3} />
                           </span>
                           {category.name}
@@ -216,10 +221,11 @@ export function AlertsForm({ categories, live }: AlertsFormProps) {
                 <label key={option.value} className={cn(CARD_CLASS, 'rounded-pill px-5')}>
                   <input
                     type="radio"
-                    className="sr-only"
+                    className="peer sr-only"
                     value={option.value}
                     {...register('frequency')}
                   />
+                  <span aria-hidden="true" className={RADIO_OVERLAY_CLASS} />
                   {option.label}
                 </label>
               ))}

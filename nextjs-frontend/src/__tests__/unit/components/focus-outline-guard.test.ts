@@ -30,12 +30,11 @@ const ALLOWED: Record<string, string> = {
   // Route-change heading focus (tabIndex -1) so screen readers announce the error; not a control.
   'app/error.tsx': 'heading focus target',
   'app/global-error.tsx': 'heading focus target',
-  // Stretched link: the title link's ::after covers the card and the card draws the one outline (has-[a:focus-visible]).
+  // Stretched link: its ::after covers the card, so the title link draws none and the card draws the one outline
+  // (the focus-proxy rule in globals.css).
   'components/catalogue/offer-card.tsx': 'stretched link: the card carries the outline',
-  // Radix roving-focus menu items: the highlight is the `focus:bg-accent` fill, an outline would collide with
-  // the neighbouring rows inside the popup.
-  'components/ui/dropdown-menu.tsx': 'Radix menu item highlight',
-  'components/ui/select.tsx': 'Radix select item highlight',
+  // Forced-colors only: the stretched link's transparent outline would show as a second ring inside the card's.
+  'app/globals.css': 'forced-colors: the card carries the outline, not its stretched link',
 };
 
 function sourceFiles(dir: string): string[] {
@@ -81,11 +80,22 @@ describe('forbidden focus pattern', () => {
     'outline-offset-2',
     'outline-2',
     'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring',
-    'has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:[outline:3px_solid_hsl(var(--ring))]',
     'outline: 3px solid hsl(var(--ring));',
     'hover:ring-2',
   ])('does not match %s', (classes) => {
     expect(FORBIDDEN.test(classes)).toBe(false);
+  });
+});
+
+/** FREEJ-35: the focus-proxy outline (sr-only control inside a label, stretched link inside an article) is one rule in globals.css. */
+describe('focus-proxy outline has a single source', () => {
+  const PROXY_UTILITY = /has-\[[^\]]*focus-visible[^\]]*\]:/;
+
+  it('is not re-drawn with has-[...] utilities in any component', () => {
+    const offenders = sourceFiles(SRC)
+      .map((file) => relative(SRC, file).split(sep).join('/'))
+      .filter((rel) => PROXY_UTILITY.test(readFileSync(join(SRC, rel), 'utf8')));
+    expect(offenders).toEqual([]);
   });
 });
 

@@ -35,4 +35,32 @@ describe('Single focus ring', () => {
     expect(css).toMatch(/\*:focus-visible\s*\{\s*outline: 3px solid hsl\(var\(--ring\)\);/);
     expect(css).not.toContain('ring-ring/50');
   });
+
+  it('defines the focus-proxy outline once, with the same 3px --ring outline and a --cta inverse variant', () => {
+    const css = read('app/globals.css');
+    expect(css).toMatch(
+      /label:has\(> \.sr-only:focus-visible\),\s*article:has\(a:focus-visible\)\s*\{\s*outline: 3px solid hsl\(var\(--ring\)\);\s*outline-offset: 2px;/
+    );
+    expect(css).toMatch(
+      /\.on-inverse label:has\(> \.sr-only:focus-visible\),\s*\.on-inverse article:has\(a:focus-visible\)\s*\{\s*outline-color: hsl\(var\(--cta\)\);/
+    );
+    // A label that only contains a link (the alerts consent line) is not a proxy.
+    expect(css).not.toMatch(/label:has\([^)]*a:focus-visible/);
+  });
+
+  it('restores the stretched link outline where :has() is unsupported', () => {
+    const css = read('app/globals.css');
+
+    expect(css).toMatch(
+      /@supports not selector\(:has\(\*\)\)\s*\{[^}]*article a\[href\]:focus-visible\s*\{\s*outline: 3px solid hsl\(var\(--ring\)\);/
+    );
+  });
+
+  it('stops the stretched link drawing a second ring in forced colors', () => {
+    const css = read('app/globals.css');
+
+    expect(css).toMatch(
+      /@media \(forced-colors: active\)\s*\{\s*@supports selector\(:has\(\*\)\)\s*\{\s*article a\[href\]:focus-visible\s*\{\s*outline-style: none;/
+    );
+  });
 });

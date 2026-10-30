@@ -173,6 +173,50 @@
     outline-color: hsl(var(--cta));
   }
 
+  /*
+   * Focus proxies: a control that is hidden (sr-only checkbox or radio) or stretched (the title link of an offer
+   * card, whose ::after covers the card) hands its outline to the container, so the same 3px outline surrounds the
+   * whole card. The control draws none itself (the card link switches its own off). The label rule
+   * matches only a direct sr-only child: a label that merely contains a link (the alerts consent line) keeps the
+   * link's own outline. Browsers without :has() (Chrome < 105, Safari < 15.4, Firefox < 121) drop these rules; the
+   * checkbox and radio then fall back to peer-focus-visible in alerts-form.tsx, and the stretched link to the
+   * @supports block below, so a focus indicator is never lost.
+   */
+  label:has(> .sr-only:focus-visible),
+  article:has(a:focus-visible) {
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  .on-inverse label:has(> .sr-only:focus-visible),
+  .on-inverse article:has(a:focus-visible) {
+    outline-color: hsl(var(--cta));
+  }
+
+  /*
+   * Forced colors repaint a transparent outline in a system colour, so the card link's own outline-off utility would
+   * draw a second ring inside the card's. Only where :has() works, so the card really carries the outline.
+   */
+  @media (forced-colors: active) {
+    @supports selector(:has(*)) {
+      article a[href]:focus-visible {
+        outline-style: none;
+      }
+    }
+  }
+
+  @supports not selector(:has(*)) {
+    /* [href] lifts the specificity above the link's own outline-off utility. */
+    article a[href]:focus-visible {
+      outline: 3px solid hsl(var(--ring));
+      outline-offset: 2px;
+    }
+
+    .on-inverse article a[href]:focus-visible {
+      outline-color: hsl(var(--cta));
+    }
+  }
+
   /* Heading defaults */
   h1,
   h2,
