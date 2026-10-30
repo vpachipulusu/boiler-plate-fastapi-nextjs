@@ -4,25 +4,34 @@ The routes, schemas, service, token codec and rate-limit dependencies are real; 
 provider and the limiter are the in-memory fakes.
 """
 
+import asyncio
 from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.api.deps import get_rate_limiter, get_session_provider
-from app.api.v1.subscribers import get_subscriber_service
+from app.api.v1.subscribers import get_confirmation_delivery, get_subscriber_service
 from app.core.config import settings
-from app.core.email_provider import EmailProviderError
+from app.core.email_provider import EmailMessage, EmailProviderError, FakeEmailProvider
 from app.core.rate_limit import SUBSCRIBE_EMAIL_POLICY, SUBSCRIBE_IP_POLICY
+from app.core.subscriber_tokens import token_digest
 from app.main import create_app
+from app.services.subscriber_delivery import PendingConfirmation
 from tests.fakes import (
     FakeRateLimiter,
     FakeSession,
     FakeSessionProvider,
     RaisingRateLimiter,
     as_limiter,
+    as_provider,
 )
-from tests.fakes_subscribers import Harness, link_tokens
+from tests.fakes_subscribers import (
+    GatedEmailProvider,
+    Harness,
+    link_tokens,
+    post_json_returning_at_response,
+)
 
 KEY = "test-only-internal-service-key-not-for-deployment"
 EMAIL = "sam@example.com"
@@ -44,6 +53,7 @@ def build(
     limiter = limiter or FakeRateLimiter()
     app = create_app()
     app.dependency_overrides[get_subscriber_service] = lambda: harness.service
+    app.dependency_overrides[get_confirmation_delivery] = lambda: harness.delivery
     app.dependency_overrides[get_rate_limiter] = lambda: as_limiter(limiter)
     client = AsyncClient(
         transport=ASGITransport(app=app, raise_app_exceptions=False),
@@ -191,20 +201,64 @@ async def test_invalid_bodies_are_422_and_send_nothing(change: dict[str, Any]) -
     assert harness.provider.sent == []
 
 
-async def test_a_provider_failure_is_a_retryable_503_with_no_detail() -> None:
+async def test_the_response_is_complete_before_the_provider_is_called() -> None:
+    provider = GatedEmailProvider()
+    harness = Harness(provider)
+    app = create_app()
+    app.dependency_overrides[get_subscriber_service] = lambda: harness.service
+    app.dependency_overrides[get_confirmation_delivery] = lambda: harness.delivery
+    app.dependency_overrides[get_rate_limiter] = lambda: as_limiter(FakeRateLimiter())
+
+    status, finished = await post_json_returning_at_response(
+        app, "/v1/subscribers", VALID, {"X-Internal-Key": KEY}
+    )
+
+    assert status == 202
+    assert provider.sent == []
+    await asyncio.wait_for(provider.started.wait(), timeout=5)
+    assert provider.sent == []
+    provider.release.set()
+    await finished
+    assert [m.to for m in provider.sent] == [EMAIL]
+    assert next(
+        iter(harness.store.rows.values())
+    ).confirmation_token_hash == token_digest(
+        link_tokens(provider.sent[0].text)["confirm"]
+    )
+
+
+async def test_a_provider_failure_after_the_response_is_invisible_to_the_visitor() -> (
+    None
+):
     harness = Harness()
     harness.provider.error = EmailProviderError("send", 500)
     http, _, _ = build(harness)
 
     async with http:
-        response = await http.post("/v1/subscribers", json=VALID)
+        failed = await http.post("/v1/subscribers", json=VALID)
+        harness.provider.error = None
+        retried = await http.post("/v1/subscribers", json=VALID)
 
-    assert response.status_code == 503
-    assert response.headers["retry-after"] == "5"
-    assert response.json() == {
-        "success": False,
-        "error": "Service temporarily unavailable",
-    }
+    assert (failed.status_code, failed.json()) == (
+        202,
+        {"success": True, "data": {"status": "accepted"}},
+    )
+    assert retried.status_code == 202
+    assert [m.to for m in harness.provider.sent] == [EMAIL]
+
+
+async def test_a_failed_send_leaves_no_row_claiming_that_a_mail_went_out() -> None:
+    harness = Harness()
+    harness.provider.error = EmailProviderError("send", 500)
+    http, _, _ = build(harness)
+
+    async with http:
+        await http.post("/v1/subscribers", json=VALID)
+
+    (row,) = harness.store.rows.values()
+    assert row.confirmation_sent_at is None
+    assert row.confirmation_token_hash is None
+    assert harness.provider.sent == []
 
 
 async def test_confirm_returns_confirmed_and_the_response_never_echoes_a_token() -> (
@@ -423,3 +477,48 @@ async def test_the_headers_show_the_ip_bucket_when_it_is_the_tighter() -> None:
     assert response.status_code == 202
     assert response.headers["x-ratelimit-limit"] == str(SUBSCRIBE_IP_POLICY.limit)
     assert response.headers["x-ratelimit-remaining"] == "2"
+
+
+class CommittingSession(FakeSession):
+    commits = 0
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+
+async def test_the_delivery_wiring_withdraws_a_failed_claim_in_a_session_of_its_own() -> (
+    None
+):
+    session = CommittingSession()
+    sessions = FakeSessionProvider(session)
+    provider = FakeEmailProvider()
+    provider.error = EmailProviderError("send", 500)
+    pending = PendingConfirmation(
+        "sub-1", "hash-1", EmailMessage("sam@example.com", "subject", "text", "html")
+    )
+
+    await get_confirmation_delivery(provider, as_provider(sessions)).deliver(pending)
+
+    assert (sessions.opened, sessions.closed, session.commits) == (1, 1, 1)
+    assert "UPDATE email_subscribers" in session.statements[0]
+
+
+async def test_the_delivery_wiring_opens_no_session_when_the_send_succeeds() -> None:
+    sessions = FakeSessionProvider(CommittingSession())
+    pending = PendingConfirmation(
+        "sub-1", "hash-1", EmailMessage("sam@example.com", "subject", "text", "html")
+    )
+
+    await get_confirmation_delivery(FakeEmailProvider(), as_provider(sessions)).deliver(
+        pending
+    )
+
+    assert sessions.opened == 0
+
+
+async def test_the_asgi_helper_shows_an_app_error_raised_before_any_response() -> None:
+    async def broken(scope: Any, receive: Any, send: Any) -> None:
+        raise ValueError("failed early")
+
+    with pytest.raises(ValueError, match="failed early"):
+        await post_json_returning_at_response(broken, "/x", {}, {})

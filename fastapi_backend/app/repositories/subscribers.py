@@ -106,6 +106,21 @@ class SubscriberRepository(BaseRepository):
             .values(**values)
         )
 
+    async def clear_confirmation(self, subscriber_id: str, token_hash: str) -> None:
+        """Undo a confirmation claim, but only while the stored token hash is still ``token_hash``.
+
+        Used when the email could not be sent: the row then no longer says one went out, and a newer
+        token (a later request's) is left alone.
+        """
+        await self._session.execute(
+            update(EmailSubscriber)
+            .where(
+                EmailSubscriber.id == subscriber_id,
+                EmailSubscriber.confirmation_token_hash == token_hash,
+            )
+            .values(confirmation_token_hash=None, confirmation_sent_at=None)
+        )
+
     async def count_expired(
         self, pending_before: datetime, unsubscribed_before: datetime
     ) -> tuple[int, int]:

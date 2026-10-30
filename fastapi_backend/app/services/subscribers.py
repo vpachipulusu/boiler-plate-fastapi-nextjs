@@ -6,6 +6,7 @@ Privacy rules the code keeps (see ``docs/developer/backend-subscribers.md``):
   all return normally, so the response cannot be used to learn who is on the list. A confirmed subscriber is
   never changed by an unauthenticated submission (anyone can type an address).
 * A confirmation email is re-sent at most once per ``RESEND_INTERVAL``.
+* The confirmation email is sent after the commit (``subscriber_delivery``), never while the request waits.
 * Only a SHA-256 of the latest confirm token is stored; a newer token replaces it, and confirming clears it,
   so a token works once. Every token failure raises the same ``InvalidToken``.
 * Nothing here logs an address or a token.
@@ -31,6 +32,7 @@ from app.core.subscriber_tokens import (
 )
 from app.models.platform.email_subscriber import AlertFrequency, SubscriberStatus
 from app.repositories.subscribers import SubscriberRecord
+from app.services.subscriber_delivery import PendingConfirmation
 from app.services.subscriber_emails import confirmation_message
 
 logger = logging.getLogger("yourapp.subscribers")
@@ -99,8 +101,12 @@ class SubscriberService:
         self._brand = brand
         self._clock = clock
 
-    async def subscribe(self, request: SubscribeRequest) -> None:
-        """Record the sign-up as PENDING and email a confirmation link, unless throttled or confirmed."""
+    async def subscribe(self, request: SubscribeRequest) -> PendingConfirmation | None:
+        """Record the sign-up as PENDING and commit it; the confirmation mail to send, or None.
+
+        Nothing here calls the provider: the caller sends the returned mail after the response
+        (``ConfirmationDelivery``). None when the address is throttled, confirmed or unsubscribed.
+        """
         now = self._clock()
         values = {
             "categories": list(request.categories),
@@ -112,44 +118,43 @@ class SubscriberService:
         subscriber_id = await self._store.insert_pending(
             {"email": request.email, **values}
         )
+        changes: dict[str, Any] = {}
         if subscriber_id is None:
-            subscriber_id = await self._reopen(request.email, values, now)
-            if subscriber_id is None:
+            reopened = await self._reopen(request.email, values, now)
+            if reopened is None:
                 await self._session.rollback()
-                return
+                return None
+            subscriber_id, changes = reopened
         confirm_token = self._tokens.issue(
             TokenPurpose.CONFIRM, subscriber_id, now + CONFIRM_TOKEN_TTL
         )
+        token_hash = token_digest(confirm_token)
+        # One write: a re-opened row's new choices and its new token travel together.
         await self._store.update(
             subscriber_id,
             {
-                "confirmation_token_hash": token_digest(confirm_token),
+                **changes,
+                "confirmation_token_hash": token_hash,
                 "confirmation_sent_at": now,
             },
         )
         unsubscribe_token = self._tokens.issue(
             TokenPurpose.UNSUBSCRIBE, subscriber_id, None
         )
-        try:
-            await self._provider.send(
-                confirmation_message(
-                    request.email,
-                    self._brand,
-                    self._link("confirm", confirm_token),
-                    self._link("unsubscribe", unsubscribe_token),
-                    self._link("unsubscribe/one-click", unsubscribe_token),
-                )
-            )
-        except EmailProviderError as exc:
-            await self._session.rollback()
-            logger.error("confirmation email failed: %s", exc)
-            raise ProviderUnavailable from None
+        message = confirmation_message(
+            request.email,
+            self._brand,
+            self._link("confirm", confirm_token),
+            self._link("unsubscribe", unsubscribe_token),
+            self._link("unsubscribe/one-click", unsubscribe_token),
+        )
         await self._session.commit()
+        return PendingConfirmation(subscriber_id, token_hash, message)
 
     async def _reopen(
         self, email: str, values: dict[str, Any], now: datetime
-    ) -> str | None:
-        """The address already has a row: its id when a new confirmation may go out, else None.
+    ) -> tuple[str, dict[str, Any]] | None:
+        """The address already has a row: (its id, the changes to write) when a new confirmation may go out.
 
         Only a PENDING row is re-opened. A CONFIRMED subscriber is never changed, and an UNSUBSCRIBED
         address is never re-opened by an anonymous submission (anyone can type it): bringing it back is an
@@ -169,8 +174,7 @@ class SubscriberService:
             if now - existing.consent_at >= PENDING_RETENTION
             else {"categories": values["categories"], "frequency": values["frequency"]}
         )
-        await self._store.update(existing.id, changes)
-        return existing.id
+        return existing.id, changes
 
     async def confirm(self, token: str) -> None:
         """PENDING to CONFIRMED and onto the provider's list. Raises ``InvalidToken``."""

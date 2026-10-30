@@ -7,6 +7,7 @@ replaced, so no email is ever sent.
 """
 
 import asyncio
+import json
 import os
 import subprocess
 import sys
@@ -16,22 +17,31 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from app.api.deps import get_email_provider, get_rate_limiter, get_session_provider
+from app.api.v1.subscribers import get_confirmation_delivery
 from app.core.config import settings
 from app.core.database import DefaultSessionProvider, build_engine
 from app.core.email_provider import EmailProviderError, FakeEmailProvider
 from app.core.ids import new_id
 from app.core.subscriber_tokens import SubscriberTokens, TokenPurpose, token_digest
 from app.main import create_app
+from app.models.platform.email_subscriber import AlertFrequency
 from app.repositories.subscribers import SubscriberRepository
+from app.services.subscriber_delivery import PendingConfirmation
+from app.services.subscribers import SubscribeRequest, SubscriberService
 from commands.purge_subscribers import purge_subscribers
 from tests.fakes import FakeRateLimiter, as_limiter
-from tests.fakes_subscribers import link_tokens
+from tests.fakes_subscribers import (
+    GatedEmailProvider,
+    link_tokens,
+    post_json_returning_at_response,
+)
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -95,16 +105,21 @@ def limiter() -> FakeRateLimiter:
 
 
 @pytest.fixture
-async def client(
+def app(
     engine: AsyncEngine, provider: FakeEmailProvider, limiter: FakeRateLimiter
-) -> AsyncIterator[AsyncClient]:
-    app = create_app()
+) -> FastAPI:
+    built = create_app()
     sessions = DefaultSessionProvider(
         async_sessionmaker(engine, expire_on_commit=False)
     )
-    app.dependency_overrides[get_session_provider] = lambda: sessions
-    app.dependency_overrides[get_email_provider] = lambda: provider
-    app.dependency_overrides[get_rate_limiter] = lambda: as_limiter(limiter)
+    built.dependency_overrides[get_session_provider] = lambda: sessions
+    built.dependency_overrides[get_email_provider] = lambda: provider
+    built.dependency_overrides[get_rate_limiter] = lambda: as_limiter(limiter)
+    return built
+
+
+@pytest.fixture
+async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=app, raise_app_exceptions=False)
     async with AsyncClient(
         transport=transport, base_url="http://test", headers={"X-Internal-Key": KEY}
@@ -442,19 +457,118 @@ async def test_simultaneous_confirms_of_one_token_succeed_once(
     assert len(provider.upserts) == 1
 
 
-async def test_a_send_failure_leaves_no_row_and_the_next_try_works(
+async def test_the_response_is_complete_before_the_provider_is_called(
+    app: FastAPI, engine: AsyncEngine
+) -> None:
+    gated = GatedEmailProvider()
+    app.dependency_overrides[get_email_provider] = lambda: gated
+
+    status, finished = await post_json_returning_at_response(
+        app, "/v1/subscribers", BODY, {"X-Internal-Key": KEY}
+    )
+
+    committed = await only_row(engine)
+    assert status == 202
+    assert gated.sent == []
+    assert committed["confirmation_sent_at"] is not None
+    await asyncio.wait_for(gated.started.wait(), timeout=5)
+    gated.release.set()
+    await finished
+    assert committed["confirmation_token_hash"] == token_digest(
+        link_tokens(gated.sent[0].text)["confirm"]
+    )
+    assert await only_row(engine) == committed
+
+
+async def test_the_mail_lands_in_the_outbox_once_the_response_is_done(
+    app: FastAPI, client: AsyncClient, tmp_path: Path
+) -> None:
+    outbox = tmp_path / "outbox.jsonl"
+    app.dependency_overrides[get_email_provider] = lambda: FakeEmailProvider(outbox)
+
+    response = await client.post("/v1/subscribers", json=BODY)
+
+    (line,) = outbox.read_text(encoding="utf-8").splitlines()
+    assert response.status_code == 202
+    assert json.loads(line)["to"] == EMAIL
+
+
+async def test_a_send_failure_withdraws_the_claim_and_the_next_try_works(
     client: AsyncClient, engine: AsyncEngine, provider: FakeEmailProvider
 ) -> None:
     provider.error = EmailProviderError("send", 500)
     failed = await client.post("/v1/subscribers", json=BODY)
-    assert failed.status_code == 503
-    assert await rows(engine) == []
+    row = await only_row(engine)
+    assert failed.status_code == 202
+    assert failed.json() == {"success": True, "data": {"status": "accepted"}}
+    assert row["status"] == "PENDING"
+    assert row["confirmation_sent_at"] is None
+    assert row["confirmation_token_hash"] is None
+    assert provider.sent == []
 
     provider.error = None
     retried = await client.post("/v1/subscribers", json=BODY)
 
     assert retried.status_code == 202
-    assert len(await rows(engine)) == 1
+    assert len(provider.sent) == 1
+    assert (await only_row(engine))["confirmation_token_hash"] == token_digest(
+        last_tokens(provider)["confirm"]
+    )
+    confirmed = await client.post(
+        "/v1/subscribers/confirm", json={"token": last_tokens(provider)["confirm"]}
+    )
+    assert confirmed.status_code == 200
+
+
+async def committed_pending(engine: AsyncEngine) -> PendingConfirmation:
+    """Run the service's subscribe step alone: the row is committed, the email is not sent."""
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    secret = settings.SUBSCRIBER_TOKEN_SECRET
+    assert secret is not None
+    async with maker() as session:
+        service = SubscriberService(
+            SubscriberRepository(session),
+            session,
+            FakeEmailProvider(),
+            SubscriberTokens(secret.get_secret_value().encode()),
+            settings.PUBLIC_SITE_URL,
+            "Freejoy",
+        )
+        pending = await service.subscribe(
+            SubscribeRequest(
+                email=EMAIL,
+                categories=("beauty", "pets"),
+                frequency=AlertFrequency.WEEKLY,
+                consent_text=str(BODY["consent_text"]),
+                consent_source="alerts_page",
+            )
+        )
+    assert pending is not None
+    return pending
+
+
+async def test_a_late_failed_send_does_not_withdraw_a_newer_token(
+    client: AsyncClient, engine: AsyncEngine, provider: FakeEmailProvider
+) -> None:
+    first = await committed_pending(engine)
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE email_subscribers "
+                "SET confirmation_sent_at = now() - interval '2 hours'"
+            )
+        )
+    await client.post("/v1/subscribers", json=BODY)
+    newer = await only_row(engine)
+    provider.error = EmailProviderError("send", 503)
+    sessions = DefaultSessionProvider(
+        async_sessionmaker(engine, expire_on_commit=False)
+    )
+
+    await get_confirmation_delivery(provider, sessions).deliver(first)
+
+    assert newer["confirmation_token_hash"] != first.token_hash
+    assert await only_row(engine) == newer
 
 
 async def test_a_sync_failure_on_confirm_keeps_the_subscriber_pending(
@@ -595,3 +709,56 @@ async def test_delete_many_applies_the_retention_test_again(
 
     assert count == 1
     assert [row["id"] for row in await rows(engine)] == [confirmed]
+
+
+@pytest.fixture
+def statements(engine: AsyncEngine) -> Iterator[list[str]]:
+    seen: list[str] = []
+
+    def record(conn: Any, cursor: Any, statement: str, *args: Any) -> None:
+        seen.append(statement.split()[0].upper())
+
+    event.listen(engine.sync_engine, "before_cursor_execute", record)
+    yield seen
+    event.remove(engine.sync_engine, "before_cursor_execute", record)
+
+
+async def test_the_statements_each_address_state_runs_match_the_documented_table(
+    client: AsyncClient,
+    engine: AsyncEngine,
+    provider: FakeEmailProvider,
+    statements: list[str],
+) -> None:
+    """Pins the residual timing difference: no path waits on the provider, the SQL differs by a few statements."""
+    counts: dict[str, list[str]] = {}
+
+    async def post(state: str) -> None:
+        statements.clear()
+        await client.post("/v1/subscribers", json=BODY)
+        counts[state] = list(statements)
+
+    await post("new")
+    await post("recent")
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                "UPDATE email_subscribers "
+                "SET confirmation_sent_at = now() - interval '2 hours'"
+            )
+        )
+    await post("resend")
+    tokens = last_tokens(provider)
+    await client.post("/v1/subscribers/confirm", json={"token": tokens["confirm"]})
+    await post("confirmed")
+    await client.post(
+        "/v1/subscribers/unsubscribe", json={"token": tokens["unsubscribe"]}
+    )
+    await post("unsubscribed")
+
+    assert counts == {
+        "new": ["INSERT", "UPDATE"],
+        "recent": ["INSERT", "SELECT"],
+        "resend": ["INSERT", "SELECT", "UPDATE"],
+        "confirmed": ["INSERT", "SELECT"],
+        "unsubscribed": ["INSERT", "SELECT"],
+    }

@@ -11,13 +11,16 @@ Called only by the Next.js server (internal key). Three rules shape the API (det
 * Every bad token gets the same 400, whether forged, expired, used or for the wrong purpose.
 """
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import require_internal_key
-from app.api.deps import EmailProviderDep, SessionDep
+from app.api.deps import EmailProviderDep, SessionDep, get_session_provider
 from app.api.rate_limit import (
     RATE_LIMIT_FAIL_CLOSED_RESPONSES,
     RATE_LIMIT_RESPONSES,
@@ -25,6 +28,7 @@ from app.api.rate_limit import (
     limit_by_client_ip_and_email,
 )
 from app.core.config import LOCAL_ENVIRONMENTS, settings
+from app.core.database import SessionProvider
 from app.core.errors import ErrorResponse
 from app.core.rate_limit import (
     SUBSCRIBE_EMAIL_POLICY,
@@ -34,6 +38,7 @@ from app.core.rate_limit import (
 from app.core.subscriber_tokens import MAX_TOKEN_LENGTH, SubscriberTokens
 from app.models.platform.email_subscriber import AlertFrequency
 from app.repositories.subscribers import SubscriberRepository
+from app.services.subscriber_delivery import ConfirmationDelivery
 from app.services.subscribers import (
     InvalidToken,
     ProviderUnavailable,
@@ -143,6 +148,27 @@ def get_subscriber_service(
 ServiceDep = Annotated[SubscriberService, Depends(get_subscriber_service)]
 
 
+def get_confirmation_delivery(
+    provider: EmailProviderDep,
+    sessions: Annotated[SessionProvider, Depends(get_session_provider)],
+) -> ConfirmationDelivery:
+    """Sends the confirmation after the response. Withdrawing a failed claim needs a session of its own:
+    the request's session is closed by then.
+    """
+
+    @asynccontextmanager
+    async def unit_of_work() -> AsyncIterator[
+        tuple[SubscriberRepository, AsyncSession]
+    ]:
+        async with sessions.session() as session:
+            yield SubscriberRepository(session), session
+
+    return ConfirmationDelivery(provider, unit_of_work)
+
+
+DeliveryDep = Annotated[ConfirmationDelivery, Depends(get_confirmation_delivery)]
+
+
 def _unavailable() -> HTTPException:
     return HTTPException(503, UNAVAILABLE_MESSAGE, {"Retry-After": RETRY_AFTER_SECONDS})
 
@@ -180,26 +206,31 @@ router = APIRouter(
     responses=RATE_LIMIT_FAIL_CLOSED_RESPONSES,
 )
 async def subscribe_to_alerts(
-    body: SubscribeBody, service: ServiceDep, response: Response
+    body: SubscribeBody,
+    service: ServiceDep,
+    delivery: DeliveryDep,
+    background: BackgroundTasks,
+    response: Response,
 ) -> SubscribeResponse:
     """Store a PENDING sign-up and email a confirmation link.
 
     The answer is identical for a new address, a pending one, a confirmed one and an unsubscribed one, and
     a confirmation is re-sent at most once an hour. Nothing says whether an email went out.
     """
+    # The email is sent after the response (FREEJ-32), so no answer waits on the provider. A provider outage is
+    # not visible here either: it is logged and the claim withdrawn, so the visitor can submit again at once.
     response.headers["Cache-Control"] = "no-store"
-    try:
-        await service.subscribe(
-            SubscribeRequest(
-                email=str(body.email),
-                categories=tuple(body.categories),
-                frequency=AlertFrequency(body.frequency),
-                consent_text=body.consent_text,
-                consent_source=body.consent_source,
-            )
+    pending = await service.subscribe(
+        SubscribeRequest(
+            email=str(body.email),
+            categories=tuple(body.categories),
+            frequency=AlertFrequency(body.frequency),
+            consent_text=body.consent_text,
+            consent_source=body.consent_source,
         )
-    except ProviderUnavailable:
-        raise _unavailable() from None
+    )
+    if pending is not None:
+        background.add_task(delivery.deliver, pending)
     return SubscribeResponse()
 
 

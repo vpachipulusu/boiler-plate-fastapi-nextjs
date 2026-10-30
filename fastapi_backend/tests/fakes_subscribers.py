@@ -1,15 +1,20 @@
 """Test doubles for the alerts sign-up: an in-memory store, a committer, a mutable clock and helpers."""
 
+import asyncio
+import json
 import re
+from collections.abc import AsyncIterator, Awaitable, Callable, MutableMapping
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from app.core.email_provider import FakeEmailProvider
+from app.core.email_provider import EmailMessage, FakeEmailProvider
 from app.core.ids import new_id
 from app.core.subscriber_tokens import SubscriberTokens
 from app.models.platform.email_subscriber import AlertFrequency, SubscriberStatus
 from app.repositories.subscribers import SubscriberRecord
+from app.services.subscriber_delivery import ConfirmationDelivery, PendingConfirmation
 from app.services.subscribers import SubscribeRequest, SubscriberService
 
 NOW = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
@@ -86,6 +91,13 @@ class FakeSubscriberStore:
         changes.pop("consent_source", None)
         self.rows[subscriber_id] = replace(self.rows[subscriber_id], **changes)
 
+    async def clear_confirmation(self, subscriber_id: str, token_hash: str) -> None:
+        row = self.rows.get(subscriber_id)
+        if row is not None and row.confirmation_token_hash == token_hash:
+            self.rows[subscriber_id] = replace(
+                row, confirmation_token_hash=None, confirmation_sent_at=None
+            )
+
 
 class CommitTrackingStore(FakeSubscriberStore):
     """Makes ``rollback`` discard uncommitted changes, like a database transaction."""
@@ -109,6 +121,20 @@ class _TransactionCommitter(FakeCommitter):
         self._store.rows = dict(self._store._committed)
 
 
+class GatedEmailProvider(FakeEmailProvider):
+    """A provider whose ``send`` waits for ``release``: proves nothing awaits the provider too early."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def send(self, message: EmailMessage) -> None:
+        self.started.set()
+        await self.release.wait()
+        await super().send(message)
+
+
 def make_request(email: str = "sam@example.com", **overrides: Any) -> SubscribeRequest:
     base = SubscribeRequest(
         email=email,
@@ -123,9 +149,9 @@ def make_request(email: str = "sam@example.com", **overrides: Any) -> SubscribeR
 class Harness:
     """A service wired to fakes, plus the pieces a test inspects."""
 
-    def __init__(self) -> None:
+    def __init__(self, provider: FakeEmailProvider | None = None) -> None:
         self.store = CommitTrackingStore()
-        self.provider = FakeEmailProvider()
+        self.provider = provider or FakeEmailProvider()
         self.clock = FakeClock()
         self.tokens = SubscriberTokens(SECRET)
         self.service = SubscriberService(
@@ -137,6 +163,23 @@ class Harness:
             "Freejoy",
             self.clock,
         )
+        self.units_opened = 0
+        self.delivery = ConfirmationDelivery(self.provider, self._unit_of_work)
+
+    @asynccontextmanager
+    async def _unit_of_work(
+        self,
+    ) -> AsyncIterator[tuple[FakeSubscriberStore, FakeCommitter]]:
+        """A fresh unit of work for the background step; here it shares the in-memory store."""
+        self.units_opened += 1
+        yield self.store, self.committer
+
+    async def subscribe(self, request: SubscribeRequest) -> PendingConfirmation | None:
+        """What the route does: subscribe, then (after the commit) deliver the confirmation."""
+        pending = await self.service.subscribe(request)
+        if pending is not None:
+            await self.delivery.deliver(pending)
+        return pending
 
     @property
     def committer(self) -> FakeCommitter:
@@ -149,3 +192,72 @@ class Harness:
 
 def link_tokens(text: str) -> dict[str, str]:
     return {kind: token for kind, token in LINK.findall(text)}
+
+
+async def post_json_returning_at_response(
+    app: Callable[..., Awaitable[None]],
+    path: str,
+    payload: dict[str, Any],
+    headers: dict[str, str],
+) -> tuple[int, asyncio.Task[None]]:
+    """Drive one POST through the raw ASGI interface and return as soon as the response is complete.
+
+    ``httpx.ASGITransport`` waits for the whole app call, background tasks included, so it cannot show
+    what happens *after* the response. The task returned finishes when the app does.
+    """
+    body = json.dumps(payload).encode()
+    raw_headers = [
+        (b"host", b"test"),
+        (b"content-type", b"application/json"),
+        (b"content-length", str(len(body)).encode()),
+        *((k.lower().encode(), v.encode()) for k, v in headers.items()),
+    ]
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "root_path": "",
+        "headers": raw_headers,
+        "client": ("127.0.0.1", 50000),
+        "server": ("test", 80),
+    }
+    response_complete = asyncio.Event()
+    app_finished = asyncio.Event()
+    status: list[int] = []
+    sent_request = False
+
+    async def receive() -> MutableMapping[str, Any]:
+        nonlocal sent_request
+        if not sent_request:
+            sent_request = True
+            return {"type": "http.request", "body": body, "more_body": False}
+        await app_finished.wait()
+        return {"type": "http.disconnect"}
+
+    async def send(message: MutableMapping[str, Any]) -> None:
+        if message["type"] == "http.response.start":
+            status.append(message["status"])
+        elif message["type"] == "http.response.body" and not message.get("more_body"):
+            response_complete.set()
+
+    async def run() -> None:
+        try:
+            await app(scope, receive, send)
+        finally:
+            app_finished.set()
+
+    task = asyncio.create_task(run())
+    done = asyncio.create_task(response_complete.wait())
+    await asyncio.wait({task, done}, timeout=5, return_when=asyncio.FIRST_COMPLETED)
+    done.cancel()
+    if not response_complete.is_set():
+        if task.done():
+            task.result()  # the app failed before answering: show that error
+        task.cancel()
+        raise AssertionError("the response was not completed before the provider call")
+    return status[0], task
