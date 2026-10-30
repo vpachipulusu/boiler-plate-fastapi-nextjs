@@ -8,7 +8,7 @@ import { waitForPageReady } from './helpers/e2e-utils';
  * Needs E2E_EMAIL_OUTBOX: the file the backend appends each message to as a JSON line. Start the backend with
  * EMAIL_PROVIDER=fake and EMAIL_FAKE_OUTBOX=<that file> (only allowed when ENVIRONMENT is local or test), plus
  * SUBSCRIBER_TOKEN_SECRET. The spec reads the confirm and unsubscribe links from that file, the way a person
- * would from their inbox. Skipped unless E2E_EMAIL_OUTBOX is set and the build has ALERTS_FORM_LIVE=true
+ * would from their inbox. Skipped unless E2E_EMAIL_OUTBOX is set and the server was started with ALERTS_FORM_LIVE=true
  * (run with E2E_ALERTS_LIVE=1). See docs/developer/backend-subscribers.md.
  */
 
@@ -45,7 +45,7 @@ function linkIn(text: string, path: string): string {
 test.describe('Alerts double opt-in', () => {
   test.skip(
     !OUTBOX || process.env.E2E_ALERTS_LIVE !== '1',
-    'needs E2E_EMAIL_OUTBOX (backend with the fake email provider) and a build with ALERTS_FORM_LIVE=true plus E2E_ALERTS_LIVE=1'
+    'needs E2E_EMAIL_OUTBOX (backend with the fake email provider) and a server started with ALERTS_FORM_LIVE=true plus E2E_ALERTS_LIVE=1'
   );
 
   async function signUp(page: import('@playwright/test').Page, email: string) {

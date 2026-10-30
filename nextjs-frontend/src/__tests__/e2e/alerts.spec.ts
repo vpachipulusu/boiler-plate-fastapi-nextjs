@@ -4,8 +4,8 @@ import { waitForPageReady } from './helpers/e2e-utils';
 /**
  * Alerts preferences (`/alerts`).
  *
- * The page has two builds. Without ALERTS_FORM_LIVE=true it shows a plain "not open yet" notice and no form;
- * with it, the form. Set E2E_ALERTS_LIVE=1 for the run against a build made with ALERTS_FORM_LIVE=true to run
+ * The page has two modes. Without ALERTS_FORM_LIVE=true it shows a plain "not open yet" notice and no form;
+ * with it, the form. Set E2E_ALERTS_LIVE=1 for the run against a server started with ALERTS_FORM_LIVE=true to run
  * the form tests; otherwise the closed-page tests run. The sign-up itself (double opt-in, confirm,
  * unsubscribe) needs a backend with the fake email provider and is in alerts-optin.spec.ts. The category
  * checkboxes come from the fixture catalogue (the e2e server runs with CATALOGUE_SOURCE=fixture unless
@@ -41,7 +41,7 @@ for (const viewport of VIEWPORTS) {
     });
 
     test.describe('while alerts are not open', () => {
-      test.skip(LIVE, 'build has ALERTS_FORM_LIVE=true');
+      test.skip(LIVE, 'server has ALERTS_FORM_LIVE=true');
 
       test('shows a plain notice, no form and no request', async ({ page }) => {
         const posts: string[] = [];
@@ -61,7 +61,7 @@ for (const viewport of VIEWPORTS) {
     });
 
     test.describe('when alerts are open', () => {
-      test.skip(!LIVE, 'needs a build with ALERTS_FORM_LIVE=true and E2E_ALERTS_LIVE=1');
+      test.skip(!LIVE, 'needs a server started with ALERTS_FORM_LIVE=true and E2E_ALERTS_LIVE=1');
 
       test('shows the promise, the six categories and the footer line', async ({ page }) => {
         await expect(
