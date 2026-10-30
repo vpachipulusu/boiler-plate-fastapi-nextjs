@@ -344,7 +344,10 @@ test.describe('Admin Dashboard', () => {
 
     test('should display recent activity section', async ({ page }) => {
       await expect(page.getByText('Recent Activity')).toBeVisible();
-      await expect(page.getByText(/showing \d+ of \d+ entries/i)).toBeVisible();
+      await expect(
+        page.getByText(/showing \d+ to \d+ of \d+ entries|^\d+ entries$/i)
+      ).toBeVisible();
+      await expect(page.getByRole('search', { name: /filter audit log entries/i })).toBeVisible();
     });
 
     test('should show table or empty state', async ({ page }) => {
