@@ -6,7 +6,9 @@ from typing import Any
 
 from sqlalchemy import func, select
 
+from app.models.platform.affiliate_link import AffiliateLink
 from app.models.platform.merchant import Merchant
+from app.models.platform.offer import Offer
 from app.repositories.base import BaseRepository
 from app.repositories.catalogue import escape_like
 
@@ -43,6 +45,20 @@ def _record(row: Merchant) -> MerchantRecord:
 
 
 class AdminMerchantRepository(BaseRepository):
+    async def active_direct_link_ids(self, merchant_id: str) -> list[str]:
+        """Ids of the merchant's active `direct` affiliate links (no URLs are read)."""
+        rows = await self._session.scalars(
+            select(AffiliateLink.id)
+            .join(Offer, Offer.id == AffiliateLink.offer_id)
+            .where(
+                Offer.merchant_id == merchant_id,
+                AffiliateLink.provider == "direct",
+                AffiliateLink.active.is_(True),
+            )
+            .order_by(AffiliateLink.id)
+        )
+        return list(rows)
+
     async def list_merchants(
         self, search: str | None, active: bool | None, limit: int, offset: int
     ) -> MerchantPage:

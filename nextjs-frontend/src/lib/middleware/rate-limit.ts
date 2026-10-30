@@ -16,6 +16,8 @@ export interface RateLimitConfig {
   maxRequests: number;
   windowMs: number;
   message?: string;
+  /** Names the bucket: the same client has a separate token bucket per scope (auth, api, general). */
+  scope?: string;
 }
 
 export interface RateLimitResult {
@@ -34,16 +36,18 @@ export interface RateLimitResult {
 export function rateLimit(identifier: string, config: RateLimitConfig): RateLimitResult {
   const now = Date.now();
   const { maxRequests, windowMs, message } = config;
+  // One bucket per scope and client, so traffic to one kind of route cannot spend another's tokens.
+  const key = `${config.scope ?? 'default'}:${identifier}`;
 
   // Get or create store entry
-  let store = rateLimitStore.get(identifier);
+  let store = rateLimitStore.get(key);
 
   if (!store) {
     store = {
       tokens: maxRequests,
       lastRefill: now,
     };
-    rateLimitStore.set(identifier, store);
+    rateLimitStore.set(key, store);
   }
 
   // Calculate tokens to add based on time elapsed
@@ -95,6 +99,11 @@ export function cleanupRateLimitStore(maxAge: number = 3600000): void {
   }
 }
 
+/** Empties every bucket. For tests only: production never calls it. */
+export function resetRateLimitStore(): void {
+  rateLimitStore.clear();
+}
+
 /**
  * Get rate limit headers for response
  */
@@ -112,18 +121,21 @@ export function getRateLimitHeaders(result: RateLimitResult): Record<string, str
 export const RATE_LIMIT_CONFIGS = {
   // Strict limits for auth endpoints
   auth: {
+    scope: 'auth',
     maxRequests: 5,
     windowMs: 15 * 60 * 1000, // 15 minutes
     message: 'Too many authentication attempts. Please try again in 15 minutes.',
   },
   // Standard API limits
   api: {
+    scope: 'api',
     maxRequests: 100,
     windowMs: 60 * 1000, // 1 minute
     message: 'API rate limit exceeded. Please slow down.',
   },
   // General limits
   general: {
+    scope: 'general',
     maxRequests: 200,
     windowMs: 60 * 1000, // 1 minute
     message: 'Too many requests. Please try again later.',

@@ -32,6 +32,7 @@ Start here, then follow the links. Root-level overview: [`../../README.md`](../.
 | [backend-plan-limits.md](backend-plan-limits.md) | Plan definitions and limit checks |
 | [backend-public-settings.md](backend-public-settings.md) | Public settings read by the frontend |
 | [backend-catalogue.md](backend-catalogue.md) | Public catalogue API: offers, offer detail, categories |
+| [freejoy-affiliate.md](freejoy-affiliate.md) | The `/go/[offerId]` affiliate redirect: flow, validation, what a click stores, provider host allowlist |
 | [backend-frontend-seams.md](backend-frontend-seams.md) | Endpoints that keep `stripe` and `firebase-admin` out of the frontend |
 | [backend-audit-logs.md](backend-audit-logs.md) | Audit log model and admin API |
 | [backend-admin-users.md](backend-admin-users.md) | Admin user management |
