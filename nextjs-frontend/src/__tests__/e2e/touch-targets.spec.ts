@@ -59,51 +59,119 @@ test('primary button on /login is 44px and focus ring is a 3px outline', async (
 });
 
 /**
- * Keyboard walkthrough: every Tab stop shows exactly one 3px outline and no ring shadow (light mode). The colour is
- * the default `freejoy` theme's --ring (ink green, 162 27% 17%), or its --cta (coral, 8 92% 68%) inside an
- * `.on-inverse` surface (globals.css). Both come from src/config/themes.ts.
+ * Keyboard walkthrough: every Tab stop shows exactly one 3px outline at a 2px offset and no ring shadow (light mode).
+ * The colour is read from the live token, never hard-coded: `--ring`, or `--cta` inside an `.on-inverse` surface
+ * (globals.css). Documentation only: the default `freejoy` theme (src/config/themes.ts) currently resolves them to
+ * ink green (162 27% 17%) and coral (8 92% 68%).
+ *
+ * Two controls draw their outline on a container because the control itself is hidden or stretched: the `sr-only`
+ * checkbox/radio inside a `label` (alerts cards) and the title link of an offer `article` (stretched link). For those
+ * stops the container must show the outline and the control itself none.
  */
-const RING = 'rgb(32, 55, 48)';
-const RING_ON_INVERSE = 'rgb(248, 118, 98)';
 const MAX_TAB_STOPS = 25;
+const MAX_TAB_STOPS_WITH_PROXY = 70;
+const PROXY_STOPS_TO_VERIFY = 2;
 
-for (const path of ['/login', '/pricing'] as const) {
+interface OutlineReading {
+  width: string;
+  style: string;
+  color: string;
+  offset: string;
+  shadow: string;
+}
+
+interface StopSnapshot {
+  tag: string;
+  proxied: boolean;
+  expectedColor: string;
+  target: OutlineReading;
+  controlOutlineVisible: boolean;
+}
+
+/** The focused element's outline, or its container's when the control is an sr-only input or a stretched link. */
+function readStop(page: Page): Promise<StopSnapshot> {
+  return page.evaluate(() => {
+    const el = document.activeElement as HTMLElement;
+    const read = (node: Element): OutlineReading => {
+      const s = getComputedStyle(node);
+      return {
+        width: s.outlineWidth,
+        style: s.outlineStyle,
+        color: s.outlineColor,
+        offset: s.outlineOffset,
+        shadow: s.boxShadow,
+      };
+    };
+    const srOnly = el.matches('input') && el.getBoundingClientRect().width <= 1;
+    const proxy = srOnly || el.matches('article a') ? el.closest('label, article') : null;
+    const target = proxy ?? el;
+    // Resolve the live token through a probe so the expectation follows the theme.
+    const probe = document.createElement('span');
+    probe.style.color = `hsl(var(${target.closest('.on-inverse') ? '--cta' : '--ring'}))`;
+    document.body.appendChild(probe);
+    const expectedColor = getComputedStyle(probe).color;
+    probe.remove();
+    const control = read(el);
+    return {
+      tag: el.tagName.toLowerCase(),
+      proxied: proxy !== null,
+      expectedColor,
+      target: read(target),
+      controlOutlineVisible:
+        !srOnly &&
+        control.style !== 'none' &&
+        control.color !== 'rgba(0, 0, 0, 0)' &&
+        parseFloat(control.width) > 0,
+    };
+  });
+}
+
+const WALKS = [
+  { path: '/login', proxy: null },
+  { path: '/pricing', proxy: null },
+  { path: '/alerts', proxy: 'sr-only checkbox/radio' },
+  { path: '/freebies', proxy: 'offer card title link' },
+] as const;
+
+for (const { path, proxy } of WALKS) {
   test(`tab order on ${path} shows one 3px focus outline per stop`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light' });
     await page.goto(path);
     await waitForPageReady(page);
+    if (path === '/alerts') {
+      test.skip(
+        (await page.locator('input[type="checkbox"]').count()) === 0,
+        'the alerts form only renders when the server runs with ALERTS_FORM_LIVE=true'
+      );
+    }
 
     const stops: string[] = [];
-    for (let i = 0; i < MAX_TAB_STOPS; i++) {
+    let proxyStops = 0;
+    const maxStops = proxy ? MAX_TAB_STOPS_WITH_PROXY : MAX_TAB_STOPS;
+    for (let i = 0; i < maxStops && proxyStops < PROXY_STOPS_TO_VERIFY; i++) {
       await page.keyboard.press('Tab');
       const active = page.locator(':focus-visible');
       if ((await active.count()) === 0) break;
       // Past the page content: the TanStack devtools toggle only exists in dev builds.
       if (await active.evaluate((el) => el.className.toString().includes('tsqd'))) break;
       // Outline animates in via transition-all on buttons.
-      await expect
-        .poll(() => active.evaluate((el) => getComputedStyle(el).outlineWidth))
-        .toBe('3px');
-      const style = await active.evaluate((el) => {
-        const s = getComputedStyle(el);
-        return {
-          tag: el.tagName.toLowerCase(),
-          inverse: el.closest('.on-inverse') !== null,
-          color: s.outlineColor,
-          style: s.outlineStyle,
-          offset: s.outlineOffset,
-          shadow: s.boxShadow,
-        };
-      });
-      expect([style.color, style.style, style.offset]).toEqual([
-        style.inverse ? RING_ON_INVERSE : RING,
+      await expect.poll(async () => (await readStop(page)).target.width).toBe('3px');
+      const stop = await readStop(page);
+      expect([stop.target.color, stop.target.style, stop.target.offset]).toEqual([
+        stop.expectedColor,
         'solid',
         '2px',
       ]);
       // A Tailwind ring is a spread shadow ("0px 0px 0px 2px"); the normal shadow-sm is fine.
-      expect(style.shadow).not.toMatch(/0px 0px 0px [1-9]\d*px/);
-      stops.push(style.tag);
+      expect(stop.target.shadow).not.toMatch(/0px 0px 0px [1-9]\d*px/);
+      if (stop.proxied) {
+        // One indicator only: the container carries it, the control itself shows none.
+        expect(stop.controlOutlineVisible).toBe(false);
+        proxyStops += 1;
+      }
+      stops.push(stop.tag);
     }
     expect(stops.length).toBeGreaterThan(2);
+    if (proxy) expect(proxyStops, `a ${proxy} stop was reached and verified`).toBeGreaterThan(0);
   });
 }
