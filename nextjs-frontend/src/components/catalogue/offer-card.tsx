@@ -43,7 +43,11 @@ export function OfferCard({ offer, merchant, className }: OfferCardProps) {
         {merchant.name}
       </p>
       <h3 className="mt-1.5 font-display text-base font-bold leading-snug text-foreground sm:text-lg">
-        <Link href={href} className="after:absolute after:inset-0 after:rounded-card">
+        {/* Stretched link: its ::after covers the card, so the card draws the one focus outline (has-[a:focus-visible]) and the link draws none. */}
+        <Link
+          href={href}
+          className="after:absolute after:inset-0 after:rounded-card focus-visible:outline-none"
+        >
           {offer.title}
         </Link>
       </h3>

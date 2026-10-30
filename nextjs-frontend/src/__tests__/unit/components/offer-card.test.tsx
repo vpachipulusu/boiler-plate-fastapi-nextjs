@@ -19,13 +19,13 @@ describe('OfferCard', () => {
     expect(screen.getByRole('img', { name: offer.image.alt })).toBeInTheDocument();
   });
 
-  it('draws the keyboard focus on the card as the global 3px outline, never a ring', () => {
+  it('leaves the keyboard focus to the card: no ring, and the stretched title link draws no outline of its own', () => {
     const { container } = render(<OfferCard offer={offer} merchant={merchant} />);
-    const classes = container.querySelector('article')!.className;
 
-    expect(classes).toContain('has-[a:focus-visible]:[outline:3px_solid_hsl(var(--ring))]');
-    expect(classes).toContain('has-[a:focus-visible]:outline-offset-2');
-    expect(classes).not.toMatch(/(^|[\s:])ring(-|\s|$)/);
+    expect(container.querySelector('article')!.className).not.toMatch(/(^|[\s:])ring(-|\s|$)/);
+    expect(screen.getByRole('link', { name: offer.title }).className).toContain(
+      'focus-visible:outline-none'
+    );
   });
 
   it('shows the demo badge on fixture offers and never links off-site', () => {

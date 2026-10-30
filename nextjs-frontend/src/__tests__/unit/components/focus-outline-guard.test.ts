@@ -10,11 +10,17 @@ import { describe, expect, it } from 'vitest';
 
 const SRC = resolve(__dirname, '../../..');
 
-/** Utilities that replace or fake the global outline. */
-const FORBIDDEN =
-  /\boutline-none\b|(?:focus|focus-visible|has-\[[^\]]*\]):ring\b|(?:focus|focus-visible|has-\[[^\]]*\]):ring-|(?:^|[\s'"`:])ring-offset-\d/;
+/** Ways of switching the outline off or hiding it: utilities, arbitrary properties and raw CSS. */
+const OUTLINE_OFF = String.raw`outline-(?:none|0|transparent|hidden)(?![\w-])|\[outline(?:-style|-width)?:\s*(?:none|0)|(?<![\w-])outline(?:-style)?:\s*(?:none|0)(?![\w.])`;
+/** A ring (a spread box-shadow) used as a focus or state indicator, under any focus-like variant. */
+const RING_VARIANT = String.raw`(?:focus|focus-visible|focus-within|(?:group|peer)-focus(?:-visible|-within)?|(?:has|data|aria)-\[[^\]]*\]|(?:data|aria)-[\w-]+):ring(?![\w])`;
+/** A ring offset is only ever used with a ring. */
+const RING_OFFSET = String.raw`(?<![\w-])ring-offset-\d`;
 
-/** Files where `outline-none` is deliberate, each with the reason. Everything else must use the global outline. */
+/** Utilities that replace or fake the global outline. */
+const FORBIDDEN = new RegExp(`${OUTLINE_OFF}|${RING_VARIANT}|${RING_OFFSET}`);
+
+/** Files where the outline is switched off on purpose, each with the reason. Everything else uses the global outline. */
 const ALLOWED: Record<string, string> = {
   // Skip-link target: `<main tabIndex={-1}>` takes programmatic focus only; a page-sized outline would be noise.
   'app/(admin)/admin/layout.tsx': 'main skip-link target',
@@ -24,6 +30,8 @@ const ALLOWED: Record<string, string> = {
   // Route-change heading focus (tabIndex -1) so screen readers announce the error; not a control.
   'app/error.tsx': 'heading focus target',
   'app/global-error.tsx': 'heading focus target',
+  // Stretched link: the title link's ::after covers the card and the card draws the one outline (has-[a:focus-visible]).
+  'components/catalogue/offer-card.tsx': 'stretched link: the card carries the outline',
   // Radix roving-focus menu items: the highlight is the `focus:bg-accent` fill, an outline would collide with
   // the neighbouring rows inside the popup.
   'components/ui/dropdown-menu.tsx': 'Radix menu item highlight',
@@ -38,8 +46,51 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
+describe('forbidden focus pattern', () => {
+  it.each([
+    'focus-visible:outline-none',
+    'outline-none',
+    'outline-0',
+    'focus-visible:outline-transparent',
+    'outline-hidden',
+    '[outline:none]',
+    '[outline:0]',
+    '[outline:0px]',
+    'outline: none;',
+    'outline:0;',
+    'outline-style: none',
+    'focus:ring',
+    'focus-visible:ring-2',
+    'focus-within:ring-2',
+    'group-focus-visible:ring-ring',
+    'peer-focus-visible:ring-2',
+    'has-[:focus-visible]:ring-2',
+    'data-[state=open]:ring-2',
+    'aria-[expanded=true]:ring-1',
+    'aria-expanded:ring-2',
+    'ring-offset-2',
+    'focus-visible:ring-offset-2',
+  ])('matches %s', (classes) => {
+    expect(FORBIDDEN.test(classes)).toBe(true);
+  });
+
+  it.each([
+    'ring-0',
+    'ring-2 ring-transparent hover:ring-ring',
+    'outline-offset-0',
+    'outline-offset-2',
+    'outline-2',
+    'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring',
+    'has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:[outline:3px_solid_hsl(var(--ring))]',
+    'outline: 3px solid hsl(var(--ring));',
+    'hover:ring-2',
+  ])('does not match %s', (classes) => {
+    expect(FORBIDDEN.test(classes)).toBe(false);
+  });
+});
+
 describe('single global focus outline', () => {
-  it('leaves outline-none and ring focus styles to the allow-listed non-tabbable targets', () => {
+  it('leaves outline-off and ring focus styles to the allow-listed non-tabbable targets', () => {
     const offenders = sourceFiles(SRC)
       .map((file) => relative(SRC, file).split(sep).join('/'))
       .filter((rel) => !(rel in ALLOWED))
@@ -47,9 +98,9 @@ describe('single global focus outline', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('keeps every allow-list entry honest (the file still uses outline-none)', () => {
+  it('keeps every allow-list entry honest (the file still switches the outline off)', () => {
     const stale = Object.keys(ALLOWED).filter(
-      (rel) => !/\boutline-none\b/.test(readFileSync(join(SRC, rel), 'utf8'))
+      (rel) => !new RegExp(OUTLINE_OFF).test(readFileSync(join(SRC, rel), 'utf8'))
     );
     expect(stale).toEqual([]);
   });

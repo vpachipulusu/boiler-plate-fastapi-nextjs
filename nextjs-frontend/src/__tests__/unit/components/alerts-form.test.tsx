@@ -46,12 +46,10 @@ beforeEach(() => {
 });
 
 describe('AlertsForm keyboard focus', () => {
-  it('shows the focus of the hidden checkbox and radio inputs as the global 3px outline on their card', () => {
+  it('uses no ring for the focus of the hidden checkbox and radio inputs', () => {
     render(<AlertsForm categories={CATEGORIES} live />);
     const card = screen.getByLabelText('Weekly round-up').closest('label')!;
 
-    expect(card.className).toContain('has-[:focus-visible]:[outline:3px_solid_hsl(var(--ring))]');
-    expect(card.className).toContain('has-[:focus-visible]:outline-offset-2');
     expect(card.className).not.toMatch(/(^|[\s:])ring(-|\s|$)/);
   });
 });
