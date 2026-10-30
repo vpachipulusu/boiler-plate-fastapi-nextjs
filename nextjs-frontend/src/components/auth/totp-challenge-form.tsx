@@ -63,14 +63,19 @@ export function TotpChallengeForm({ idToken, onSignedIn, onCancel }: TotpChallen
     await signOutQuietly();
   }, []);
 
-  // Unmounting without a successful sign-in abandons it.
-  useEffect(
-    () => () => {
+  // Unmounting without a successful sign-in abandons it. React StrictMode (dev) runs mount, a simulated unmount and
+  // mount again, so the check is deferred: an immediate remount cancels it and only a real unmount signs out.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
       clearTimeout(redirectTimer.current);
-      if (!signedIn.current) void signOutOnce();
-    },
-    [signOutOnce]
-  );
+      setTimeout(() => {
+        if (!mounted.current && !signedIn.current) void signOutOnce();
+      }, 0);
+    };
+  }, [signOutOnce]);
 
   // A new step, and after each error: the cursor goes where the person types (this also keeps a phone keypad open).
   useEffect(() => {
@@ -88,13 +93,15 @@ export function TotpChallengeForm({ idToken, onSignedIn, onCancel }: TotpChallen
   }
 
   async function leave(notice?: AuthFormError) {
-    await signOutOnce();
+    // Once the session cookie is set the sign-in succeeded (even if the redirect stalled): keep the Firebase user.
+    if (!signedIn.current) await signOutOnce();
     onCancel(notice);
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (isSubmitting.current) return;
+    // After a success the code is spent: a stalled redirect must not resend it.
+    if (isSubmitting.current || signedIn.current) return;
     if (!totpCodeSchema.safeParse(code).success) {
       showError(INCOMPLETE_CODE);
       return;
@@ -134,7 +141,7 @@ export function TotpChallengeForm({ idToken, onSignedIn, onCancel }: TotpChallen
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4" noValidate aria-busy={isLoading}>
+    <form method="post" onSubmit={onSubmit} className="space-y-4" noValidate aria-busy={isLoading}>
       <div className="space-y-1">
         <h2 className="font-display text-lg font-semibold">Two-factor authentication</h2>
         <p id={HELP_ID} className="text-sm text-muted-foreground">

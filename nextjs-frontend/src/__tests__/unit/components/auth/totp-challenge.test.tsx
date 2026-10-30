@@ -1,6 +1,7 @@
 /** two-factor sign-in: the code step of the login panel, from the first step to the dashboard. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import userEvent from '@testing-library/user-event';
 
 const mocks = vi.hoisted(() => ({
@@ -27,6 +28,7 @@ vi.mock('@/app/actions/auth-actions', () => ({ verifyTokenAction: mocks.verifyTo
 
 import { LoginPanel } from '@/components/auth/login-panel';
 import { TotpChallengeForm } from '@/components/auth/totp-challenge-form';
+import { REDIRECT_RECOVERY_MS } from '@/components/auth/auth-form-errors';
 import {
   SIGN_IN_RATE_LIMITED_ERROR,
   SIGN_IN_SERVICE_UNAVAILABLE_ERROR,
@@ -71,7 +73,11 @@ describe('two-factor code step', () => {
     vi.clearAllMocks();
     mocks.signOut.mockResolvedValue({ error: null });
   });
-  afterEach(cleanup);
+  afterEach(async () => {
+    cleanup();
+    // The step's deferred abandon check runs on a zero-delay timer: let it settle before the next test.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 
   it('opens when the password step answers totpRequired, forwarding the same ID token later', async () => {
     const user = userEvent.setup();
@@ -386,7 +392,11 @@ describe('TotpChallengeForm', () => {
     vi.clearAllMocks();
     mocks.signOut.mockResolvedValue({ error: null });
   });
-  afterEach(cleanup);
+  afterEach(async () => {
+    cleanup();
+    // The step's deferred abandon check runs on a zero-delay timer: let it settle before the next test.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 
   it('calls onSignedIn after a successful code, submitted with Enter, and stays locked', async () => {
     const user = userEvent.setup();
@@ -413,24 +423,81 @@ describe('TotpChallengeForm', () => {
     expect(mocks.signOut).toHaveBeenCalledTimes(1);
   });
 
-  it('signs out when it is unmounted without a successful sign-in', () => {
-    const { unmount } = render(
-      <TotpChallengeForm idToken={ID_TOKEN} onSignedIn={vi.fn()} onCancel={vi.fn()} />
-    );
+  describe('abandoning the step', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
 
-    unmount();
+    it('signs out when it is unmounted without a successful sign-in', () => {
+      const { unmount } = render(
+        <TotpChallengeForm idToken={ID_TOKEN} onSignedIn={vi.fn()} onCancel={vi.fn()} />
+      );
 
-    expect(mocks.signOut).toHaveBeenCalledTimes(1);
-  });
+      unmount();
+      act(() => vi.runAllTimers());
 
-  it('does not throw to the UI when signing out fails', async () => {
-    mocks.signOut.mockRejectedValue(new Error('network'));
-    const { unmount } = render(
-      <TotpChallengeForm idToken={ID_TOKEN} onSignedIn={vi.fn()} onCancel={vi.fn()} />
-    );
+      expect(mocks.signOut).toHaveBeenCalledTimes(1);
+    });
 
-    expect(() => unmount()).not.toThrow();
-    await waitFor(() => expect(mocks.signOut).toHaveBeenCalled());
+    it('does not sign out on the StrictMode mount, simulated unmount and remount', () => {
+      const { unmount } = render(
+        <StrictMode>
+          <TotpChallengeForm idToken={ID_TOKEN} onSignedIn={vi.fn()} onCancel={vi.fn()} />
+        </StrictMode>
+      );
+
+      act(() => vi.runAllTimers());
+      expect(mocks.signOut).not.toHaveBeenCalled();
+
+      unmount();
+      act(() => vi.runAllTimers());
+      expect(mocks.signOut).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not throw to the UI when signing out fails', () => {
+      mocks.signOut.mockRejectedValue(new Error('network'));
+      const { unmount } = render(
+        <TotpChallengeForm idToken={ID_TOKEN} onSignedIn={vi.fn()} onCancel={vi.fn()} />
+      );
+
+      expect(() => {
+        unmount();
+        act(() => vi.runAllTimers());
+      }).not.toThrow();
+      expect(mocks.signOut).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the Firebase user, and does not resend the code, when Back is used after a stalled redirect', async () => {
+      const onCancel = vi.fn();
+      mocks.verifyTokenAction.mockResolvedValue({ success: true, data: {} });
+      render(<TotpChallengeForm idToken={ID_TOKEN} onSignedIn={vi.fn()} onCancel={onCancel} />);
+      const field = screen.getByLabelText('Authenticator code');
+      fireEvent.change(field, { target: { value: CODE } });
+      await act(async () => {
+        fireEvent.submit(field.closest('form') as HTMLFormElement);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(REDIRECT_RECOVERY_MS);
+      });
+
+      // The form is handed back (the redirect stalled) but the session cookie is already set.
+      fireEvent.submit(field.closest('form') as HTMLFormElement);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /back to sign in/i }));
+      });
+
+      expect(mocks.verifyTokenAction).toHaveBeenCalledTimes(1);
+      expect(mocks.signOut).not.toHaveBeenCalled();
+      expect(onCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('is a post form, so a native submit can never put the code in the address', () => {
+      render(<TotpChallengeForm idToken={ID_TOKEN} onSignedIn={vi.fn()} onCancel={vi.fn()} />);
+
+      expect(screen.getByLabelText('Authenticator code').closest('form')).toHaveAttribute(
+        'method',
+        'post'
+      );
+    });
   });
 
   it('keeps the Firebase sign-in after a successful code, even when unmounted', async () => {
@@ -444,7 +511,10 @@ describe('TotpChallengeForm', () => {
     await user.keyboard('{Enter}');
     await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
 
+    vi.useFakeTimers();
     unmount();
+    act(() => vi.runAllTimers());
+    vi.useRealTimers();
 
     expect(mocks.signOut).not.toHaveBeenCalled();
   });
