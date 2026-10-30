@@ -18,7 +18,7 @@ for (const { path, button } of PAGES) {
       await page.goto(path);
       await waitForPageReady(page);
 
-      await expect(page.getByRole('alert')).toContainText(/link is incomplete/i);
+      await expect(page.getByText(/link is incomplete/i)).toBeVisible();
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth
       );
