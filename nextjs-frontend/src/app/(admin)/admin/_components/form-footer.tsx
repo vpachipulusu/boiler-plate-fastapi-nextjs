@@ -38,7 +38,7 @@ export function FormFooter({
           ref={savedRef}
           tabIndex={-1}
           role="status"
-          className="rounded-lg border border-good-foreground/40 bg-good p-3 text-sm font-medium text-good-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="rounded-lg border border-good-foreground/40 bg-good p-3 text-sm font-medium text-good-foreground"
         >
           Changes saved.
         </p>
