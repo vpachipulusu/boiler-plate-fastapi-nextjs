@@ -162,7 +162,7 @@
     scroll-behavior: smooth;
   }
 
-  /* The one focus style: 3px outline, 2px offset, --ring (navy in light, gold in dark). */
+  /* The one focus style: 3px outline, 2px offset, --ring (the theme token: ink green in the freejoy light theme, gold in dark). */
   *:focus-visible {
     outline: 3px solid hsl(var(--ring));
     outline-offset: 2px;

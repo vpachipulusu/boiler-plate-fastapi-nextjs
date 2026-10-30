@@ -58,12 +58,17 @@ test('primary button on /login is 44px and focus ring is a 3px outline', async (
     .toEqual({ width: '3px', offset: '2px', style: 'solid' });
 });
 
-/** Keyboard walkthrough: every Tab stop shows exactly one navy outline and no ring shadow (light mode). */
-const NAVY = 'rgb(15, 23, 41)'; // --ring 222 47% 11%
+/**
+ * Keyboard walkthrough: every Tab stop shows exactly one 3px outline and no ring shadow (light mode). The colour is
+ * the default `freejoy` theme's --ring (ink green, 162 27% 17%), or its --cta (coral, 8 92% 68%) inside an
+ * `.on-inverse` surface (globals.css). Both come from src/config/themes.ts.
+ */
+const RING = 'rgb(32, 55, 48)';
+const RING_ON_INVERSE = 'rgb(248, 118, 98)';
 const MAX_TAB_STOPS = 25;
 
 for (const path of ['/login', '/pricing'] as const) {
-  test(`tab order on ${path} shows one navy focus outline per stop`, async ({ page }) => {
+  test(`tab order on ${path} shows one 3px focus outline per stop`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light' });
     await page.goto(path);
     await waitForPageReady(page);
@@ -83,13 +88,18 @@ for (const path of ['/login', '/pricing'] as const) {
         const s = getComputedStyle(el);
         return {
           tag: el.tagName.toLowerCase(),
+          inverse: el.closest('.on-inverse') !== null,
           color: s.outlineColor,
           style: s.outlineStyle,
           offset: s.outlineOffset,
           shadow: s.boxShadow,
         };
       });
-      expect([style.color, style.style, style.offset]).toEqual([NAVY, 'solid', '2px']);
+      expect([style.color, style.style, style.offset]).toEqual([
+        style.inverse ? RING_ON_INVERSE : RING,
+        'solid',
+        '2px',
+      ]);
       // A Tailwind ring is a spread shadow ("0px 0px 0px 2px"); the normal shadow-sm is fine.
       expect(style.shadow).not.toMatch(/0px 0px 0px [1-9]\d*px/);
       stops.push(style.tag);
