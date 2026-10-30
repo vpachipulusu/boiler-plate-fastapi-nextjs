@@ -1,6 +1,6 @@
 /** auth errors are classified into copy that never reveals whether an account exists. */
-import { describe, expect, it } from 'vitest';
-import { siteConfig } from '@/config/site';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('@/config/site', () => ({ siteConfig: { name: 'Acme Shop' } }));
 import { getFirebaseErrorMessage } from '@/lib/utils/firebase-errors';
 import { SIGN_IN_SERVICE_UNAVAILABLE_ERROR } from '@/lib/auth/auth-error-messages';
 import {
@@ -41,7 +41,7 @@ describe('classifyAuthError', () => {
     const result = classifyAuthError(fromCode('auth/network-request-failed'), 'sign-in');
 
     expect(result.kind).toBe('network');
-    expect(result.title).toBe(`We could not reach ${siteConfig.name}`);
+    expect(result.title).toBe('We could not reach Acme Shop');
     expect(result.message).toBe('Check your connection and try again.');
   });
 

@@ -20,7 +20,7 @@ Trials pay nothing yet and are not revenue. A billed organisation whose price id
 cannot be read is counted in `unpriced_organizations` and `complete` is `false` (the totals are then a floor).
 The figure is **list-price MRR**: subscription quantity, coupons and tax are not modelled. Price amount and currency
 come from the same `/prices/{id}` read; a price whose currency differs from the platform `currency` setting is
-counted as unpriced (`complete=false`) rather than added. ARR is exact (monthly x 12 plus yearly prices as paid).
+counted as unpriced (`complete=false`) rather than added. Stripe prices must be in the platform currency (GBP unless the `currency` app setting says otherwise): a price in another currency is excluded from admin MRR and shown with the platform symbol on `/pricing`. ARR is exact (monthly x 12 plus yearly prices as paid).
 Price reads are cached in process for 5 minutes (`price_cache.py`; failures are never cached), and the request's
 database transaction is ended before them, so no connection is held during Stripe calls. Admin grants (`granted_plan`) are complimentary and never revenue.
 

@@ -79,6 +79,14 @@ async def test_enrollment_confirmation_and_disable_lifecycle(setup):
     assert not repository.state.enabled and repository.state.ciphertext is None
 
 
+async def test_enrollment_uri_carries_the_configured_issuer(setup, monkeypatch):
+    service, current, _, _, _ = setup
+    monkeypatch.setattr(settings, "TOTP_ISSUER", "Acme Shop")
+    enrollment = await service.enroll(current, "fresh-id")
+    assert enrollment.uri.startswith("otpauth://totp/Acme%20Shop%3Aada%40example.com?")
+    assert "issuer=Acme+Shop" in enrollment.uri
+
+
 async def test_reenrollment_replaces_pending_secret(setup):
     service, current, _, repository, _ = setup
     first = await service.enroll(current, "fresh-id")

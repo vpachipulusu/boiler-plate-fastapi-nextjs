@@ -57,7 +57,7 @@ describe('formatMinorUnits', () => {
   });
 
   it('falls back to the raw amount for an unknown currency code', () => {
-    expect(formatMinorUnits(500, 'not-a-code')).toBe('500 not-a-code');
+    expect(formatMinorUnits(500, 'not-a-code')).toBe('5.00 NOT-A-CODE');
   });
 });
 

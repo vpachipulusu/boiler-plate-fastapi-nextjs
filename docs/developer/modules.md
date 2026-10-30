@@ -12,6 +12,8 @@ webhook that is the only writer of subscription state, admin subscription manage
 Docs: `backend-org-billing.md`, `backend-billing-webhook.md`, `backend-admin-subscriptions.md`,
 `backend-admin-analytics.md`.
 
+Stripe prices must be in the platform currency (GBP unless the `currency` app setting says otherwise): a price in another currency is excluded from admin MRR and shown with the platform symbol on `/pricing`.
+
 Stays in core when the module is removed: `app/core/plans.py` and `app/services/plan_limits.py` (plan names
 and the member limit; every organisation is on `free` without Stripe), the `organizations` columns
 `stripe_*`, `subscription_*` and `granted_*` (part of the single Alembic baseline; harmless when unused), and

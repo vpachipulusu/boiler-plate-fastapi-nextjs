@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { siteConfig } from '@/config/site';
+vi.mock('@/config/site', () => ({ siteConfig: { name: 'Acme Shop' } }));
 import { getFirebaseErrorMessage } from '@/lib/utils/firebase-errors';
 
 const mocks = vi.hoisted(() => ({
@@ -75,7 +75,7 @@ describe('LoginForm', () => {
     await fillAndSubmit(user);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      new RegExp(`could not reach ${siteConfig.name}.*check your connection`, 'i')
+      /could not reach Acme Shop.*check your connection/i
     );
   });
 
@@ -157,7 +157,7 @@ describe('LoginForm', () => {
 
     await fillAndSubmit(user);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(new RegExp(`could not reach ${siteConfig.name}`, 'i'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not reach Acme Shop/i);
   });
 
   it('clears the alert on the next submit', async () => {
@@ -197,7 +197,7 @@ describe('LoginForm', () => {
     await fillAndSubmit(user);
 
     const alert = await screen.findByRole('alert');
-    expect(alert).not.toHaveTextContent(new RegExp(`reach ${siteConfig.name}|connection`, 'i'));
+    expect(alert).not.toHaveTextContent(/reach Acme Shop|connection/i);
     expect(alert).toHaveTextContent(/try again/i);
   });
 

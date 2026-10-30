@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { siteConfig } from '@/config/site';
+vi.mock('@/config/site', () => ({ siteConfig: { name: 'Acme Shop' } }));
 import { getFirebaseErrorMessage } from '@/lib/utils/firebase-errors';
 
 const mocks = vi.hoisted(() => ({ resetPassword: vi.fn() }));
@@ -67,7 +67,7 @@ describe('PasswordResetForm', () => {
     await submit(user);
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(new RegExp(`could not reach ${siteConfig.name}`, 'i'));
+    expect(alert).toHaveTextContent(/could not reach Acme Shop/i);
     await waitFor(() => expect(alert).toHaveFocus());
   });
 

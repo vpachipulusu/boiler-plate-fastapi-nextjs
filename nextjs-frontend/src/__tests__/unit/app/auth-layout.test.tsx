@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 
-import { siteConfig } from '@/config/site';
-
+vi.mock('@/config/site', () => ({ siteConfig: { name: 'Acme Shop' } }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/components/auth/login-form', () => ({
   LoginForm: () => <form data-testid="login-form" />,
@@ -49,6 +48,21 @@ describe('auth layout', () => {
     );
   });
 
+  it('names the brand panel and shows the configured brand, never the placeholder', () => {
+    render(
+      <AuthLayout>
+        <p>child</p>
+      </AuthLayout>
+    );
+
+    const panel = screen.getByRole('complementary', { name: 'About Acme Shop', hidden: true });
+    expect(within(panel).getByRole('link', { name: 'Acme Shop', hidden: true })).toHaveAttribute(
+      'href',
+      '/'
+    );
+    expect(screen.queryByText('Your App')).toBeNull();
+  });
+
   it('shows the inverse brand panel only from 760px and keeps the form on phones', () => {
     render(
       <AuthLayout>
@@ -73,7 +87,7 @@ describe('auth layout', () => {
     );
 
     const phoneBrand = container.querySelector('main a[href="/"]') as HTMLElement;
-    expect(phoneBrand).toHaveTextContent(siteConfig.name);
+    expect(phoneBrand).toHaveTextContent('Acme Shop');
     expect(phoneBrand.className).toMatch(/min-\[760px\]:hidden/);
     expect(phoneBrand.className).toMatch(/min-h-11/);
   });

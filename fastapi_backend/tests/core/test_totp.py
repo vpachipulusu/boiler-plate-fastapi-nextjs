@@ -46,6 +46,14 @@ def test_missing_or_invalid_key_fails_closed(key):
 
 
 def test_uri_encodes_user_label():
-    uri = provisioning_uri("TEST", "ada+test@example.com")
+    uri = provisioning_uri("TEST", "ada+test@example.com", "Freejoy")
     assert "Freejoy%3Aada%2Btest%40example.com" in uri
     assert "algorithm=SHA1" in uri and "digits=6" in uri and "period=30" in uri
+
+
+def test_uri_percent_encodes_an_issuer_with_reserved_characters():
+    uri = provisioning_uri("TEST", "ada@example.com", "A:B&C")
+    path, query = uri.removeprefix("otpauth://totp/").split("?")
+    assert path == "A%3AB%26C%3Aada%40example.com"
+    assert "issuer=A%3AB%26C" in query.split("&")
+    assert len(query.split("&")) == 5

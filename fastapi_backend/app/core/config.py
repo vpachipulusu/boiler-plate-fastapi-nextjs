@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     # re-authentication freshness. Out of range stops startup.
     FIREBASE_CLOCK_SKEW_SECONDS: Annotated[int, Field(ge=0, le=60)] = 10
     TOTP_ENCRYPTION_KEY: SecretStr | None = None
+    # Name shown in the authenticator app next to the account (the brand, as on the website).
+    TOTP_ISSUER: str = "Freejoy"
 
     # Stripe Billing (optional module). Unset webhook secret means the webhook answers 503.
     STRIPE_WEBHOOK_SECRET: SecretStr | None = None

@@ -113,13 +113,13 @@ describe('SecurityPage data export', () => {
     const click = await exportWith(
       {
         success: true,
-        data: { filename: 'yourapp-export-20261017.json', json: '{"a":1}', truncated: false },
+        data: { filename: 'acme-shop-export-20261017.json', json: '{"a":1}', truncated: false },
       },
       downloads
     );
 
     expect(click).toHaveBeenCalledTimes(1);
-    expect(downloads).toEqual(['yourapp-export-20261017.json']);
+    expect(downloads).toEqual(['acme-shop-export-20261017.json']);
     expect(createUrl.mock.calls[0][0].type).toBe('application/json');
     expect(revokeUrl).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(10_000);

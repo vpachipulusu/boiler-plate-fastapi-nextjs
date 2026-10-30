@@ -188,6 +188,23 @@ async def test_revenue_leaves_out_a_price_in_another_currency(client, engine, pr
     assert data["mrr_minor"] == 0
 
 
+async def test_revenue_without_a_currency_row_excludes_a_usd_price(
+    client, engine, prices
+):
+    await seed_user(engine, "boss", "super_admin", ["*"])
+    await seed_org(engine, **paying())
+    prices.currencies["price_pro_m"] = (
+        "USD"  # no currency row: the platform currency is GBP
+    )
+
+    result = await client.get(f"{BASE}/revenue", headers=as_user("boss"))
+
+    data = result.json()["data"]
+    assert data["currency"] == "GBP"
+    assert data["complete"] is False and data["unpriced_organizations"] == 1
+    assert data["mrr_minor"] == 0
+
+
 async def test_revenue_uses_the_platform_currency_setting(client, engine):
     await seed_user(engine, "boss", "super_admin", ["*"])
     async with engine.begin() as connection:

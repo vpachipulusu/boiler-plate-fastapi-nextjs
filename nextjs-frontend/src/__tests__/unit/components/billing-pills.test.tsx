@@ -81,8 +81,13 @@ describe('InvoiceTable links', () => {
 });
 
 describe('formatAmount', () => {
-  it('formats a known currency', () => {
-    expect(formatAmount(2900, 'usd')).toBe('$29.00');
+  it('formats a known currency in its own marking', () => {
+    expect(formatAmount(2900, 'usd')).toBe('US$29.00');
+    expect(formatAmount(2900, 'gbp')).toBe('£29.00');
+  });
+
+  it('uses the currency own number of decimals', () => {
+    expect(formatAmount(1500, 'jpy')).toBe('JP¥1,500');
   });
 
   it('falls back to the plain number for an invalid currency code instead of throwing', () => {
