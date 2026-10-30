@@ -1,0 +1,49 @@
+import { ADMIN_OFFERS_PAGE_SIZE, MAX_OFFSET } from '@/lib/admin-catalogue/paging';
+import { OFFER_STATUSES, type OfferStatus } from '@/lib/admin-catalogue/offer-status';
+
+/** The list page's URL parameters: parsing, and the links that carry them (chips, pagination, retry). */
+
+export const OFFERS_PATH = '/admin/offers';
+export const MAX_QUERY_LENGTH = 100;
+
+/** The API refuses an offset past 1,000,000, so a later page is the last one that can exist. */
+const MAX_PAGE = Math.floor(MAX_OFFSET / ADMIN_OFFERS_PAGE_SIZE) + 1;
+const ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
+export type OffersQuery = {
+  q: string | undefined;
+  status: OfferStatus | undefined;
+  category: string | undefined;
+  page: number;
+};
+
+type RawParams = { q?: string; status?: string; category?: string; page?: string };
+
+function parsePage(value: string | undefined): number {
+  const page = Number.parseInt(value ?? '1', 10);
+  return Number.isFinite(page) && page > 0 ? Math.min(page, MAX_PAGE) : 1;
+}
+
+function parseStatus(value: string | undefined): OfferStatus | undefined {
+  const upper = value?.toUpperCase();
+  return OFFER_STATUSES.find((status) => status === upper);
+}
+
+export function parseOffersQuery(params: RawParams): OffersQuery {
+  return {
+    q: params.q?.trim().slice(0, MAX_QUERY_LENGTH) || undefined,
+    status: parseStatus(params.status),
+    category: params.category && ID_PATTERN.test(params.category) ? params.category : undefined,
+    page: parsePage(params.page),
+  };
+}
+
+export function offersHref(query: Partial<OffersQuery>): string {
+  const params = new URLSearchParams();
+  if (query.q) params.set('q', query.q);
+  if (query.status) params.set('status', query.status.toLowerCase());
+  if (query.category) params.set('category', query.category);
+  if (query.page && query.page > 1) params.set('page', String(query.page));
+  const qs = params.toString();
+  return qs ? `${OFFERS_PATH}?${qs}` : OFFERS_PATH;
+}

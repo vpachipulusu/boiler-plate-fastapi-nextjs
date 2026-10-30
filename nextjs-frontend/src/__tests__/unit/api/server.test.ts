@@ -243,6 +243,26 @@ describe('callBackend', () => {
       expect(result).toEqual({ success: false, error: 'Invalid request', status: 422 });
     });
 
+    it('carries the stable error code when the envelope has one, and never a non-string code', async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ success: false, error: 'Not now', code: 'illegal_transition' }, 409)
+      );
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ success: false, error: 'Bad', code: 42 }, 422)
+      );
+
+      const coded = await callBackend((client) => healthCheck({ client }));
+      const uncoded = await callBackend((client) => healthCheck({ client }));
+
+      expect(coded).toEqual({
+        success: false,
+        error: 'Not now',
+        status: 409,
+        code: 'illegal_transition',
+      });
+      expect(uncoded).toEqual({ success: false, error: 'Bad', status: 422 });
+    });
+
     it('returns a generic message when the body is not the envelope', async () => {
       fetchMock.mockResolvedValue(new Response('<html>Bad gateway</html>', { status: 502 }));
 
