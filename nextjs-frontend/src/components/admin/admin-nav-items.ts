@@ -2,9 +2,12 @@ import {
   BarChart3,
   CreditCard,
   FileText,
+  Gift,
   LayoutDashboard,
   Search,
   Settings,
+  Store,
+  Tags,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -21,6 +24,9 @@ export interface AdminNavItem {
  */
 export const ADMIN_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/offers', label: 'Freebies', icon: Gift },
+  { href: '/admin/categories', label: 'Categories', icon: Tags },
+  { href: '/admin/merchants', label: 'Merchants', icon: Store },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/subscriptions', label: 'Subscriptions', icon: CreditCard },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },

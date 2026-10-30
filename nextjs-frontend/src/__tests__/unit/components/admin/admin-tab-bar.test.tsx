@@ -58,12 +58,12 @@ describe('AdminTabBar', () => {
   });
 
   it('marks the current tab with aria-current', () => {
-    mocks.pathname = '/admin/subscriptions';
+    mocks.pathname = '/admin/offers/abc';
     render(<AdminTabBar />);
     const current = screen
       .getAllByRole('link')
       .filter((link) => link.getAttribute('aria-current') === 'page');
-    expect(current.map((link) => link.textContent)).toEqual(['Subscriptions']);
+    expect(current.map((link) => link.textContent)).toEqual(['Freebies']);
   });
 
   it('opens a dialog listing the remaining items and returns focus to More on Escape', async () => {

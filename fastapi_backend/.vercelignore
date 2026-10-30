@@ -1,0 +1,4 @@
+# Not part of the deployed bundle: tests (including tests/e2e_identity_server.py, a test-only fake sign-in), local env files, caches.
+tests/
+.env*
+__pycache__/

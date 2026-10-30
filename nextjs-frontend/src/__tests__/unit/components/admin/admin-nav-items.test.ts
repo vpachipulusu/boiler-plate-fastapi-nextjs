@@ -25,7 +25,20 @@ describe('admin nav items', () => {
     expect(ADMIN_TAB_ITEMS).toHaveLength(3);
   });
 
+  it('lists Freebies, Categories and Merchants after the dashboard', () => {
+    expect(ADMIN_NAV_ITEMS.slice(0, 4).map(({ href, label }) => [href, label])).toEqual([
+      ['/admin', 'Dashboard'],
+      ['/admin/offers', 'Freebies'],
+      ['/admin/categories', 'Categories'],
+      ['/admin/merchants', 'Merchants'],
+    ]);
+  });
+
   it.each([
+    ['/admin/offers/abc', '/admin/offers'],
+    ['/admin/offers/new', '/admin/offers'],
+    ['/admin/categories/c1', '/admin/categories'],
+    ['/admin/merchants', '/admin/merchants'],
     ['/admin', '/admin'],
     ['/admin/users', '/admin/users'],
     ['/admin/users/abc', '/admin/users'],

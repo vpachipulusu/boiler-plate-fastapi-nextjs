@@ -56,6 +56,12 @@ npm run test:e2e:local -- src/__tests__/e2e/catalogue-live.spec.ts
 Run the fixture specs without `E2E_LIVE_CATALOGUE`; they skip themselves when it is set. The live specs were
 written in FREEJ-21 but have not been run (no seeded backend existed yet).
 
+## Admin offers journey
+
+`admin-offers.spec.ts` (draft, verify, publish, see it live, unpublish) needs the live catalogue flags above and an
+admin session. Besides the Firebase test project it can run against a private database with a test-only identity
+server and two throwaway session values: see [admin-offers.md](admin-offers.md#journey-4-playwright).
+
 ## Setup before the first run
 
 Run it for user-facing changes and record the command and result in the PR ([workflow.md](workflow.md)).
