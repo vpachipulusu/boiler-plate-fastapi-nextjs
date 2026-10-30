@@ -32,6 +32,9 @@ export const ADMIN_USERS_PAGE_SIZE = 50;
 
 export { ADMIN_FORBIDDEN_MESSAGE, ADMIN_REQUEST_FAILED_MESSAGE, ADMIN_UNAVAILABLE_MESSAGE };
 export const ADMIN_USER_NOT_FOUND_MESSAGE = 'User not found';
+/** A 409 from the users API: the action is refused for that account (your own, or an admin you may not manage). */
+export const ADMIN_USER_CONFLICT_MESSAGE =
+  'That action is not allowed for this account. You cannot change your own account here.';
 
 /** Search text is capped before it reaches the API; the backend validates again. */
 const MAX_SEARCH_LENGTH = 100;

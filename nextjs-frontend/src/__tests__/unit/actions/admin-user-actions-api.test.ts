@@ -17,7 +17,12 @@ const mocks = vi.hoisted(() => ({
   banAdminUser: vi.fn(),
   unbanAdminUser: vi.fn(),
   logError: vi.fn(),
+  requireAdminSession: vi.fn(),
+  revalidatePath: vi.fn(),
 }));
+
+vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
+vi.mock('@/lib/api/admin-guard', () => ({ requireAdminSession: mocks.requireAdminSession }));
 
 vi.mock('@/lib/api/admin-users', async () => {
   const actual =
@@ -66,6 +71,7 @@ const fail = (status?: number) => ({ success: false as const, error: SECRET, sta
 describe('admin user actions (API-backed)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.requireAdminSession.mockResolvedValue({ ok: true });
   });
 
   it('getAllUsersAction maps users and computes pagination from the offset', async () => {
@@ -218,4 +224,122 @@ describe('admin user actions (API-backed)', () => {
       }
     }
   );
+
+  describe('server-side admin gate', () => {
+    const DENIED = {
+      ok: false,
+      error: 'You do not have permission to do that',
+      reason: 'not-admin',
+    };
+    const calls: Array<[string, () => Promise<{ success: boolean; error?: string }>]> = [
+      ['getAllUsersAction', () => getAllUsersAction()],
+      ['getUserByIdAction', () => getUserByIdAction('u1')],
+      ['updateUserAction', () => updateUserAction('u1', { bio: 'x' })],
+      ['deleteUserAction', () => deleteUserAction('u1')],
+      [
+        'grantAdminRoleAction',
+        () => grantAdminRoleAction('u1', { role: 'admin', permissions: ['users.read'] }),
+      ],
+      ['revokeAdminRoleAction', () => revokeAdminRoleAction('u1')],
+      ['banUserAction', () => banUserAction('u1', 'spam')],
+      ['unbanUserAction', () => unbanUserAction('u1')],
+    ];
+
+    it.each(calls)('%s refuses a non-admin and never calls the API', async (_name, call) => {
+      mocks.requireAdminSession.mockResolvedValue(DENIED);
+
+      const result = await call();
+
+      expect(result).toEqual({ success: false, error: DENIED.error });
+      for (const api of [
+        mocks.fetchAdminUsers,
+        mocks.fetchAdminUser,
+        mocks.patchAdminUser,
+        mocks.removeAdminUser,
+        mocks.grantAdminRole,
+        mocks.revokeAdminRole,
+        mocks.banAdminUser,
+        mocks.unbanAdminUser,
+      ]) {
+        expect(api).not.toHaveBeenCalled();
+      }
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ban and unban', () => {
+    it('banUserAction passes a trimmed reason and refreshes the users pages', async () => {
+      mocks.banAdminUser.mockResolvedValue(ok({}));
+
+      await banUserAction('user-1', '  spam  ');
+
+      expect(mocks.banAdminUser).toHaveBeenCalledWith('user-1', 'spam');
+      expect(mocks.revalidatePath).toHaveBeenCalledWith('/admin/users');
+      expect(mocks.revalidatePath).toHaveBeenCalledWith('/admin/users/user-1');
+    });
+
+    it('banUserAction sends no reason when it is blank', async () => {
+      mocks.banAdminUser.mockResolvedValue(ok({}));
+
+      await banUserAction('user-1', '   ');
+
+      expect(mocks.banAdminUser).toHaveBeenCalledWith('user-1', '');
+    });
+
+    it('banUserAction rejects a reason longer than the API allows without calling it', async () => {
+      const result = await banUserAction('user-1', 'x'.repeat(201));
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Keep the reason to 200 characters or fewer.');
+      expect(mocks.banAdminUser).not.toHaveBeenCalled();
+    });
+
+    it('unbanUserAction refreshes the users pages', async () => {
+      mocks.unbanAdminUser.mockResolvedValue(ok({}));
+
+      await unbanUserAction('user-1');
+
+      expect(mocks.revalidatePath).toHaveBeenCalledWith('/admin/users');
+      expect(mocks.revalidatePath).toHaveBeenCalledWith('/admin/users/user-1');
+    });
+
+    it.each([
+      ['banUserAction', () => banUserAction('u1'), mocks.banAdminUser],
+      ['unbanUserAction', () => unbanUserAction('u1'), mocks.unbanAdminUser],
+      ['updateUserAction', () => updateUserAction('u1', { bio: 'x' }), mocks.patchAdminUser],
+    ])('%s answers a 409 with a curated message and does not refresh', async (_n, call, api) => {
+      api.mockResolvedValue(fail(409));
+
+      const result = await call();
+
+      expect(result).toEqual({
+        success: false,
+        error:
+          'That action is not allowed for this account. You cannot change your own account here.',
+      });
+      expect(JSON.stringify(result)).not.toContain('SECRET');
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateUserAction validation', () => {
+    it('refreshes the users pages after a save', async () => {
+      mocks.patchAdminUser.mockResolvedValue(ok(DETAIL));
+
+      await updateUserAction('user-1', { displayName: 'Ada' });
+
+      expect(mocks.revalidatePath).toHaveBeenCalledWith('/admin/users/user-1');
+    });
+
+    it.each([
+      ['a non-http website', { website: 'javascript:alert(1)' }],
+      ['a malformed phone number', { phoneNumber: 'call me' }],
+      ['an over-long display name', { displayName: 'x'.repeat(101) }],
+    ])('rejects %s before calling the API', async (_label, data) => {
+      const result = await updateUserAction('user-1', data);
+
+      expect(result.success).toBe(false);
+      expect(mocks.patchAdminUser).not.toHaveBeenCalled();
+    });
+  });
 });

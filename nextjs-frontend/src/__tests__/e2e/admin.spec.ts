@@ -298,14 +298,9 @@ test.describe('Admin Dashboard', () => {
       }
     });
 
-    test('should display manage buttons for subscriptions', async ({ page }) => {
-      const manageBtn = page.getByRole('button', { name: /manage/i });
-      const hasManage = await manageBtn
-        .first()
-        .isVisible()
-        .catch(() => false);
-      // Manage buttons should exist if there are subscriptions
-      expect(hasManage || true).toBeTruthy();
+    test('should not show controls that do nothing', async ({ page }) => {
+      await expect(page.getByRole('button', { name: /^manage/i })).toHaveCount(0);
+      await expect(page.getByRole('columnheader', { name: /^actions$/i })).toHaveCount(0);
     });
   });
 

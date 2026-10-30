@@ -116,6 +116,8 @@ describe('admin user detail page', () => {
     expect(markup).toContain('ada@example.test');
     expect(markup).toContain('Mathematician');
     expect(markup).toContain('users.read');
+    expect(markup).toContain('href="/admin/users/user-1/edit"');
+    expect(markup).toContain('Edit user');
   });
 
   it('shows status pills and one h1, with a retry link on the error state', async () => {
@@ -396,14 +398,16 @@ describe('admin subscriptions page', () => {
     expect(markup).not.toContain('Org enterprise-0');
   });
 
-  it('labels the table and the manage buttons, and gives empty renewal dates text', async () => {
+  it('labels the table, has no inert Manage controls, and gives empty renewal dates text', async () => {
     const markup = html(await AdminSubscriptionsPage());
 
     for (const header of ['Organisation', 'Slug', 'Plan', 'Status', 'Renewal Date']) {
       expect(markup).toContain(`>${header}</th>`);
     }
     expect(markup).toContain('aria-label="Newest paid organisations"');
-    expect(markup).toContain('aria-label="Manage Org p1"');
+    expect(markup).not.toContain('>Manage<');
+    expect(markup).not.toContain('aria-label="Manage ');
+    expect(markup).not.toContain('>Actions</th>');
     expect(markup).toContain('<span class="sr-only">None</span>');
   });
 

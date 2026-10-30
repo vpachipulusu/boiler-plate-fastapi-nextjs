@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -17,7 +16,7 @@ export type SubscriptionRow = (SubscriptionsResult extends infer R
   ? Extract<R, { success: true }>
   : never)['data']['subscriptions'][number];
 
-const SUBSCRIPTION_COLUMNS = ['Organisation', 'Slug', 'Plan', 'Status', 'Renewal Date', 'Actions'];
+const SUBSCRIPTION_COLUMNS = ['Organisation', 'Slug', 'Plan', 'Status', 'Renewal Date'];
 
 export function SubscriptionsTable({ subscriptions }: { subscriptions: SubscriptionRow[] }) {
   return (
@@ -25,9 +24,7 @@ export function SubscriptionsTable({ subscriptions }: { subscriptions: Subscript
       <TableHeader>
         <TableRow>
           {SUBSCRIPTION_COLUMNS.map((column) => (
-            <TableHead key={column} className={column === 'Actions' ? 'text-right' : undefined}>
-              {column}
-            </TableHead>
+            <TableHead key={column}>{column}</TableHead>
           ))}
         </TableRow>
       </TableHeader>
@@ -50,11 +47,6 @@ export function SubscriptionsTable({ subscriptions }: { subscriptions: Subscript
               ) : (
                 <EmptyCell />
               )}
-            </TableCell>
-            <TableCell className="text-right">
-              <Button variant="ghost" size="sm" aria-label={`Manage ${subscription.name}`}>
-                Manage
-              </Button>
             </TableCell>
           </TableRow>
         ))}

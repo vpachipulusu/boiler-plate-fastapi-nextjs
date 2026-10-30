@@ -68,7 +68,12 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           <h1 className="text-3xl font-bold tracking-tight">User Details</h1>
           <p className="text-muted-foreground">Viewing information for {user.email}</p>
         </div>
-        <BackToUsers />
+        <div className="flex flex-wrap items-center gap-3">
+          <Button asChild>
+            <Link href={`${USERS_HREF}/${encodeURIComponent(user.id)}/edit`}>Edit user</Link>
+          </Button>
+          <BackToUsers />
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
