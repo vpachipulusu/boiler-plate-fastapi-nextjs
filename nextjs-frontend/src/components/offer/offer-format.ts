@@ -58,8 +58,9 @@ export function ctaConditions(
 ): string | null {
   if (offer.offerType === 'free_sample') {
     const { postage } = offer;
-    if (postage.kind === 'check_terms') return "Postage: check the brand's terms.";
-    return `Postage: ${postageText(postage).toLowerCase()}.`;
+    // The value after "Postage:" is capitalised like the card line ("Postage: Free", "Postage: Check terms").
+    if (postage.kind === 'check_terms') return "Postage: Check the brand's terms.";
+    return `Postage: ${postageText(postage)}.`;
   }
   if (offer.offerType === 'free_trial' && offer.requiresCard) {
     return 'A payment card is required to start.';
