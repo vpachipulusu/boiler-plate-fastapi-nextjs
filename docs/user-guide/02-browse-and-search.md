@@ -27,7 +27,7 @@ other filters.
 
 ## Step 2. Search
 
-1. Click the box that says "Search offers, brands or categories" in the page heading (or use the search box in
+1. Click the box that says "Search offers or brands" in the page heading (or use the search box in
    the header).
 2. Type a word, for example `tea`.
 3. Press **Enter** or click **Search**.

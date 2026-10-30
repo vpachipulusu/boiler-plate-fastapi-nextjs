@@ -63,6 +63,16 @@ describe('site-wide slogans', () => {
 
     expect(container.textContent).not.toMatch(/free thing/i);
   });
+
+  // FREEJ-42: the backend matches the search word against offer title, summary and brand name only
+  // (_search_condition in fastapi_backend/app/repositories/catalogue.py), never against categories.
+  it('the catalogue search placeholder names only what the search matches', () => {
+    render(<CatalogueHeader query={DEFAULT_QUERY} demo={false} />);
+
+    const box = screen.getByPlaceholderText('Search offers or brands');
+    expect(box).toBeInTheDocument();
+    expect(box.getAttribute('placeholder')).not.toMatch(/categor/i);
+  });
 });
 
 describe('alerts promises on the home page', () => {
