@@ -142,7 +142,7 @@ built on the server from `NEXT_PUBLIC_APP_URL` (required in production; Vercel p
 
 Admin pages need an admin grant in the backend. The first admin is granted in the database (SQL in
 [local-e2e.md](local-e2e.md)); after that an existing admin grants others through
-`POST /v1/admin/users/{user_id}/admin` (the Users page in the admin area).
+`PUT /v1/admin/users/{user_id}/admin` (the Users page in the admin area).
 
 ## The whole stack in Docker
 

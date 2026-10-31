@@ -57,7 +57,7 @@ otherwise only counted for the settings page.
 ## Access
 
 1. Sign in as an admin user. An existing admin grants admin rights to another user through
-   `POST /v1/admin/users/{user_id}/admin`; the first admin is granted in the backend database (see
+   `PUT /v1/admin/users/{user_id}/admin`; the first admin is granted in the backend database (see
    [local-e2e.md](local-e2e.md)).
 2. Open `/admin/settings`. The backend checks the `settings.read` permission, and every admin page and action verifies the
    admin on the server (the proxy cannot, see the Next.js proxy note in `.claude/CLAUDE.md`).
