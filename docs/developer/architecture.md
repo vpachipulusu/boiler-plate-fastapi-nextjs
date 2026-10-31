@@ -102,7 +102,7 @@ stale (pre-commit and CI).
   The frontend reads them for billing; it ships no organisation management page.
 - **Admin portal** (`src/app/(admin)/admin/`): `users`, `audit-logs`, `settings` (general, theme, feature flags),
   `seo` (placeholder), and with the billing module `subscriptions` and `analytics`. An admin needs an admin grant in
-  the backend (`POST /v1/admin/users/{user_id}/admin`). Admin actions are written to the audit log.
+  the backend (`PUT /v1/admin/users/{user_id}/admin`). Admin actions are written to the audit log.
 - **Billing module** (`src/app/actions/subscription-actions.ts`): `createCheckoutSessionAction` starts a Stripe
   Checkout session, the backend webhook (`POST /webhooks/stripe`, [backend-billing-webhook.md](backend-billing-webhook.md))
   updates the organisation's subscription, `createBillingPortalSessionAction` opens the billing portal. The pricing page

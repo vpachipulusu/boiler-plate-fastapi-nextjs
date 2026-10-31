@@ -15,7 +15,7 @@ subscriptions pages display.
 
 ## Value rules
 
-The code is upper case, as the admin settings page stores it (`USD`, `EUR`, ...), so it maps
+The code is upper case, as it is stored in `app_settings` (`USD`, `EUR`, ...), so it maps
 straight onto `CURRENCIES` in `nextjs-frontend/src/config/currencies.ts`. The stored value is
 trimmed and upper-cased. A missing row, a non-string value, or a code outside the supported
 list (`SUPPORTED_CURRENCIES` in `app/services/public_settings.py`, kept in step with
@@ -37,8 +37,9 @@ The server trims and upper-cases the stored code, so a stored `" eur"` is served
 
 ## Seeding
 
-The `app_settings` table exists since baseline `0001`. The `currency` row is written by the
-admin settings action. When it is absent the service default
+The `app_settings` table exists since baseline `0001`. Nothing in the app writes the `currency` row (the
+admin settings page is read-only, see [admin-settings.md](admin-settings.md)); a developer sets it in the
+database. When it is absent the service default
 applies, so no data migration or seed is needed for this endpoint.
 
 ## What is public

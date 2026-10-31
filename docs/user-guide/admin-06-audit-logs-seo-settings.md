@@ -108,9 +108,8 @@ not available yet." Under **System stats** it lists how many of each of these ex
 **Feature flags**, **Email templates**, **SEO entries**, **URL redirects**, **Audit log entries**, **Stripe events
 processed** and **Platform admins**. Use **Refresh** to reload.
 
-You cannot change the site name, currency, language, theme or feature flags from this page. (Developer notes in
-[admin-settings.md](../developer/admin-settings.md) describe editable General, Theme and Feature flag tabs. Those are
-not what the page does today.)
+You cannot change the site name, currency, language, theme or feature flags from this page. (The currency is
+currently set by a developer in the database; see [admin-settings.md](../developer/admin-settings.md).)
 
 ![The Settings page](images/admin-settings-d.png)
 

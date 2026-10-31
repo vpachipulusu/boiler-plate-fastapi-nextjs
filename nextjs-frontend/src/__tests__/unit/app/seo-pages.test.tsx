@@ -47,7 +47,7 @@ import CategoryPage, * as categoryRoute from '@/app/(public)/category/[slug]/pag
 import OfferPage, * as offerRoute from '@/app/(public)/freebies/[slug]/page';
 import * as freebiesRoute from '@/app/(public)/freebies/page';
 import HomePage, * as homeRoute from '@/app/(public)/page';
-import { metadata as alertsMetadata } from '@/app/(public)/alerts/page';
+import { generateMetadata as alertsGenerateMetadata } from '@/app/(public)/alerts/page';
 import { HomeSections } from '@/components/home/home-sections';
 import { JsonLd } from '@/components/seo/json-ld';
 import { OFFERS } from '@/lib/catalogue/fixtures';
@@ -102,6 +102,7 @@ describe('fixture-backed catalogue', () => {
   it('keeps the home page, /freebies and the alerts page out of search', async () => {
     expect((await homeMetadata()).robots).toEqual({ index: false });
     expect((await freebiesMetadata(search({}))).robots).toEqual({ index: false });
+    const alertsMetadata = await alertsGenerateMetadata();
     expect(alertsMetadata.robots).toEqual({ index: false });
     expect(alertsMetadata.alternates?.canonical).toBe('/alerts');
   });
@@ -190,8 +191,8 @@ describe('once the catalogue is API-backed', () => {
     expect(document.body.textContent).not.toMatch(/design preview|sample listings/i);
   });
 
-  it('keeps the alerts page noindex until its form is live', () => {
-    expect(alertsMetadata.robots).toEqual({ index: false });
+  it('keeps the alerts page noindex until its form is live', async () => {
+    expect((await alertsGenerateMetadata()).robots).toEqual({ index: false });
   });
 
   it('renders a real offer with no demo wording and a call to action that links through /go/', async () => {

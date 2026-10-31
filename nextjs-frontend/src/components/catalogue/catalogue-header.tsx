@@ -53,7 +53,7 @@ export function CatalogueHeader({ query, demo }: CatalogueHeaderProps) {
           id="catalogue-search"
           defaultValue={q}
           hiddenParams={carriedParams(query)}
-          placeholder="Search offers, brands or categories"
+          placeholder="Search offers or brands"
           className="w-full lg:max-w-xl"
         />
       </div>

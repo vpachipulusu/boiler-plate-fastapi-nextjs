@@ -1,282 +1,80 @@
 # Admin settings
 
-**Last updated:** 2026-10-12
-**Scope:** the admin settings area (`/admin/settings`). The "Ideas for later" are ideas, not planned work.
+**Last updated:** 2026-10-30
+**Scope:** the admin settings area (`/admin/settings`), and how the one platform setting the site reads, the
+currency, is stored and used. The "Ideas for later" are ideas, not planned work.
 
-## Overview
+## What the page does today
 
-This page describes the admin settings functionality, including currency and language configuration from the admin portal.
+`/admin/settings` is **read-only**. It shows system statistics and nothing can be edited from it: the page says
+"System statistics. Editing settings, flags and templates is not available yet."
 
-## Features
+- **Path:** `src/app/(admin)/admin/settings/page.tsx` (server component, `force-dynamic`).
+- **Data:** `fetchAdminSystemStats()` in `src/lib/api/admin-analytics.ts`, which calls
+  `GET /v1/admin/analytics/system` (permission `settings.read`; see
+  [backend-admin-analytics.md](backend-admin-analytics.md)).
+- **What it shows:** a "System stats" panel with the row counts of application settings, feature flags, email
+  templates, SEO entries, URL redirects, audit log entries, Stripe events processed (Stripe Billing module) and
+  platform admins. A **Refresh** button reloads it.
+- **When the stats cannot load:** a curated error with a **Retry** link back to `/admin/settings`; the status is
+  logged, the response body is not shown.
+- **Tests:** `src/__tests__/unit/app/admin-analytics-pages.test.tsx` (`admin settings page`) and the
+  `settings page shows the system stats` case in `src/__tests__/e2e/admin-analytics.spec.ts`.
 
-### 1. General Settings
+There are no General, Theme or Feature flag tabs, no settings form and no feature flag toggles, and no server action
+or backend route that writes `app_settings` or `feature_flags`. Earlier versions of this document described those;
+they came from the original template and are not in this codebase.
 
-The admin portal now includes a **General Settings** form with the following configurable options:
+## Currency
 
-#### Currency Settings
+The platform currency is the one setting the site reads from `app_settings` (key `currency`).
 
+- **Read path:** the backend serves it at `GET /v1/settings/currency` (see
+  [backend-public-settings.md](backend-public-settings.md)); the Next.js wrapper is `src/lib/api/settings.ts`.
 - **Default:** GBP (a UK product). The backend (`DEFAULT_CURRENCY` in `app/services/public_settings.py`) and the
   frontend (`DEFAULT_CURRENCY_CODE` in `src/config/currencies.ts`) both default to it when the setting is missing,
   unsupported or the lookup fails. Admin money is formatted by `src/lib/utils/format-money.ts` (en-GB; the currency
   the data carries; the GBP default is applied where the currency is looked up).
-- **Stripe prices:** Stripe prices must be in the platform currency (GBP unless the `currency` app setting says otherwise): a price in another currency is excluded from admin MRR and shown with the platform symbol on `/pricing`.
-- **9 Supported Currencies:**
-  - USD ($) - US Dollar
-  - EUR (€) - Euro
-  - GBP (£) - British Pound
-  - JPY (¥) - Japanese Yen
-  - AUD (A$) - Australian Dollar
-  - CAD (C$) - Canadian Dollar
-  - CHF (Fr) - Swiss Franc
-  - CNY (¥) - Chinese Yuan
-  - INR (₹) - Indian Rupee
-
-#### Language Settings
-
-- **11 Supported Languages:**
-  - English (en)
-  - Spanish (es)
-  - French (fr)
-  - German (de)
-  - Italian (it)
-  - Portuguese (pt)
-  - Japanese (ja)
-  - Chinese (zh)
-  - Korean (ko)
-  - Arabic (ar)
-  - Hindi (hi)
-
-#### Other Settings
-
-- **App Name**: Customize the application name
-- **Support Email**: Set the primary support contact email
-- **Default Timezone**: Configure the default timezone (currently UTC)
-
-### 2. Feature Flags
-
-Interactive feature flag management with toggle switches:
-
-- Enable/disable features across the platform
-- Real-time updates with optimistic UI
-- Success/error toast notifications
-- Audit logging for all changes
-
-## File Structure
-
-### Components Created
-
-#### 1. GeneralSettingsForm Component
-
-**Path**: `src/components/admin/general-settings-form.tsx`
-
-**Purpose**: Client-side form for managing general app settings
-
-**Key Features**:
-
-- Select components for currency and language
-- Input fields for app name, support email, and timezone
-- Saves to `AppSettings` table via `upsertAppSettingAction`
-- Toast notifications for success/error states
-
-#### 2. FeatureFlagsList Component
-
-**Path**: `src/components/admin/feature-flags-list.tsx`
-
-**Purpose**: Interactive list for toggling feature flags
-
-**Key Features**:
-
-- Switch toggles for each feature flag
-- Optimistic UI updates
-- Server action integration with `toggleFeatureFlagAction`
-- Disabled state during updates
-- Visual badges for enabled flags
-
-### Server Actions
-
-**Path**: `src/app/actions/admin/settings-actions.ts`
-
-**Key Functions**:
-
-- `upsertAppSettingAction`: Create/update app settings
-- `toggleFeatureFlagAction`: Toggle feature flag enabled state
-- `getAllAppSettingsAction`: Fetch all settings by category
-- `getAllFeatureFlagsAction`: Fetch all feature flags
-
-All actions include:
-
-- Admin authentication verification
-- Permission checking (`settings.write`, `settings.read`)
-- Audit logging
-- Error handling
-
-### Admin Settings Page
-
-**Path**: `src/app/(admin)/admin/settings/page.tsx`
-
-**Structure**: Tabbed interface with 5 sections:
-
-1. **General**: App configuration (name, email, timezone, currency, language)
-2. **Theme**: Theme settings (`theme-settings-form.tsx`)
-3. **Feature Flags**: Feature flag toggles
-4. **Email Templates**: Email template management
-5. **Pricing**: Pricing configuration
+- **Supported codes:** the nine in `CURRENCIES` (`src/config/currencies.ts`): USD, EUR, GBP, JPY, AUD, CAD, CHF, CNY
+  and INR. The backend list `SUPPORTED_CURRENCIES` must stay equal to it (a test fails when they drift). Any other
+  stored value reads as GBP.
+- **Stripe prices:** Stripe prices must be in the platform currency (GBP unless the `currency` app setting says
+  otherwise): a price in another currency is excluded from admin MRR and shown with the platform symbol on `/pricing`.
+- **How to change it today:** there is no admin screen or API for it. The `currency` row in the `app_settings` table
+  (`value` is JSONB holding a string such as `"EUR"`, `category` `general`) can only be inserted or updated directly
+  in the database by a developer. The change shows on the site within about a minute (the 60 s in-memory cache in
+  `src/lib/api/settings.ts`), plus the stale-while-revalidate window described in the backend note.
+- **Not settings:** the site name comes from `NEXT_PUBLIC_APP_NAME` / `APP_NAME` and the support email from
+  `NEXT_PUBLIC_SUPPORT_EMAIL` (see `src/config/site.ts` and the `.env.example` files), not from this area. There is
+  no language setting: the site is English only.
 
 ## Data storage
 
-The `app_settings` and `feature_flags` tables live in the backend database; the page reads and writes them through the backend settings API (see [backend-public-settings.md](backend-public-settings.md) for the public read).
+The `app_settings`, `feature_flags` and `email_templates` tables exist in the backend database from baseline `0001`
+([platform-models.md](platform-models.md)). Today only `app_settings.currency` is read by the site; the tables are
+otherwise only counted for the settings page.
 
-## Setup Instructions
+## Access
 
-### 1. Access Admin Settings
-
-1. Sign in as an admin user. An existing admin grants admin rights to another user through `POST /v1/admin/users/{user_id}/admin`; the first admin is granted in the backend database (see [local-e2e.md](local-e2e.md))
-2. Navigate to `/admin/settings`
-3. Configure currency and language from the "General" tab
-4. Toggle feature flags from the "Feature Flags" tab
-
-## Usage Examples
-
-### Updating Currency
-
-```typescript
-// Admin can select from dropdown in UI
-// Or programmatically:
-await upsertAppSettingAction({
-  key: 'currency',
-  value: 'EUR',
-  category: 'general',
-  description: 'Default currency for pricing and billing',
-});
-```
-
-### Updating Language
-
-```typescript
-await upsertAppSettingAction({
-  key: 'language',
-  value: 'es',
-  category: 'general',
-  description: 'Default language for the application interface',
-});
-```
-
-### Toggling Feature Flags
-
-```typescript
-// Toggle via admin UI or programmatically:
-await toggleFeatureFlagAction('oauth_signup');
-```
+1. Sign in as an admin user. An existing admin grants admin rights to another user through
+   `PUT /v1/admin/users/{user_id}/admin`; the first admin is granted in the backend database (see
+   [local-e2e.md](local-e2e.md)).
+2. Open `/admin/settings`. The backend checks the `settings.read` permission, and every admin page and action verifies the
+   admin on the server (the proxy cannot, see the Next.js proxy note in `.claude/CLAUDE.md`).
 
 ## Ideas for later
 
-### 1. Global Currency Application
+These are not built and not scheduled.
 
-Apply the saved currency setting to pricing pages:
-
-- Read currency from `AppSettings` in pricing components
-- Format prices using the selected currency symbol
-- Update Stripe integration to use selected currency
-
-### 2. Global Language Application
-
-Apply the saved language setting throughout the app:
-
-- Set up i18n/internationalization
-- Load language files based on selected language
-- Update UI text dynamically
-
-## Security Considerations
-
-1. **Admin-Only Access**: All settings actions require admin authentication
-2. **Permission-Based**: Actions check for specific permissions (e.g., `settings.write`)
-3. **Audit Logging**: All changes are logged in the `AuditLog` table
-4. **Validation**: Input validation using Zod schemas
-
-## Testing
-
-### Manual Testing Checklist
-
-- [ ] Access `/admin/settings` as admin user
-- [ ] Change currency from USD to EUR
-- [ ] Verify setting persists on page reload
-- [ ] Change language from English to Spanish
-- [ ] Verify setting persists on page reload
-- [ ] Toggle feature flag on/off
-- [ ] Verify toast notifications appear
-- [ ] Check audit logs for all changes
-- [ ] Test as non-admin user (should be denied access)
-
-### Automated Testing
-
-Create integration tests for:
-
-- Settings CRUD operations
-- Feature flag toggles
-- Permission validation
-- Audit log creation
+- **Edit the currency from the admin area.** A `settings.write` route with audit logging, a server action in
+  `src/app/actions/admin/` and a form on this page, validated against `SUPPORTED_CURRENCIES`. Until then the
+  database row is the only way to set it.
+- **Feature flags and email templates.** The tables exist and are counted; there is no toggle or editor.
+- **Translations.** Only worth doing once the site has a second language.
 
 ## Troubleshooting
 
-### Settings Not Saving
-
-1. Check browser console for errors
-2. Verify admin user has `settings.write` permission
-3. Check database connection
-4. Review server action error responses
-
-### Feature Flags Not Toggling
-
-1. Verify `toggleFeatureFlagAction` is imported correctly
-2. Check network tab for failed requests
-3. Ensure feature flag exists in database
-4. Verify admin permissions
-
-### Currency/Language Not Applied Globally
-
-1. Implement global read functions for settings
-2. Create utility functions to format currency
-3. Set up i18n for language support
-
-## API Reference
-
-### Server Actions
-
-#### `upsertAppSettingAction(data)`
-
-Creates or updates an app setting.
-
-**Parameters**:
-
-```typescript
-{
-  key: string;
-  value: any;
-  category: string;
-  description?: string;
-}
-```
-
-**Returns**: `Promise<AdminSettingsActionResponse>`
-
-#### `toggleFeatureFlagAction(name)`
-
-Toggles a feature flag's enabled state.
-
-**Parameters**: `name: string`
-
-**Returns**: `Promise<AdminSettingsActionResponse>`
-
-#### `getAllAppSettingsAction(category?)`
-
-Fetches all app settings, optionally filtered by category.
-
-**Parameters**: `category?: string`
-
-**Returns**: `Promise<AdminSettingsActionResponse>`
-
-#### `getAllFeatureFlagsAction()`
-
-Fetches all feature flags.
-
-**Returns**: `Promise<AdminSettingsActionResponse>`
+- **The currency did not change.** Check the row's `value` is a supported code as a JSON string (a lower-case or
+  padded code is trimmed and upper-cased; anything else reads as GBP), then allow the cache time above.
+- **The page shows an error with Retry.** The system stats call failed: check the backend is reachable and the
+  signed-in user has an admin record with `settings.read`.
