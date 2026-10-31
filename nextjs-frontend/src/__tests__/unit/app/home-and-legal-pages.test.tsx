@@ -5,7 +5,10 @@ vi.mock('@/app/globals.css', () => ({}));
 
 import HomePage, { generateMetadata as homeGenerateMetadata } from '@/app/(public)/page';
 import { HomeSections } from '@/components/home/home-sections';
-import AboutPage, { metadata as aboutMetadata } from '@/app/(public)/about/page';
+import AboutPage, {
+  dynamic as aboutDynamic,
+  metadata as aboutMetadata,
+} from '@/app/(public)/about/page';
 import PrivacyPage, { metadata as privacyMetadata } from '@/app/(public)/privacy/page';
 import CookiesPage, { metadata as cookiesMetadata } from '@/app/(public)/cookies/page';
 import TermsPage, { metadata as termsMetadata } from '@/app/(public)/terms/page';
@@ -244,6 +247,25 @@ describe('about page copy follows the alerts and catalogue switches (FREEJ-42)',
       expect(text).toMatch(/nothing can be entered or saved there until they launch/i);
       expect(text).not.toMatch(/does not save anything yet|try the alerts form|sign up for email/i);
       expect(screen.getByRole('link', { name: 'alerts page' })).toHaveAttribute('href', '/alerts');
+    }
+  );
+
+  // The page reads server-only switches, so it must be rendered per request; a prerendered page would bake
+  // in whatever the build saw.
+  it('is rendered on every request', () => {
+    expect(aboutDynamic).toBe('force-dynamic');
+  });
+
+  it.each([
+    { alerts: 'true', catalogue: 'api' },
+    { alerts: '', catalogue: 'fixture' },
+  ])(
+    'makes no compliance claims, counts or verification stamps (alerts "$alerts", catalogue "$catalogue")',
+    async (env) => {
+      const text = await aboutText(env);
+
+      expect(text).not.toMatch(COMPLIANCE_CLAIMS);
+      expect(text).not.toMatch(/\d|verified by|guaranteed/i);
     }
   );
 
