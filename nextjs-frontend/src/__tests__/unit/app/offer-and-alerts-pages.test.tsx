@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 
 const notFoundMock = vi.fn(() => {
@@ -26,7 +26,7 @@ import { CatalogueUnavailableError } from '@/lib/catalogue/errors';
 import { OFFERS } from '@/lib/catalogue/fixtures';
 import { formatIsoDate } from '@/components/offer/offer-format';
 import OfferPage, * as offerRoute from '@/app/(public)/freebies/[slug]/page';
-import AlertsPage from '@/app/(public)/alerts/page';
+import AlertsPage, { generateMetadata as alertsMetadata } from '@/app/(public)/alerts/page';
 
 const generateMetadata = offerRoute.generateMetadata;
 
@@ -137,32 +137,61 @@ describe('offer detail page', () => {
 });
 
 describe('alerts page', () => {
-  async function renderAlerts() {
+  const HEADING = { level: 1, name: 'Good things. Straight to you.' } as const;
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  async function renderAlerts(flag: 'true' | '') {
+    vi.stubEnv('ALERTS_FORM_LIVE', flag);
     render(await AlertsPage());
   }
 
-  it('shows the promise heading and, until alerts are open, a plain notice and no form', async () => {
-    await renderAlerts();
+  it('closed: shows the promise heading and a plain notice, with no form', async () => {
+    await renderAlerts('');
 
-    expect(
-      screen.getByRole('heading', { level: 1, name: 'Good things. Straight to you.' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', HEADING)).toBeInTheDocument();
     expect(screen.getByText(/alerts aren.t open yet/i)).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: /interested in/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /send me free alerts/i })).toBeNull();
     expect(screen.queryByText(/something went wrong/i)).toBeNull();
   });
 
-  it('shows a retryable alert instead of the form when the categories cannot be read', async () => {
+  it('open: shows the form with the categories', async () => {
+    await renderAlerts('true');
+
+    expect(screen.getByRole('group', { name: /interested in/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /send me free alerts/i })).toBeInTheDocument();
+    expect(screen.queryByText(/alerts aren.t open yet/i)).toBeNull();
+  });
+
+  it('is indexable only while open', async () => {
+    vi.stubEnv('ALERTS_FORM_LIVE', 'true');
+    expect((await alertsMetadata()).robots).not.toEqual({ index: false });
+    vi.stubEnv('ALERTS_FORM_LIVE', '');
+    expect((await alertsMetadata()).robots).toEqual({ index: false });
+  });
+
+  it('closed: still says alerts are not open when the categories cannot be read, and does not ask for them', async () => {
     catalogueMocks.categories.mockRejectedValue(new CatalogueUnavailableError());
 
-    await renderAlerts();
+    await renderAlerts('');
+
+    expect(screen.getByText(/alerts aren.t open yet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/the alerts form is not loading/i)).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(catalogueMocks.categories).not.toHaveBeenCalled();
+  });
+
+  it('open: shows a retryable alert instead of the form when the categories cannot be read', async () => {
+    catalogueMocks.categories.mockRejectedValue(new CatalogueUnavailableError());
+
+    await renderAlerts('true');
 
     expect(screen.getByRole('alert')).toHaveTextContent(/could not load the categories/i);
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: /interested in/i })).toBeNull();
-    expect(
-      screen.getByRole('heading', { level: 1, name: 'Good things. Straight to you.' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', HEADING)).toBeInTheDocument();
   });
 });

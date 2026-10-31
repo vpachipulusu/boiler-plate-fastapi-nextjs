@@ -17,6 +17,12 @@ async function loadPage(live: boolean) {
   return import('@/app/(public)/alerts/page');
 }
 
+/** Metadata is built per request, so the switch is read when it is asked for, not when the module loads. */
+async function robotsFor(live: boolean) {
+  const { generateMetadata } = await loadPage(live);
+  return (await generateMetadata()).robots;
+}
+
 describe('alerts page switch (ALERTS_FORM_LIVE)', () => {
   it('shows the form with one checkbox per category and starts empty when the switch is true', async () => {
     const { default: AlertsPage } = await loadPage(true);
@@ -30,11 +36,8 @@ describe('alerts page switch (ALERTS_FORM_LIVE)', () => {
   });
 
   it('is indexable only when the switch is true', async () => {
-    const live = await loadPage(true);
-    const off = await loadPage(false);
-
-    expect(live.metadata.robots).not.toEqual({ index: false });
-    expect(off.metadata.robots).toEqual({ index: false });
+    expect(await robotsFor(true)).not.toEqual({ index: false });
+    expect(await robotsFor(false)).toEqual({ index: false });
   });
 
   it.each(['', 'false', '1', 'TRUE'])('stays closed for ALERTS_FORM_LIVE=%j', async (value) => {

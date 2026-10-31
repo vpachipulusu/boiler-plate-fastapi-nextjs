@@ -7,27 +7,29 @@ import { getCategories, settle } from '@/lib/catalogue';
 import { listingRobots, openGraphFor } from '@/lib/seo/metadata';
 
 /**
- * Alerts are open only when ALERTS_FORM_LIVE=true is set (server-only, read when the server starts). Set it
- * once a real email provider is configured in production (ADR-012). Until then the page shows a plain "not
- * open yet" notice instead of the form, stays noindex, and the backend refuses sign-ups as a last line.
+ * Alerts are open only when ALERTS_FORM_LIVE=true is set (server-only, read on each request through
+ * `isAlertsFormLive`, so the About page agrees). Set it once a real email provider is configured in
+ * production (ADR-012). Until then the page shows a plain "not open yet" notice instead of the form, does not
+ * load the categories, stays noindex, and the backend refuses sign-ups as a last line.
  */
-const ALERTS_FORM_LIVE = isAlertsFormLive();
 
 const ALERTS_TITLE = 'Free alerts';
 const ALERTS_DESCRIPTION =
   'Choose the freebie categories you care about and how often you want to hear about them.';
 
-export const metadata: Metadata = {
-  title: ALERTS_TITLE,
-  description: ALERTS_DESCRIPTION,
-  alternates: { canonical: '/alerts' },
-  openGraph: openGraphFor({
+export async function generateMetadata(): Promise<Metadata> {
+  return {
     title: ALERTS_TITLE,
     description: ALERTS_DESCRIPTION,
-    path: '/alerts',
-  }),
-  robots: listingRobots({ indexable: ALERTS_FORM_LIVE }),
-};
+    alternates: { canonical: '/alerts' },
+    openGraph: openGraphFor({
+      title: ALERTS_TITLE,
+      description: ALERTS_DESCRIPTION,
+      path: '/alerts',
+    }),
+    robots: listingRobots({ indexable: isAlertsFormLive() }),
+  };
+}
 
 // Dynamic, like the other catalogue pages: a build never reaches the catalogue, and a request that cannot
 // reach it shows an error instead of failing the page.
@@ -35,7 +37,9 @@ export const dynamic = 'force-dynamic';
 
 /** No query string is read: an address must never travel in a page address, so nothing is prefilled. */
 export default async function AlertsPage() {
-  const categories = await settle(getCategories());
+  const live = isAlertsFormLive();
+  // Closed: the form shows only its notice, so there is nothing to load and a catalogue outage cannot hide it.
+  const categories = live ? await settle(getCategories()) : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-14">
@@ -68,10 +72,12 @@ export default async function AlertsPage() {
           </div>
         </section>
         <section className="px-6 py-10 sm:px-10 sm:py-12">
-          {categories.ok ? (
+          {categories === null ? (
+            <AlertsForm categories={[]} live={false} />
+          ) : categories.ok ? (
             <AlertsForm
               categories={categories.data.map(({ slug, name }) => ({ slug, name }))}
-              live={ALERTS_FORM_LIVE}
+              live
             />
           ) : (
             <InlineError
