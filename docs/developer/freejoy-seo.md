@@ -10,7 +10,7 @@ the pages under `src/app/(public)/`.
 
 Indexability is decided by where the catalogue comes from (`getCatalogueSource()`) and by each offer's
 own data, not by a flag in the code. The one exception is `ALERTS_FORM_LIVE` (an environment variable read in
-`src/app/(public)/alerts/page.tsx`, unset by default): a deliberate pre-launch hold that keeps `/alerts` noindex
+`src/app/(public)/alerts/page.tsx`, unset by default; the About page reads it too, through `src/lib/alerts/live.ts`): a deliberate pre-launch hold that keeps `/alerts` noindex
 and shows a "not open yet" notice instead of the form, until `ALERTS_FORM_LIVE=true` is set (read when the
 server starts) once an email provider is configured. The page has no catalogue data to decide from.
 
